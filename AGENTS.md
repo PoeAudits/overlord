@@ -38,14 +38,15 @@ Overlord is a CLI-based project management system for organizing Python, TypeScr
 ├── overlord             # Main dispatcher
 ├── overlord-new         # Create new project
 ├── overlord-add         # Register existing project
+├── overlord-init        # Initialize existing directory
 ├── overlord-list        # List projects
 ├── overlord-mv          # Move project status
+├── overlord-rm          # Remove project from registry
 ├── overlord-open        # Open workspace
 ├── overlord-info        # Show project details
-├── overlord-sync        # Propagate Makefiles to projects
+├── overlord-sync        # Propagate files to projects
 ├── overlord-config      # Edit registry.json
 ├── overlord-edit        # Edit overlord scripts
-├── overlord-migrate-init # One-time migration script
 └── AGENTS.md            # This documentation
 ```
 
@@ -149,6 +150,50 @@ overlord add mylib . --lib --alias ml --alias mylib        # Add current dir as 
 overlord add overlord ~/bin/overlord --force                # Overwrite existing
 ```
 
+### overlord init
+
+Initialize existing directory with Overlord configuration.
+
+```bash
+overlord init [path] [options]
+
+# Arguments:
+path      # Directory to initialize (default: current directory)
+
+# Language flags (optional, auto-detects if omitted):
+--py, --python       # Python project
+--ts, --typescript   # TypeScript project
+--sol, --solidity    # Solidity project
+--base               # Force base configuration (no language-specific)
+
+# Options:
+--lib                # Set status to 'lib' instead of 'active'
+--name <name>        # Override project name (default: directory basename)
+--alias <alias>      # Add alias (can be used multiple times)
+--no-git             # Skip git initialization
+--force              # Overwrite existing .tmux.local, Makefile, and opencode.jsonc
+```
+
+**Language auto-detection:**
+- `pyproject.toml` or `setup.py` → Python
+- `package.json` → TypeScript
+- `foundry.toml` → Solidity
+- None detected → base
+
+**Creates:**
+- `.tmux.local` - Workspace configuration
+- `Makefile` - Build/test commands
+- `opencode.jsonc` - AI assistant instructions
+- `thoughts/` - Development artifact structure (never overwritten)
+
+**Examples:**
+```bash
+overlord init                              # Initialize current dir, auto-detect language
+overlord init /path/to/repo --py           # Initialize specific path as Python
+overlord init --base --name myproj         # Force base config with custom name
+overlord init --ts --alias mp --lib        # TypeScript library with alias
+```
+
 ### overlord mv
 
 Move project between status categories. Physically moves directory and updates registry.
@@ -166,6 +211,39 @@ status    # Target: active, lib, or archive
 overlord mv myproject active     # Activate project
 overlord mv myproject lib        # Mark as library
 overlord mv myproject archive    # Archive project
+```
+
+### overlord rm
+
+Remove project from the Overlord registry (does not delete project files).
+
+```bash
+overlord rm <name> [options]
+
+# Arguments:
+name      # Project name, alias, or absolute path
+
+# Options:
+--force, -f          # Skip confirmation prompt
+--help, -h           # Show this help
+```
+
+**Lookup priority:**
+1. Project name
+2. Project alias
+3. Absolute path
+
+**Behavior:**
+- Creates registry backup at `~/.config/overlord/registry.json.bak`
+- Shows confirmation prompt with project details (unless `--force` is used)
+- Removes project from registry only; project files remain on disk
+
+**Examples:**
+```bash
+overlord rm myproject                 # Remove by name
+overlord rm mp                        # Remove by alias
+overlord rm /path/to/project          # Remove by path
+overlord rm myproject --force          # Skip confirmation
 ```
 
 ### overlord open
@@ -237,7 +315,8 @@ overlord edit
 
 ### overlord sync
 
-Propagate Makefile templates to all registered projects. Combines `base.mk` (git worktree commands) with language-specific templates into each project's `Makefile`.
+Propagate Makefile templates, opencode.jsonc, and thoughts/ directory to all registered projects.
+By default, only creates files if missing. Use `--force` to overwrite existing files.
 
 ```bash
 overlord sync [options]
@@ -248,17 +327,19 @@ overlord sync [options]
 --sol, --solidity    # Sync only Solidity projects
 
 # Options:
+--force              # Overwrite existing Makefile and opencode.jsonc
 --dry-run            # Preview changes without writing files
 ```
 
 **Examples:**
 ```bash
-overlord sync                  # Sync all projects
+overlord sync                  # Sync all projects (create if missing)
+overlord sync --force          # Sync all projects (overwrite existing)
 overlord sync --py             # Sync only Python projects
 overlord sync --dry-run        # Preview what would be synced
 ```
 
-**Note:** Sync overwrites existing Makefiles. Projects can customize behavior via `.worktree-setup.sh` script which is called by `make worktree-setup`.
+**Note:** Sync respects existing files by default. The `thoughts/` directory is always additive - existing content is never removed, even with `--force`.
 
 ## Makefile System
 
@@ -320,6 +401,55 @@ uv sync
 # or: pnpm install
 # or: forge install
 ```
+
+## OpenCode Configuration
+
+Each project gets an `opencode.jsonc` file with language-specific AI assistant instructions:
+
+### Python Projects
+```json
+{
+  "instructions": ["~/.config/opencode/CODING.md", "~/.config/opencode/PYTHON_STYLEGUIDE.md"]
+}
+```
+
+### TypeScript Projects
+```json
+{
+  "instructions": ["~/.config/opencode/CODING.md", "~/.config/opencode/TYPESCRIPT_STYLEGUIDE.md"]
+}
+```
+
+### Solidity Projects
+```json
+{
+  "instructions": ["~/.config/opencode/CODING.md", "~/.config/opencode/SOLIDITY_STYLEGUIDE.md"]
+}
+```
+
+### Base Projects (non-language-specific)
+```json
+{
+  "instructions": []
+}
+```
+
+Templates are stored in `~/.config/overlord/templates/opencode-{lang}.jsonc`.
+
+## Thoughts Directory
+
+Each project gets a `thoughts/` directory for organizing development artifacts:
+
+```
+thoughts/
+├── tickets/    # Feature requests, bug reports
+├── plans/      # Implementation plans
+├── logs/       # Development logs, decisions
+├── research/   # Research notes, findings
+└── handoffs/   # Context for session handoffs
+```
+
+This directory is always created additively - existing content is never removed during initialization, sync, or any other operation, regardless of the `--force` flag.
 
 ## Registry Format
 
