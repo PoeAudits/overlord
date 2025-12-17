@@ -22,9 +22,9 @@ Usage:
   overlord list [options]
 
 Options:
-  --py, --python       Show only Python projects
-  --ts, --typescript   Show only TypeScript projects
-  --sol, --solidity    Show only Solidity projects
+  --py, --python       Filter to Python projects
+  --ts, --typescript   Filter to TypeScript projects
+  --sol, --solidity    Filter to Solidity projects
   --active             Show active projects (default)
   --lib                Show library projects
   --archive            Show archived projects
@@ -32,16 +32,26 @@ Options:
   --json               Output as JSON
   --help               Show this help
 
+Language Filtering:
+  Multiple language flags can be combined with OR logic:
+    --py --ts          Show Python OR TypeScript projects
+
+  Language flags combine with status filters using AND logic:
+    --py --all         Show all Python projects (any status)
+    --py --archive     Show archived Python projects only
+
 Examples:
   overlord list                  # Active projects (default)
   overlord list --all            # All projects
   overlord list --py --lib       # Python libraries
+  overlord list --py --ts        # Python and TypeScript active projects
+  overlord list --py --ts --all  # All Python and TypeScript projects
   overlord list --archive        # Archived projects
 EOF
 }
 
 # Parse arguments
-FILTER_LANG=""
+FILTER_LANG=()
 FILTER_STATUS="active"
 OUTPUT_JSON=false
 
@@ -49,13 +59,13 @@ parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --py|--python)
-        FILTER_LANG="python"
+        FILTER_LANG+=("python")
         ;;
       --ts|--typescript)
-        FILTER_LANG="typescript"
+        FILTER_LANG+=("typescript")
         ;;
       --sol|--solidity)
-        FILTER_LANG="solidity"
+        FILTER_LANG+=("solidity")
         ;;
       --active)
         FILTER_STATUS="active"
@@ -128,13 +138,35 @@ list_projects() {
   if [[ -n "$FILTER_STATUS" ]]; then
     conditions+=(".value.status == \"$FILTER_STATUS\"")
   fi
-  if [[ -n "$FILTER_LANG" ]]; then
-    conditions+=(".value.lang == \"$FILTER_LANG\"")
+  
+  # Build language filter with OR logic for multiple languages
+  if [[ ${#FILTER_LANG[@]} -gt 0 ]]; then
+    local lang_conditions=()
+    for lang in "${FILTER_LANG[@]}"; do
+      lang_conditions+=(".value.lang == \"$lang\"")
+    done
+    # Join with " or " using a loop
+    local lang_filter=""
+    for i in "${!lang_conditions[@]}"; do
+      if [[ $i -eq 0 ]]; then
+        lang_filter="${lang_conditions[$i]}"
+      else
+        lang_filter="$lang_filter or ${lang_conditions[$i]}"
+      fi
+    done
+    conditions+=("($lang_filter)")
   fi
 
   if [[ ${#conditions[@]} -gt 0 ]]; then
-    local filter_str
-    filter_str=$(IFS=" and "; echo "${conditions[*]}")
+    # Join with " and " using a loop
+    local filter_str=""
+    for i in "${!conditions[@]}"; do
+      if [[ $i -eq 0 ]]; then
+        filter_str="${conditions[$i]}"
+      else
+        filter_str="$filter_str and ${conditions[$i]}"
+      fi
+    done
     jq_filter="$jq_filter | select($filter_str)"
   fi
 
@@ -146,7 +178,8 @@ list_projects() {
 
   # Table output
   local projects
-  projects=$(jq -r "$jq_filter | [.key, .value.lang, .value.status, .value.path, (.value.aliases // [] | join(\",\"))] | @tsv" "$OVERLORD_REGISTRY" 2>/dev/null || true)
+  # Sort by status: active (1), lib (2), archive (3)
+  projects=$(jq -r "$jq_filter | . + {sort_order: (if .value.status == \"active\" then 1 elif .value.status == \"lib\" then 2 elif .value.status == \"archive\" then 3 else 4 end)} | [.key, .value.lang, .value.status, .value.path, (.value.aliases // [] | join(\",\")), .sort_order] | @tsv" "$OVERLORD_REGISTRY" 2>/dev/null | sort -t$'\t' -k6,6n | cut -f1-5 || true)
 
   if [[ -z "$projects" ]]; then
     local status_msg=""
@@ -154,16 +187,18 @@ list_projects() {
       status_msg=" with status '$FILTER_STATUS'"
     fi
     local lang_msg=""
-    if [[ -n "$FILTER_LANG" ]]; then
-      lang_msg=" for language '$FILTER_LANG'"
+    if [[ ${#FILTER_LANG[@]} -gt 0 ]]; then
+      local lang_list
+      lang_list=$(IFS=", "; echo "${FILTER_LANG[*]}")
+      lang_msg=" for language(s) '$lang_list'"
     fi
     echo -e "${DIM}No projects found${status_msg}${lang_msg}.${NC}"
     return
   fi
 
   # Header
-  printf "${DIM}%-20s %-6s %-8s %-40s %s${NC}\n" "NAME" "LANG" "STATUS" "PATH" "ALIASES"
-  printf "${DIM}%-20s %-6s %-8s %-40s %s${NC}\n" "----" "----" "------" "----" "-------"
+  printf "${DIM}%-40s %-6s %-8s %-40s %s${NC}\n" "NAME" "LANG" "STATUS" "PATH" "ALIASES"
+  printf "${DIM}%-40s %-6s %-8s %-40s %s${NC}\n" "----" "----" "------" "----" "-------"
 
   # Projects
   while IFS=$'\t' read -r name lang status path aliases; do
@@ -179,7 +214,7 @@ list_projects() {
       display_path="...${display_path: -37}"
     fi
 
-    printf "${sc}%-20s ${lc}%-6s ${sc}%-8s ${NC}%-40s ${DIM}%s${NC}\n" \
+    printf "${sc}%-40s ${lc}%-6s ${sc}%-8s ${NC}%-40s ${DIM}%s${NC}\n" \
       "$name" "$lang_s" "$status" "$display_path" "$aliases"
   done <<< "$projects"
 }
