@@ -138,31 +138,31 @@ remove_from_registry() {
 ## Success Criteria
 
 ### Automated Verification
-- [ ] Script is executable: `chmod +x ~/bin/overlord/overlord-rm`
-- [ ] `overlord rm --help` shows usage text
-- [ ] `overlord rm nonexistent` shows error "Project not found: nonexistent"
-- [ ] `overlord rm testproject` prompts for confirmation with project details
-- [ ] Entering 'n' at confirmation leaves project in registry
-- [ ] Entering 'y' at confirmation removes project from registry
-- [ ] `overlord rm testproject -f` removes without prompt
-- [ ] `overlord list --all` doesn't show removed project
-- [ ] Registry backup created at `~/.config/overlord/registry.json.bak`
+- [x] Script is executable: `chmod +x ~/bin/overlord/overlord-rm`
+- [x] `overlord rm --help` shows usage text
+- [x] `overlord rm nonexistent` shows error "Project not found: nonexistent"
+- [x] `overlord rm testproject` prompts for confirmation with project details
+- [x] Entering 'n' at confirmation leaves project in registry
+- [x] Entering 'y' at confirmation removes project from registry
+- [x] `overlord rm testproject -f` removes without prompt
+- [x] `overlord list --all` doesn't show removed project
+- [x] Registry backup created at `~/.config/overlord/registry.json.bak`
 
 ### Manual Verification
-- [ ] Confirmation shows colored output (language and status colors match `overlord-info`)
-- [ ] Project directory still exists on disk after removal
-- [ ] Can verify with `ls /path/to/project` that files are untouched
-- [ ] Registry is valid JSON after removal (can run `jq . registry.json`)
-- [ ] Removal by project name works
-- [ ] Removal by project alias works  
-- [ ] Removal by absolute path works
-- [ ] Error message clear when project not found
+- [x] Confirmation shows colored output (language and status colors match `overlord-info`)
+- [x] Project directory still exists on disk after removal
+- [x] Can verify with `ls /path/to/project` that files are untouched
+- [x] Registry is valid JSON after removal (can run `jq . registry.json`)
+- [x] Removal by project name works
+- [x] Removal by project alias works  
+- [x] Removal by absolute path works
+- [x] Error message clear when project not found
 
 ### Edge Cases
-- [ ] Removing non-existent project shows clear error
-- [ ] Removing when registry.json is empty or missing projects key
-- [ ] Force flag works correctly
-- [ ] Confirmation defaults to 'N' (pressing Enter doesn't remove)
+- [x] Removing non-existent project shows clear error
+- [x] Removing when registry.json is empty or missing projects key
+- [x] Force flag works correctly
+- [x] Confirmation defaults to 'N' (pressing Enter doesn't remove)
 
 ---
 

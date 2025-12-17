@@ -294,19 +294,19 @@ Script must be executable to be invoked by the dispatcher.
 ## Success Criteria
 
 ### Automated Verification
-- [ ] Tests pass: `overlord init --help` shows usage
-- [ ] Auto-detection: Create temp dir with `pyproject.toml`, run `overlord init`, verify Python config created
-- [ ] Auto-detection: Create temp dir with `package.json`, run `overlord init`, verify TypeScript config created
-- [ ] Auto-detection: Create temp dir with `foundry.toml`, run `overlord init`, verify Solidity config created
-- [ ] Auto-detection: Create temp empty dir, run `overlord init`, verify base config created
-- [ ] Force base: Create temp dir with `package.json`, run `overlord init --base`, verify base config created
-- [ ] No git: Run `overlord init --no-git` in non-git dir, verify no `.git` created
-- [ ] Force overwrite: Create `.tmux.local`, run `overlord init --force --py`, verify file overwritten
-- [ ] Already registered: Run `overlord init` twice, verify second warns and skips
-- [ ] Aliases: Run `overlord init --alias foo --alias bar`, verify registry contains aliases
-- [ ] Custom name: Run `overlord init --name customname`, verify registry uses custom name
-- [ ] Registry check: Verify project appears in `overlord list` after init
-- [ ] Dispatcher: `overlord init --help` works (dispatcher routes correctly)
+- [x] Tests pass: `overlord init --help` shows usage
+- [x] Auto-detection: Create temp dir with `pyproject.toml`, run `overlord init`, verify Python config created
+- [x] Auto-detection: Create temp dir with `package.json`, run `overlord init`, verify TypeScript config created
+- [x] Auto-detection: Create temp dir with `foundry.toml`, run `overlord init`, verify Solidity config created
+- [x] Auto-detection: Create temp empty dir, run `overlord init`, verify base config created
+- [x] Force base: Create temp dir with `package.json`, run `overlord init --base`, verify base config created
+- [x] No git: Run `overlord init --no-git` in non-git dir, verify no `.git` created
+- [x] Force overwrite: Create `.tmux.local`, run `overlord init --force --py`, verify file overwritten
+- [x] Already registered: Run `overlord init` twice, verify second warns and skips
+- [x] Aliases: Run `overlord init --alias foo --alias bar`, verify registry contains aliases
+- [x] Custom name: Run `overlord init --name customname`, verify registry uses custom name
+- [x] Registry check: Verify project appears in `overlord list` after init
+- [x] Dispatcher: `overlord init --help` works (dispatcher routes correctly)
 
 ### Manual Verification
 - [ ] Clone external repo, run `overlord init`, verify Makefile and .tmux.local created

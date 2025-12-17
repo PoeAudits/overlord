@@ -2,7 +2,7 @@
 type: feature
 priority: high
 created: 2025-12-16T00:00:00Z
-status: planned
+status: implemented
 tags: [cli, registry, initialization, project-setup]
 keywords: [overlord-init, initialize, setup, makefile, tmux.local, git init, base.tmux]
 patterns: [language detection, template copying, git initialization, registry registration]
