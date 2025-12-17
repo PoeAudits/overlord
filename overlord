@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# overlord: Project management system dispatcher
+# Routes commands to overlord-* subcommands
+
+set -euo pipefail
+
+OVERLORD_VERSION="1.0.0"
+OVERLORD_CONFIG="${OVERLORD_CONFIG:-$HOME/.config/overlord}"
+OVERLORD_REGISTRY="$OVERLORD_CONFIG/registry.json"
+OVERLORD_BIN="${OVERLORD_BIN:-$HOME/bin/overlord}"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+usage() {
+  cat <<EOF
+overlord - Project Management System v${OVERLORD_VERSION}
+
+Usage:
+  overlord                              List active projects (default)
+  overlord new <name> --py|--ts|--sol   Create new project
+  overlord list [options]               List projects
+  overlord mv <name> <status>           Move project (active|lib|archive)
+  overlord open [name]                  Open workspace (fzf if no match)
+  overlord info <name>                  Show project details
+  overlord sync [options]               Propagate Makefile templates to projects
+  overlord config                       Edit registry.json in \$EDITOR
+  overlord edit                         Edit overlord scripts in \$EDITOR
+  overlord --help                       Show this help
+  overlord --version                    Show version
+
+Subcommand Help:
+  overlord <command> --help             Show help for specific command
+
+Environment:
+  OVERLORD_CONFIG   Config directory (default: ~/.config/overlord)
+  OVERLORD_BIN      Scripts directory (default: ~/bin)
+  EDITOR            Editor for config/edit commands
+EOF
+}
+
+# Ensure config directory exists
+ensure_config() {
+  if [[ ! -d "$OVERLORD_CONFIG" ]]; then
+    mkdir -p "$OVERLORD_CONFIG/tmux"
+  fi
+  if [[ ! -f "$OVERLORD_REGISTRY" ]]; then
+    echo '{"projects":{}}' > "$OVERLORD_REGISTRY"
+  fi
+}
+
+main() {
+  ensure_config
+
+  # No arguments: run list (active projects)
+  if [[ $# -eq 0 ]]; then
+    exec "$OVERLORD_BIN/overlord-list"
+  fi
+
+  case "$1" in
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --version|-v)
+      echo "overlord v${OVERLORD_VERSION}"
+      exit 0
+      ;;
+    new|list|mv|open|info|sync|config|edit)
+      local cmd="$1"
+      shift
+      local subcmd="$OVERLORD_BIN/overlord-$cmd"
+      if [[ -x "$subcmd" ]]; then
+        exec "$subcmd" "$@"
+      else
+        echo -e "${RED}Error:${NC} Subcommand not found: $subcmd" >&2
+        exit 1
+      fi
+      ;;
+    *)
+      echo -e "${RED}Error:${NC} Unknown command: $1" >&2
+      echo ""
+      usage >&2
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"

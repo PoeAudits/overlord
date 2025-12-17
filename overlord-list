@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+# overlord-list: List projects from registry
+# Default: shows active projects only
+
+set -euo pipefail
+
+OVERLORD_CONFIG="${OVERLORD_CONFIG:-$HOME/.config/overlord}"
+OVERLORD_REGISTRY="$OVERLORD_CONFIG/registry.json"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+DIM='\033[2m'
+NC='\033[0m'
+
+usage() {
+  cat <<'EOF'
+Usage:
+  overlord list [options]
+
+Options:
+  --py, --python       Show only Python projects
+  --ts, --typescript   Show only TypeScript projects
+  --sol, --solidity    Show only Solidity projects
+  --active             Show active projects (default)
+  --lib                Show library projects
+  --archive            Show archived projects
+  --all                Show all projects regardless of status
+  --json               Output as JSON
+  --help               Show this help
+
+Examples:
+  overlord list                  # Active projects (default)
+  overlord list --all            # All projects
+  overlord list --py --lib       # Python libraries
+  overlord list --archive        # Archived projects
+EOF
+}
+
+# Parse arguments
+FILTER_LANG=""
+FILTER_STATUS="active"
+OUTPUT_JSON=false
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --py|--python)
+        FILTER_LANG="python"
+        ;;
+      --ts|--typescript)
+        FILTER_LANG="typescript"
+        ;;
+      --sol|--solidity)
+        FILTER_LANG="solidity"
+        ;;
+      --active)
+        FILTER_STATUS="active"
+        ;;
+      --lib)
+        FILTER_STATUS="lib"
+        ;;
+      --archive)
+        FILTER_STATUS="archive"
+        ;;
+      --all)
+        FILTER_STATUS=""
+        ;;
+      --json)
+        OUTPUT_JSON=true
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        echo -e "${RED}Error:${NC} Unknown option: $1" >&2
+        exit 1
+        ;;
+    esac
+    shift
+  done
+}
+
+# Get status color
+status_color() {
+  case "$1" in
+    active)  echo -e "${GREEN}" ;;
+    lib)     echo -e "${CYAN}" ;;
+    archive) echo -e "${DIM}" ;;
+    *)       echo -e "${NC}" ;;
+  esac
+}
+
+# Get language color
+lang_color() {
+  case "$1" in
+    python)     echo -e "${BLUE}" ;;
+    typescript) echo -e "${YELLOW}" ;;
+    solidity)   echo -e "${RED}" ;;
+    *)          echo -e "${NC}" ;;
+  esac
+}
+
+# Format language short name
+lang_short() {
+  case "$1" in
+    python)     echo "py" ;;
+    typescript) echo "ts" ;;
+    solidity)   echo "sol" ;;
+    *)          echo "$1" ;;
+  esac
+}
+
+list_projects() {
+  if [[ ! -f "$OVERLORD_REGISTRY" ]]; then
+    echo -e "${YELLOW}No registry found.${NC} Run 'overlord new' to create a project."
+    exit 0
+  fi
+
+  local jq_filter='.projects | to_entries[]'
+  
+  # Build filter conditions
+  local conditions=()
+  if [[ -n "$FILTER_STATUS" ]]; then
+    conditions+=(".value.status == \"$FILTER_STATUS\"")
+  fi
+  if [[ -n "$FILTER_LANG" ]]; then
+    conditions+=(".value.lang == \"$FILTER_LANG\"")
+  fi
+
+  if [[ ${#conditions[@]} -gt 0 ]]; then
+    local filter_str
+    filter_str=$(IFS=" and "; echo "${conditions[*]}")
+    jq_filter="$jq_filter | select($filter_str)"
+  fi
+
+  # JSON output
+  if [[ "$OUTPUT_JSON" == true ]]; then
+    jq "[$jq_filter]" "$OVERLORD_REGISTRY"
+    return
+  fi
+
+  # Table output
+  local projects
+  projects=$(jq -r "$jq_filter | [.key, .value.lang, .value.status, .value.path, (.value.aliases // [] | join(\",\"))] | @tsv" "$OVERLORD_REGISTRY" 2>/dev/null || true)
+
+  if [[ -z "$projects" ]]; then
+    local status_msg=""
+    if [[ -n "$FILTER_STATUS" ]]; then
+      status_msg=" with status '$FILTER_STATUS'"
+    fi
+    local lang_msg=""
+    if [[ -n "$FILTER_LANG" ]]; then
+      lang_msg=" for language '$FILTER_LANG'"
+    fi
+    echo -e "${DIM}No projects found${status_msg}${lang_msg}.${NC}"
+    return
+  fi
+
+  # Header
+  printf "${DIM}%-20s %-6s %-8s %-40s %s${NC}\n" "NAME" "LANG" "STATUS" "PATH" "ALIASES"
+  printf "${DIM}%-20s %-6s %-8s %-40s %s${NC}\n" "----" "----" "------" "----" "-------"
+
+  # Projects
+  while IFS=$'\t' read -r name lang status path aliases; do
+    local lc sc
+    lc=$(lang_color "$lang")
+    sc=$(status_color "$status")
+    local lang_s
+    lang_s=$(lang_short "$lang")
+    
+    # Truncate path for display
+    local display_path="$path"
+    if [[ ${#display_path} -gt 40 ]]; then
+      display_path="...${display_path: -37}"
+    fi
+
+    printf "${sc}%-20s ${lc}%-6s ${sc}%-8s ${NC}%-40s ${DIM}%s${NC}\n" \
+      "$name" "$lang_s" "$status" "$display_path" "$aliases"
+  done <<< "$projects"
+}
+
+main() {
+  parse_args "$@"
+  list_projects
+}
+
+main "$@"

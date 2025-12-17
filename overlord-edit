@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# overlord-edit: Open overlord scripts directory in editor
+
+set -euo pipefail
+
+OVERLORD_BIN="${OVERLORD_BIN:-$HOME/bin/overlord}"
+EDITOR="${EDITOR:-nvim}"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  overlord edit
+
+Opens the overlord scripts directory in your editor ($EDITOR or nvim).
+
+Use this to:
+  - View or modify overlord scripts
+  - Check AGENTS.md documentation
+
+The scripts are located at: ~/bin/overlord*
+EOF
+}
+
+main() {
+  if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    usage
+    exit 0
+  fi
+
+  # Open directory containing overlord scripts
+  exec "$EDITOR" "$OVERLORD_BIN"
+}
+
+main "$@"

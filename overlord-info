@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+# overlord-info: Show detailed information about a project
+
+set -euo pipefail
+
+OVERLORD_CONFIG="${OVERLORD_CONFIG:-$HOME/.config/overlord}"
+OVERLORD_REGISTRY="$OVERLORD_CONFIG/registry.json"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+DIM='\033[2m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+usage() {
+  cat <<'EOF'
+Usage:
+  overlord info <name>
+
+Arguments:
+  name      Project name or alias
+
+Output:
+  Displays project metadata from registry including:
+  - Name, language, status
+  - Path and aliases
+  - Creation date
+  - Directory existence check
+
+Examples:
+  overlord info myproject
+EOF
+}
+
+log_error() { echo -e "${RED}✗${NC} $*" >&2; }
+
+# Find project by name or alias
+find_project() {
+  local query="$1"
+  
+  # Try exact name match
+  local result
+  result=$(jq -r --arg q "$query" '
+    .projects | to_entries[] | 
+    select(.key == $q) | 
+    .key
+  ' "$OVERLORD_REGISTRY" 2>/dev/null || true)
+  
+  if [[ -n "$result" ]]; then
+    echo "$result"
+    return 0
+  fi
+  
+  # Try alias match
+  result=$(jq -r --arg q "$query" '
+    .projects | to_entries[] | 
+    select(.value.aliases != null and (.value.aliases[] == $q)) | 
+    .key
+  ' "$OVERLORD_REGISTRY" 2>/dev/null || true)
+  
+  if [[ -n "$result" ]]; then
+    echo "$result"
+    return 0
+  fi
+  
+  return 1
+}
+
+# Get project details
+get_project_info() {
+  local name="$1"
+  jq --arg name "$name" '.projects[$name]' "$OVERLORD_REGISTRY"
+}
+
+# Format status with color
+format_status() {
+  case "$1" in
+    active)  echo -e "${GREEN}$1${NC}" ;;
+    lib)     echo -e "${CYAN}$1${NC}" ;;
+    archive) echo -e "${DIM}$1${NC}" ;;
+    *)       echo "$1" ;;
+  esac
+}
+
+# Format language with color
+format_lang() {
+  case "$1" in
+    python)     echo -e "${BLUE}$1${NC}" ;;
+    typescript) echo -e "${YELLOW}$1${NC}" ;;
+    solidity)   echo -e "${RED}$1${NC}" ;;
+    *)          echo "$1" ;;
+  esac
+}
+
+main() {
+  if [[ $# -lt 1 || "$1" == "--help" || "$1" == "-h" ]]; then
+    usage
+    exit 0
+  fi
+
+  local query="$1"
+  local project_name
+
+  if ! project_name=$(find_project "$query"); then
+    log_error "Project not found: $query"
+    exit 1
+  fi
+
+  local info
+  info=$(get_project_info "$project_name")
+
+  local lang status path created aliases
+  lang=$(echo "$info" | jq -r '.lang')
+  status=$(echo "$info" | jq -r '.status')
+  path=$(echo "$info" | jq -r '.path')
+  created=$(echo "$info" | jq -r '.created // "unknown"')
+  aliases=$(echo "$info" | jq -r '(.aliases // []) | join(", ")')
+
+  echo ""
+  echo -e "${BOLD}Project: ${NC}$project_name"
+  echo -e "${DIM}─────────────────────────────────────${NC}"
+  echo -e "${BOLD}Language:${NC} $(format_lang "$lang")"
+  echo -e "${BOLD}Status:${NC}   $(format_status "$status")"
+  echo -e "${BOLD}Path:${NC}     $path"
+  echo -e "${BOLD}Created:${NC}  $created"
+  
+  if [[ -n "$aliases" ]]; then
+    echo -e "${BOLD}Aliases:${NC}  $aliases"
+  else
+    echo -e "${BOLD}Aliases:${NC}  ${DIM}(none)${NC}"
+  fi
+  
+  echo ""
+
+  # Check directory status
+  if [[ -d "$path" ]]; then
+    echo -e "${GREEN}✓${NC} Directory exists"
+    
+    # Check for git
+    if [[ -d "$path/.git" ]]; then
+      echo -e "${GREEN}✓${NC} Git repository"
+    else
+      echo -e "${DIM}○${NC} No git repository"
+    fi
+    
+    # Check for tmux config
+    if [[ -f "$path/.tmux.local" ]]; then
+      echo -e "${GREEN}✓${NC} Has .tmux.local"
+    else
+      echo -e "${DIM}○${NC} No .tmux.local"
+    fi
+  else
+    echo -e "${RED}✗${NC} Directory does not exist!"
+    echo -e "${YELLOW}!${NC} Registry may be out of sync"
+  fi
+
+  echo ""
+}
+
+main "$@"

@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# overlord-config: Open registry.json in editor
+
+set -euo pipefail
+
+OVERLORD_CONFIG="${OVERLORD_CONFIG:-$HOME/.config/overlord}"
+OVERLORD_REGISTRY="$OVERLORD_CONFIG/registry.json"
+EDITOR="${EDITOR:-nvim}"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  overlord config
+
+Opens the registry.json file in your editor ($EDITOR or nvim).
+
+Use this to:
+  - Add or modify project aliases
+  - Manually edit project metadata
+  - Fix registry issues
+
+The registry is located at: ~/.config/overlord/registry.json
+EOF
+}
+
+main() {
+  if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    usage
+    exit 0
+  fi
+
+  if [[ ! -f "$OVERLORD_REGISTRY" ]]; then
+    echo "Creating registry at $OVERLORD_REGISTRY"
+    mkdir -p "$OVERLORD_CONFIG"
+    echo '{"projects":{}}' > "$OVERLORD_REGISTRY"
+  fi
+
+  exec "$EDITOR" "$OVERLORD_REGISTRY"
+}
+
+main "$@"

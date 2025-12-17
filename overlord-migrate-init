@@ -1,0 +1,335 @@
+#!/usr/bin/env bash
+# overlord-migrate-init: One-time migration script to reorganize existing projects
+# Default: --dry-run (shows what would happen)
+# Requires --execute to actually perform migration
+
+set -euo pipefail
+
+OVERLORD_CONFIG="${OVERLORD_CONFIG:-$HOME/.config/overlord}"
+OVERLORD_REGISTRY="$OVERLORD_CONFIG/registry.json"
+WORK_DIR="$HOME/Work"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+DIM='\033[2m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+DRY_RUN=true
+
+usage() {
+  cat <<'EOF'
+overlord-migrate-init: Migrate existing projects to new directory structure
+
+Usage:
+  overlord-migrate-init [--dry-run]     Preview changes (default)
+  overlord-migrate-init --execute       Actually perform migration
+  overlord-migrate-init --help          Show this help
+
+The migration will:
+  1. Create new directory structure (active/, libs/, archive/ under each language)
+  2. Move all projects to archive/ by default
+  3. Move poe-*-utils projects to libs/
+  4. Generate registry.json from migrated projects
+  5. Backup existing registry before changes
+
+After migration:
+  - Use 'overlord mv <name> active' to activate projects you're working on
+  - Use 'overlord config' to add aliases
+  - Use 'overlord list --all' to see all projects
+
+IMPORTANT: Review the --dry-run output before running --execute!
+EOF
+}
+
+log_info() { echo -e "${BLUE}>${NC} $*"; }
+log_success() { echo -e "${GREEN}✓${NC} $*"; }
+log_error() { echo -e "${RED}✗${NC} $*" >&2; }
+log_warning() { echo -e "${YELLOW}!${NC} $*"; }
+log_action() {
+  if [[ "$DRY_RUN" == true ]]; then
+    echo -e "${DIM}[dry-run]${NC} $*"
+  else
+    echo -e "${GREEN}[execute]${NC} $*"
+  fi
+}
+
+# Parse arguments
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --dry-run)
+        DRY_RUN=true
+        ;;
+      --execute)
+        DRY_RUN=false
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        log_error "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+    shift
+  done
+}
+
+# Language directories mapping
+declare -A LANG_DIRS=(
+  ["Python"]="python"
+  ["Typescript"]="typescript"
+  ["Solidity"]="solidity"
+)
+
+# Determine target status for a project
+get_target_status() {
+  local name="$1"
+  
+  # poe-*-utils go to libs
+  if [[ "$name" =~ ^poe-.*-utils$ ]]; then
+    echo "lib"
+    return
+  fi
+  
+  # Everything else goes to archive
+  echo "archive"
+}
+
+# Get status directory name
+get_status_dir() {
+  case "$1" in
+    active)  echo "active" ;;
+    lib)     echo "libs" ;;
+    archive) echo "archive" ;;
+  esac
+}
+
+# Create directory structure
+create_directory_structure() {
+  log_info "Creating directory structure..."
+  
+  for lang_dir in Python Typescript Solidity; do
+    for status in active libs archive; do
+      local target="$WORK_DIR/$lang_dir/$status"
+      if [[ ! -d "$target" ]]; then
+        log_action "mkdir -p $target"
+        if [[ "$DRY_RUN" == false ]]; then
+          mkdir -p "$target"
+        fi
+      fi
+    done
+  done
+  
+  echo ""
+}
+
+# Backup registry
+backup_registry() {
+  if [[ -f "$OVERLORD_REGISTRY" ]]; then
+    local backup="$OVERLORD_REGISTRY.pre-migration.$(date +%Y%m%d_%H%M%S)"
+    log_action "Backup registry to $backup"
+    if [[ "$DRY_RUN" == false ]]; then
+      cp "$OVERLORD_REGISTRY" "$backup"
+    fi
+  fi
+}
+
+# Initialize new registry
+init_registry() {
+  log_action "Initialize new registry"
+  if [[ "$DRY_RUN" == false ]]; then
+    mkdir -p "$OVERLORD_CONFIG"
+    echo '{"projects":{}}' > "$OVERLORD_REGISTRY"
+  fi
+}
+
+# Add project to registry
+add_to_registry() {
+  local name="$1"
+  local lang="$2"
+  local status="$3"
+  local path="$4"
+  local date
+  date=$(date +%Y-%m-%d)
+  
+  if [[ "$DRY_RUN" == false ]]; then
+    local tmp_file
+    tmp_file=$(mktemp)
+    
+    jq --arg name "$name" \
+       --arg lang "$lang" \
+       --arg status "$status" \
+       --arg path "$path" \
+       --arg date "$date" \
+       '.projects[$name] = {
+         "lang": $lang,
+         "status": $status,
+         "path": $path,
+         "created": $date,
+         "aliases": []
+       }' "$OVERLORD_REGISTRY" > "$tmp_file"
+    
+    mv "$tmp_file" "$OVERLORD_REGISTRY"
+  fi
+}
+
+# Scan and migrate projects
+migrate_projects() {
+  log_info "Scanning existing projects..."
+  echo ""
+  
+  local project_count=0
+  local lib_count=0
+  local archive_count=0
+  
+  for lang_dir in Python Typescript Solidity; do
+    local lang="${LANG_DIRS[$lang_dir]}"
+    local source_dir="$WORK_DIR/$lang_dir"
+    
+    if [[ ! -d "$source_dir" ]]; then
+      continue
+    fi
+    
+    echo -e "${BOLD}$lang_dir projects:${NC}"
+    
+    # Find all directories (excluding new structure dirs and hidden)
+    for project_path in "$source_dir"/*/; do
+      [[ ! -d "$project_path" ]] && continue
+      
+      local project_name
+      project_name=$(basename "$project_path")
+      
+      # Skip new structure directories
+      if [[ "$project_name" == "active" || "$project_name" == "libs" || "$project_name" == "archive" ]]; then
+        continue
+      fi
+      
+      # Skip hidden directories
+      if [[ "$project_name" == .* ]]; then
+        continue
+      fi
+      
+      local target_status
+      target_status=$(get_target_status "$project_name")
+      local status_dir
+      status_dir=$(get_status_dir "$target_status")
+      local target_path="$WORK_DIR/$lang_dir/$status_dir/$project_name"
+      
+      # Display migration plan
+      local status_color
+      case "$target_status" in
+        lib)     status_color="${CYAN}" ;;
+        archive) status_color="${DIM}" ;;
+        *)       status_color="${NC}" ;;
+      esac
+      
+      echo -e "  ${status_color}$project_name${NC} -> $status_dir/"
+      log_action "  mv $project_path -> $target_path"
+      
+      # Perform migration
+      if [[ "$DRY_RUN" == false ]]; then
+        if [[ -d "$target_path" ]]; then
+          log_warning "  Target exists, skipping: $target_path"
+        else
+          mv "$project_path" "$target_path"
+          add_to_registry "$project_name" "$lang" "$target_status" "$target_path"
+        fi
+      else
+        # Simulate registry addition in dry-run
+        add_to_registry "$project_name" "$lang" "$target_status" "$target_path"
+      fi
+      
+       ((++project_count))
+       if [[ "$target_status" == "lib" ]]; then
+         ((++lib_count))
+       else
+         ((++archive_count))
+       fi
+    done
+    
+    echo ""
+  done
+  
+  # Summary
+  echo -e "${BOLD}Migration Summary:${NC}"
+  echo -e "  Total projects: $project_count"
+  echo -e "  To libs/:       ${CYAN}$lib_count${NC}"
+  echo -e "  To archive/:    ${DIM}$archive_count${NC}"
+  echo ""
+}
+
+# Handle files in root Work directory
+check_root_files() {
+  local root_files=()
+  for item in "$WORK_DIR"/*; do
+    if [[ -f "$item" ]]; then
+      root_files+=("$item")
+    fi
+  done
+  
+  if [[ ${#root_files[@]} -gt 0 ]]; then
+    log_warning "Files found in $WORK_DIR root (not migrated):"
+    for f in "${root_files[@]}"; do
+      echo "  - $(basename "$f")"
+    done
+    echo ""
+  fi
+}
+
+main() {
+  parse_args "$@"
+  
+  echo ""
+  echo -e "${BOLD}Overlord Migration Script${NC}"
+  echo -e "${DIM}═══════════════════════════════════════${NC}"
+  
+  if [[ "$DRY_RUN" == true ]]; then
+    echo -e "${YELLOW}Mode: DRY RUN (no changes will be made)${NC}"
+    echo -e "${DIM}Run with --execute to perform migration${NC}"
+  else
+    echo -e "${RED}Mode: EXECUTE (changes will be made!)${NC}"
+  fi
+  echo ""
+  
+  # Backup existing registry
+  backup_registry
+  echo ""
+  
+  # Create directory structure
+  create_directory_structure
+  
+  # Initialize registry (only in execute mode, or create temp for dry-run counting)
+  if [[ "$DRY_RUN" == false ]]; then
+    init_registry
+  fi
+  
+  # Migrate projects
+  migrate_projects
+  
+  # Check for root files
+  check_root_files
+  
+  if [[ "$DRY_RUN" == true ]]; then
+    echo -e "${YELLOW}This was a dry run. No changes were made.${NC}"
+    echo -e "Review the output above, then run:"
+    echo -e "  ${BOLD}overlord-migrate-init --execute${NC}"
+  else
+    echo -e "${GREEN}Migration complete!${NC}"
+    echo ""
+    echo "Next steps:"
+    echo "  1. Run 'overlord list --all' to see all projects"
+    echo "  2. Run 'overlord mv <name> active' for projects you're working on"
+    echo "  3. Run 'overlord config' to add aliases"
+  fi
+  
+  echo ""
+}
+
+main "$@"

@@ -1,0 +1,263 @@
+#!/usr/bin/env bash
+# overlord-open: Open project workspace with tmux
+# Uses fzf for fuzzy search when no exact match found
+# Only opens active and lib projects (archived projects must be moved first)
+
+set -euo pipefail
+
+OVERLORD_CONFIG="${OVERLORD_CONFIG:-$HOME/.config/overlord}"
+OVERLORD_REGISTRY="$OVERLORD_CONFIG/registry.json"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+DIM='\033[2m'
+NC='\033[0m'
+
+usage() {
+  cat <<'EOF'
+Usage:
+  overlord open [name]
+
+Arguments:
+  name      Project name or alias (optional)
+
+Behavior:
+  - No argument: Launch fzf picker with active/lib projects
+  - Exact match: Open project immediately
+  - No exact match: Launch fzf pre-filtered with query
+  - Archived projects cannot be opened (must move to active first)
+
+Examples:
+  overlord open              # Interactive picker
+  overlord open myproject    # Open exact match
+  overlord open mypr         # Fuzzy search if no exact match
+EOF
+}
+
+log_info() { echo -e "${BLUE}>${NC} $*"; }
+log_success() { echo -e "${GREEN}✓${NC} $*"; }
+log_error() { echo -e "${RED}✗${NC} $*" >&2; }
+log_warning() { echo -e "${YELLOW}!${NC} $*"; }
+
+# Find project by exact name or alias
+find_project_exact() {
+  local query="$1"
+  
+  # Try exact name match
+  local result
+  result=$(jq -r --arg q "$query" '
+    .projects | to_entries[] | 
+    select(.key == $q) | 
+    [.key, .value.lang, .value.status, .value.path] | @tsv
+  ' "$OVERLORD_REGISTRY" 2>/dev/null || true)
+  
+  if [[ -n "$result" ]]; then
+    echo "$result"
+    return 0
+  fi
+  
+  # Try alias match
+  result=$(jq -r --arg q "$query" '
+    .projects | to_entries[] | 
+    select(.value.aliases != null and (.value.aliases[] == $q)) | 
+    [.key, .value.lang, .value.status, .value.path] | @tsv
+  ' "$OVERLORD_REGISTRY" 2>/dev/null || true)
+  
+  if [[ -n "$result" ]]; then
+    echo "$result"
+    return 0
+  fi
+  
+  return 1
+}
+
+# Get all openable projects (active and lib only)
+get_openable_projects() {
+  jq -r '
+    .projects | to_entries[] | 
+    select(.value.status == "active" or .value.status == "lib") |
+    "\(.key)\t\(.value.lang)\t\(.value.status)\t\(.value.path)"
+  ' "$OVERLORD_REGISTRY" 2>/dev/null || true
+}
+
+# Format project for fzf display
+format_for_fzf() {
+  local projects="$1"
+  while IFS=$'\t' read -r name lang status path; do
+    [[ -z "$name" ]] && continue
+    local lang_short
+    case "$lang" in
+      python)     lang_short="py" ;;
+      typescript) lang_short="ts" ;;
+      solidity)   lang_short="sol" ;;
+      *)          lang_short="$lang" ;;
+    esac
+    printf "%-20s [%s] %-7s %s\n" "$name" "$lang_short" "$status" "$path"
+  done <<< "$projects"
+}
+
+# Run fzf picker
+run_fzf_picker() {
+  local query="${1:-}"
+  local projects
+  projects=$(get_openable_projects)
+  
+  if [[ -z "$projects" ]]; then
+    log_error "No active or lib projects found"
+    log_info "Create a project with 'overlord new' or activate archived projects with 'overlord mv'"
+    exit 1
+  fi
+  
+  local formatted
+  formatted=$(format_for_fzf "$projects")
+  
+  local fzf_args=(
+    --height=40%
+    --reverse
+    --header="Select project (active/lib only)"
+    --prompt="project> "
+  )
+  
+  if [[ -n "$query" ]]; then
+    fzf_args+=(--query="$query")
+  fi
+  
+  local selection
+  selection=$(echo "$formatted" | fzf "${fzf_args[@]}" 2>/dev/null || true)
+  
+  if [[ -z "$selection" ]]; then
+    exit 0
+  fi
+  
+  # Extract project name (first field)
+  echo "$selection" | awk '{print $1}'
+}
+
+# Create or attach to tmux session
+create_or_attach_session() {
+  local session="$1"
+  local project_dir="$2"
+  shift 2
+  local args=("$@")
+
+  # Attach if session exists
+  if tmux has-session -t "$session" 2>/dev/null; then
+    log_info "Attaching to existing session: $session"
+    if [[ -n "${TMUX-}" ]]; then
+      exec tmux switch-client -t "$session"
+    else
+      exec tmux attach -t "$session"
+    fi
+  fi
+
+  log_info "Creating new session: $session"
+  log_info "Directory: $project_dir"
+
+  # Create session
+  tmux new-session -d -s "$session" -c "$project_dir" -n base
+
+  # Check for local tmux config
+  local local_rc="$project_dir/.tmux.local"
+  local mode="override"
+
+  if [[ -f "$local_rc" ]]; then
+    local maybe_mode
+    maybe_mode=$(grep -E '^[[:space:]]*MODE=' "$local_rc" 2>/dev/null | head -n1 || true)
+    if [[ -n "$maybe_mode" ]]; then
+      mode=$(echo "$maybe_mode" | sed -E 's/^[[:space:]]*MODE=//; s/[[:space:]]*$//')
+    fi
+  fi
+
+  if [[ -f "$local_rc" && "$mode" == "override" ]]; then
+    # Full override mode
+    TMUX_SESSION="$session" TMUX_PROJECT_DIR="$project_dir" \
+      bash "$local_rc" "${args[@]}"
+  else
+    # Default layout
+    tmux rename-window -t "${session}:base" "editor"
+    tmux send-keys -t "${session}:editor" "nvim" C-m
+
+    tmux new-window -t "$session:" -n shell -c "$project_dir"
+    tmux new-window -t "$session:" -n git -c "$project_dir"
+    tmux send-keys -t "${session}:git" "git status" C-m
+
+    # Run local config in merge mode if present
+    if [[ -f "$local_rc" && "$mode" == "merge" ]]; then
+      TMUX_SESSION="$session" TMUX_PROJECT_DIR="$project_dir" \
+        bash "$local_rc" "${args[@]}"
+    fi
+  fi
+
+  # Focus editor window
+  tmux select-window -t "${session}:editor"
+
+  # Attach
+  if [[ -n "${TMUX-}" ]]; then
+    exec tmux switch-client -t "$session"
+  else
+    exec tmux attach -t "$session"
+  fi
+}
+
+main() {
+  if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    usage
+    exit 0
+  fi
+
+  local query="${1:-}"
+  shift || true
+
+  local project_name=""
+  local project_info=""
+
+  if [[ -n "$query" ]]; then
+    # Try exact match first
+    if project_info=$(find_project_exact "$query"); then
+      project_name=$(echo "$project_info" | cut -f1)
+    else
+      # No exact match, use fzf with query
+      project_name=$(run_fzf_picker "$query")
+      if [[ -n "$project_name" ]]; then
+        project_info=$(find_project_exact "$project_name")
+      fi
+    fi
+  else
+    # No query, launch fzf picker
+    project_name=$(run_fzf_picker)
+    if [[ -n "$project_name" ]]; then
+      project_info=$(find_project_exact "$project_name")
+    fi
+  fi
+
+  if [[ -z "$project_name" || -z "$project_info" ]]; then
+    exit 0
+  fi
+
+  # Parse project info
+  local name lang status path
+  IFS=$'\t' read -r name lang status path <<< "$project_info"
+
+  # Check if archived
+  if [[ "$status" == "archive" ]]; then
+    log_error "Cannot open archived project: $name"
+    log_info "Move to active first: overlord mv $name active"
+    exit 1
+  fi
+
+  # Check path exists
+  if [[ ! -d "$path" ]]; then
+    log_error "Project directory does not exist: $path"
+    log_warning "Registry may be out of sync"
+    exit 1
+  fi
+
+  # Open session
+  create_or_attach_session "$name" "$path" "$@"
+}
+
+main "$@"

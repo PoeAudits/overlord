@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+# overlord-mv: Move project between status categories (active/lib/archive)
+# Physically moves directory and updates registry
+
+set -euo pipefail
+
+OVERLORD_CONFIG="${OVERLORD_CONFIG:-$HOME/.config/overlord}"
+OVERLORD_REGISTRY="$OVERLORD_CONFIG/registry.json"
+WORK_DIR="$HOME/Work"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+usage() {
+  cat <<'EOF'
+Usage:
+  overlord mv <name> <status>
+
+Arguments:
+  name      Project name (or alias)
+  status    Target status: active, lib, or archive
+
+Examples:
+  overlord mv myproject active      # Move to active
+  overlord mv myproject lib         # Move to libs
+  overlord mv myproject archive     # Archive project
+
+Notes:
+  - Creates backup of registry before modification
+  - Physically moves project directory
+  - Updates registry with new path and status
+EOF
+}
+
+log_info() { echo -e "${BLUE}>${NC} $*"; }
+log_success() { echo -e "${GREEN}✓${NC} $*"; }
+log_error() { echo -e "${RED}✗${NC} $*" >&2; }
+log_warning() { echo -e "${YELLOW}!${NC} $*"; }
+
+# Get status directory name
+get_status_dir() {
+  case "$1" in
+    active)  echo "active" ;;
+    lib)     echo "libs" ;;
+    archive) echo "archive" ;;
+    *)
+      log_error "Invalid status: $1 (must be active, lib, or archive)"
+      exit 1
+      ;;
+  esac
+}
+
+# Get language directory name
+get_lang_dir() {
+  case "$1" in
+    python)     echo "Python" ;;
+    typescript) echo "Typescript" ;;
+    solidity)   echo "Solidity" ;;
+    *)
+      log_error "Unknown language: $1"
+      exit 1
+      ;;
+  esac
+}
+
+# Find project by name or alias
+find_project() {
+  local query="$1"
+  
+  # First try exact name match
+  local result
+  result=$(jq -r --arg q "$query" '
+    .projects | to_entries[] | 
+    select(.key == $q) | 
+    [.key, .value.lang, .value.status, .value.path] | @tsv
+  ' "$OVERLORD_REGISTRY" 2>/dev/null || true)
+  
+  if [[ -n "$result" ]]; then
+    echo "$result"
+    return 0
+  fi
+  
+  # Try alias match
+  result=$(jq -r --arg q "$query" '
+    .projects | to_entries[] | 
+    select(.value.aliases != null and (.value.aliases[] == $q)) | 
+    [.key, .value.lang, .value.status, .value.path] | @tsv
+  ' "$OVERLORD_REGISTRY" 2>/dev/null || true)
+  
+  if [[ -n "$result" ]]; then
+    echo "$result"
+    return 0
+  fi
+  
+  return 1
+}
+
+# Backup registry
+backup_registry() {
+  local backup="$OVERLORD_REGISTRY.bak"
+  cp "$OVERLORD_REGISTRY" "$backup"
+  log_info "Registry backed up to $backup"
+}
+
+# Update registry with new path and status
+update_registry() {
+  local name="$1"
+  local new_status="$2"
+  local new_path="$3"
+  
+  local tmp_file
+  tmp_file=$(mktemp)
+  
+  jq --arg name "$name" \
+     --arg status "$new_status" \
+     --arg path "$new_path" \
+     '.projects[$name].status = $status | .projects[$name].path = $path' \
+     "$OVERLORD_REGISTRY" > "$tmp_file"
+  
+  mv "$tmp_file" "$OVERLORD_REGISTRY"
+}
+
+main() {
+  if [[ $# -lt 2 ]]; then
+    usage >&2
+    exit 1
+  fi
+
+  if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    usage
+    exit 0
+  fi
+
+  local project_query="$1"
+  local target_status="$2"
+
+  # Validate target status
+  local target_dir
+  target_dir=$(get_status_dir "$target_status")
+
+  # Find project
+  local project_info
+  if ! project_info=$(find_project "$project_query"); then
+    log_error "Project not found: $project_query"
+    exit 1
+  fi
+
+  local project_name project_lang current_status current_path
+  IFS=$'\t' read -r project_name project_lang current_status current_path <<< "$project_info"
+
+  # Check if already in target status
+  if [[ "$current_status" == "$target_status" ]]; then
+    log_warning "Project '$project_name' is already in '$target_status'"
+    exit 0
+  fi
+
+  # Calculate new path
+  local lang_dir
+  lang_dir=$(get_lang_dir "$project_lang")
+  local new_path="$WORK_DIR/$lang_dir/$target_dir/$project_name"
+
+  log_info "Moving project: $project_name"
+  log_info "From: $current_path"
+  log_info "To:   $new_path"
+  log_info "Status: $current_status -> $target_status"
+  echo ""
+
+  # Check source exists
+  if [[ ! -d "$current_path" ]]; then
+    log_error "Source directory does not exist: $current_path"
+    log_warning "Updating registry only..."
+    backup_registry
+    update_registry "$project_name" "$target_status" "$new_path"
+    log_success "Registry updated (directory not moved)"
+    exit 0
+  fi
+
+  # Check destination doesn't exist
+  if [[ -d "$new_path" ]]; then
+    log_error "Destination already exists: $new_path"
+    exit 1
+  fi
+
+  # Ensure destination parent directory exists
+  mkdir -p "$(dirname "$new_path")"
+
+  # Backup registry before changes
+  backup_registry
+
+  # Move directory
+  log_info "Moving directory..."
+  mv "$current_path" "$new_path"
+  log_success "Directory moved"
+
+  # Update registry
+  update_registry "$project_name" "$target_status" "$new_path"
+  log_success "Registry updated"
+
+  echo ""
+  log_success "Project '$project_name' moved to '$target_status'"
+}
+
+main "$@"
