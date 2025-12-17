@@ -187,6 +187,40 @@ generate_base_makefile() {
   log_success "Generated Makefile (base only)"
 }
 
+# Copy opencode.jsonc template
+copy_opencode_template() {
+  local dir="$1"
+  local lang="$2"
+  local template="$OVERLORD_CONFIG/templates/opencode-${lang}.jsonc"
+  
+  if [[ -f "$template" ]]; then
+    cp "$template" "$dir/opencode.jsonc"
+    log_success "Created opencode.jsonc"
+  else
+    log_warning "No opencode template found for ${lang}"
+  fi
+}
+
+# Create thoughts directory structure (always additive)
+create_thoughts_dirs() {
+  local dir="$1"
+  local thoughts_dir="$dir/thoughts"
+  local created=false
+  
+  for subdir in tickets plans logs research handoffs; do
+    if [[ ! -d "$thoughts_dir/$subdir" ]]; then
+      mkdir -p "$thoughts_dir/$subdir"
+      created=true
+    fi
+  done
+  
+  if [[ "$created" == true ]]; then
+    log_success "Created thoughts/ directory structure"
+  else
+    log_info "thoughts/ directory structure already exists"
+  fi
+}
+
 # Register project with aliases
 register_project_with_aliases() {
   local name="$1"
@@ -322,6 +356,16 @@ main() {
       generate_makefile "$PROJECT_PATH" "$LANGUAGE"
     fi
   fi
+  
+  # Check if opencode.jsonc exists
+  if [[ -f "$PROJECT_PATH/opencode.jsonc" ]] && [[ "$FORCE" == false ]]; then
+    log_warning "opencode.jsonc already exists (use --force to overwrite)"
+  else
+    copy_opencode_template "$PROJECT_PATH" "$LANGUAGE"
+  fi
+
+  # Create thoughts directory structure (always additive, ignores --force)
+  create_thoughts_dirs "$PROJECT_PATH"
   
   # Initialize git if needed
   if [[ "$INIT_GIT" == true ]]; then
