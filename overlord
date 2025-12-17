@@ -24,10 +24,12 @@ overlord - Project Management System v${OVERLORD_VERSION}
 Usage:
   overlord                              List active projects (default)
   overlord new <name> --py|--ts|--sol   Create new project
+  overlord add <name> <path> [options]  Register existing directory
   overlord list [options]               List projects
   overlord mv <name> <status>           Move project (active|lib|archive)
   overlord open [name]                  Open workspace (fzf if no match)
   overlord info <name>                  Show project details
+  overlord rm <name> [options]          Remove project from registry
   overlord sync [options]               Propagate Makefile templates to projects
   overlord config                       Edit registry.json in \$EDITOR
   overlord edit                         Edit overlord scripts in \$EDITOR
@@ -71,7 +73,7 @@ main() {
       echo "overlord v${OVERLORD_VERSION}"
       exit 0
       ;;
-    new|list|mv|open|info|sync|config|edit)
+    new|add|list|mv|open|info|sync|config|edit|rm)
       local cmd="$1"
       shift
       local subcmd="$OVERLORD_BIN/overlord-$cmd"

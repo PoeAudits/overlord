@@ -1,0 +1,350 @@
+#!/usr/bin/env bash
+# overlord-add: Register existing directories in Overlord registry
+# Adds existing projects without creating new ones
+
+set -euo pipefail
+
+OVERLORD_CONFIG="${OVERLORD_CONFIG:-$HOME/.config/overlord}"
+OVERLORD_REGISTRY="$OVERLORD_CONFIG/registry.json"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+usage() {
+  cat <<'EOF'
+Usage:
+  overlord add <name> <path> [options]
+
+Arguments:
+  name                 Project name for registry
+  path                 Directory path (., absolute, or ~/)
+
+Language flags (optional, auto-detected if omitted):
+  --py, --python       Force Python configuration
+  --ts, --typescript   Force TypeScript configuration
+  --sol, --solidity    Force Solidity configuration
+
+Options:
+  --lib                Register as library (default: active)
+  --alias <name>       Add alias (can be used multiple times)
+  --force              Overwrite existing registry entry
+  --help               Show this help
+
+Examples:
+  overlord add myproject /path/to/existing/project --py
+  overlord add overlord ~/bin/overlord
+  overlord add mylib . --ts --lib --alias ml
+EOF
+}
+
+log_info() { echo -e "${BLUE}>${NC} $*"; }
+log_success() { echo -e "${GREEN}✓${NC} $*"; }
+log_error() { echo -e "${RED}✗${NC} $*" >&2; }
+log_warning() { echo -e "${YELLOW}!${NC} $*"; }
+
+# Detect language from project files
+detect_language() {
+  local dir="$1"
+  if [[ -f "$dir/pyproject.toml" ]] || [[ -f "$dir/setup.py" ]]; then
+    echo "python"
+  elif [[ -f "$dir/package.json" ]]; then
+    echo "typescript"
+  elif [[ -f "$dir/foundry.toml" ]]; then
+    echo "solidity"
+  else
+    echo "base"
+  fi
+}
+
+# Check if project name exists in registry
+check_registry_exists() {
+  local name="$1"
+  jq -e --arg name "$name" '.projects[$name]' "$OVERLORD_REGISTRY" >/dev/null 2>&1
+}
+
+# Copy tmux template
+copy_tmux_template() {
+  local dir="$1"
+  local lang="$2"
+  local template="$OVERLORD_CONFIG/tmux/${lang}.tmux"
+  local base_template="$OVERLORD_CONFIG/tmux/base.tmux"
+  
+  # Skip if .tmux.local already exists
+  if [[ -f "$dir/.tmux.local" ]]; then
+    log_info ".tmux.local already exists, skipping template copy"
+    return 0
+  fi
+  
+  # Try language-specific template first
+  if [[ -f "$template" ]]; then
+    cp "$template" "$dir/.tmux.local"
+    chmod +x "$dir/.tmux.local"
+    log_success "Copied ${lang} tmux template"
+  elif [[ -f "$base_template" ]]; then
+    # Fall back to base template
+    cp "$base_template" "$dir/.tmux.local"
+    chmod +x "$dir/.tmux.local"
+    log_success "Copied base tmux template"
+  else
+    log_warning "No tmux template found for ${lang} or base"
+  fi
+}
+
+# Get language-specific makefile name
+get_lang_makefile() {
+  case "$1" in
+    python)     echo "python.mk" ;;
+    typescript) echo "typescript.mk" ;;
+    solidity)   echo "solidity.mk" ;;
+    base)       echo "" ;;
+  esac
+}
+
+# Generate Makefile from templates
+generate_makefile() {
+  local dir="$1"
+  local lang="$2"
+  local makefile_dir="$OVERLORD_CONFIG/makefiles"
+  local base_file="$makefile_dir/base.mk"
+  
+  # Skip if Makefile already exists
+  if [[ -f "$dir/Makefile" ]]; then
+    log_info "Makefile already exists, skipping generation"
+    return 0
+  fi
+  
+  if [[ ! -f "$base_file" ]]; then
+    log_warning "Base makefile template not found"
+    return 0
+  fi
+  
+  # For base language, use only base.mk
+  if [[ "$lang" == "base" ]]; then
+    cp "$base_file" "$dir/Makefile"
+    log_success "Generated Makefile (base only)"
+    return 0
+  fi
+  
+  # For other languages, combine base + language-specific
+  local lang_mk
+  lang_mk=$(get_lang_makefile "$lang")
+  local lang_file="$makefile_dir/$lang_mk"
+  
+  if [[ ! -f "$lang_file" ]]; then
+    log_warning "Language makefile template not found for ${lang}, using base only"
+    cp "$base_file" "$dir/Makefile"
+    log_success "Generated Makefile (base only)"
+    return 0
+  fi
+  
+  # Combine base + language-specific
+  {
+    cat "$base_file"
+    echo ""
+    cat "$lang_file"
+  } > "$dir/Makefile"
+  
+  log_success "Generated Makefile"
+}
+
+# Register project in registry with aliases
+register_project() {
+  local name="$1"
+  local lang="$2"
+  local status="$3"
+  local path="$4"
+  shift 4
+  local aliases=("$@")
+  local date
+  date=$(date +%Y-%m-%d)
+
+  local tmp_file
+  tmp_file=$(mktemp)
+  
+  # Build jq command with aliases
+  local jq_cmd
+  jq_cmd=$(cat <<'JQ_CMD'
+.projects[$name] = {
+  "lang": $lang,
+  "status": $status,
+  "path": $path,
+  "created": $date,
+  "aliases": $aliases
+}
+JQ_CMD
+)
+  
+  # Convert bash array to JSON array
+  local aliases_json
+  if [[ ${#aliases[@]} -eq 0 ]]; then
+    aliases_json="[]"
+  else
+    aliases_json=$(printf '%s\n' "${aliases[@]}" | jq -R . | jq -s .)
+  fi
+  
+  jq --arg name "$name" \
+     --arg lang "$lang" \
+     --arg status "$status" \
+     --arg path "$path" \
+     --arg date "$date" \
+     --argjson aliases "$aliases_json" \
+     "$jq_cmd" "$OVERLORD_REGISTRY" > "$tmp_file"
+  
+  mv "$tmp_file" "$OVERLORD_REGISTRY"
+  log_success "Registered project in registry"
+}
+
+# Parse arguments
+PROJECT_NAME=""
+PROJECT_PATH=""
+LANGUAGE=""
+STATUS="active"
+FORCE=false
+ALIASES=()
+
+parse_args() {
+  # No arguments shows help
+  if [[ $# -eq 0 ]]; then
+    usage
+    exit 0
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --py|--python)
+        LANGUAGE="python"
+        ;;
+      --ts|--typescript)
+        LANGUAGE="typescript"
+        ;;
+      --sol|--solidity)
+        LANGUAGE="solidity"
+        ;;
+      --lib)
+        STATUS="lib"
+        ;;
+      --alias)
+        if [[ $# -lt 2 ]]; then
+          log_error "--alias requires an argument"
+          exit 1
+        fi
+        shift
+        ALIASES+=("$1")
+        ;;
+      --force)
+        FORCE=true
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      -*)
+        log_error "Unknown option: $1"
+        exit 1
+        ;;
+      *)
+        if [[ -z "$PROJECT_NAME" ]]; then
+          PROJECT_NAME="$1"
+        elif [[ -z "$PROJECT_PATH" ]]; then
+          PROJECT_PATH="$1"
+        else
+          log_error "Unexpected argument: $1"
+          exit 1
+        fi
+        ;;
+    esac
+    shift
+  done
+
+  if [[ -z "$PROJECT_NAME" ]]; then
+    log_error "Project name is required"
+    usage >&2
+    exit 1
+  fi
+
+  if [[ -z "$PROJECT_PATH" ]]; then
+    log_error "Project path is required"
+    usage >&2
+    exit 1
+  fi
+}
+
+# Validate and normalize path
+validate_path() {
+  local path="$1"
+  
+  # Expand ~ to $HOME
+  if [[ "$path" == "~" ]]; then
+    path="$HOME"
+  elif [[ "$path" =~ ^~/ ]]; then
+    path="${HOME}/${path#~/}"
+  fi
+  
+  # Convert . to absolute path
+  if [[ "$path" == "." ]]; then
+    path="$(pwd)"
+  fi
+  
+  # Reject relative paths (except . which we already converted)
+  if [[ "$path" != /* ]]; then
+    log_error "Path must be absolute, '.', or start with '~/' (got: $1)"
+    exit 1
+  fi
+  
+  # Check if directory exists
+  if [[ ! -d "$path" ]]; then
+    log_error "Directory does not exist: $path"
+    exit 1
+  fi
+  
+  echo "$path"
+}
+
+main() {
+  parse_args "$@"
+  
+  # Validate and normalize path
+  PROJECT_PATH=$(validate_path "$PROJECT_PATH")
+  
+  log_info "Registering existing project: ${PROJECT_NAME}"
+  log_info "Location: $PROJECT_PATH"
+  log_info "Status: $STATUS"
+  echo ""
+
+  # Check if project already exists in registry
+  if check_registry_exists "$PROJECT_NAME"; then
+    if [[ "$FORCE" == false ]]; then
+      log_error "Project already exists in registry: $PROJECT_NAME"
+      log_error "Use --force to overwrite"
+      exit 1
+    else
+      log_warning "Overwriting existing registry entry..."
+    fi
+  fi
+
+  # Auto-detect language if not specified
+  if [[ -z "$LANGUAGE" ]]; then
+    LANGUAGE=$(detect_language "$PROJECT_PATH")
+    log_info "Auto-detected language: $LANGUAGE"
+  fi
+
+  # Copy tmux template if missing
+  copy_tmux_template "$PROJECT_PATH" "$LANGUAGE"
+
+  # Generate Makefile if missing
+  generate_makefile "$PROJECT_PATH" "$LANGUAGE"
+
+  # Register in registry with aliases
+  register_project "$PROJECT_NAME" "$LANGUAGE" "$STATUS" "$PROJECT_PATH" "${ALIASES[@]}"
+
+  echo ""
+  log_success "Project registered successfully!"
+  echo ""
+  log_info "Run 'overlord open ${PROJECT_NAME}' to open workspace"
+}
+
+main "$@"
