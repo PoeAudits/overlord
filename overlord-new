@@ -279,6 +279,34 @@ generate_makefile() {
   log_success "Generated Makefile"
 }
 
+# Copy opencode.jsonc template
+copy_opencode_template() {
+  local dir="$1"
+  local lang="$2"
+  local template="$OVERLORD_CONFIG/templates/opencode-${lang}.jsonc"
+  
+  if [[ -f "$template" ]]; then
+    cp "$template" "$dir/opencode.jsonc"
+    log_success "Created opencode.jsonc"
+  else
+    log_warning "No opencode template found for ${lang}"
+  fi
+}
+
+# Create thoughts directory structure
+create_thoughts_dirs() {
+  local dir="$1"
+  local thoughts_dir="$dir/thoughts"
+  
+  mkdir -p "$thoughts_dir/tickets"
+  mkdir -p "$thoughts_dir/plans"
+  mkdir -p "$thoughts_dir/logs"
+  mkdir -p "$thoughts_dir/research"
+  mkdir -p "$thoughts_dir/handoffs"
+  
+  log_success "Created thoughts/ directory structure"
+}
+
 # Register project in registry
 register_project() {
   local name="$1"
@@ -358,6 +386,12 @@ main() {
 
   # Generate Makefile
   generate_makefile "$project_dir" "$LANGUAGE"
+
+  # Create opencode.jsonc
+  copy_opencode_template "$project_dir" "$LANGUAGE"
+
+  # Create thoughts directory structure
+  create_thoughts_dirs "$project_dir"
 
   # Register in registry
   register_project "$PROJECT_NAME" "$LANGUAGE" "$STATUS" "$project_dir"
