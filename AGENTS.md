@@ -24,6 +24,7 @@ Overlord is a CLI-based project management system for organizing Python, TypeScr
 ~/.config/overlord/
 ├── registry.json        # Project metadata
 ├── tmux/
+│   ├── base.tmux        # Base tmux template (non-language projects)
 │   ├── python.tmux      # Python tmux template
 │   ├── typescript.tmux  # TypeScript tmux template
 │   └── solidity.tmux    # Solidity tmux template
@@ -92,12 +93,12 @@ List projects from registry.
 ```bash
 overlord list [options]
 
-# Language filters:
+# Language filters (can be combined with OR logic):
 --py, --python       # Python projects only
 --ts, --typescript   # TypeScript projects only
 --sol, --solidity    # Solidity projects only
 
-# Status filters:
+# Status filters (AND logic with language filters):
 --active             # Active projects (default)
 --lib                # Library projects
 --archive            # Archived projects
@@ -109,10 +110,12 @@ overlord list [options]
 
 **Examples:**
 ```bash
-overlord list                # Active projects (default)
-overlord list --all          # All projects
-overlord list --py --lib     # Python libraries
-overlord list --archive      # Archived projects
+overlord list                      # Active projects (default)
+overlord list --all                # All projects
+overlord list --py --lib           # Python libraries
+overlord list --py --ts            # Python OR TypeScript active projects
+overlord list --py --ts --all      # All Python and TypeScript projects
+overlord list --archive            # Archived projects
 ```
 
 ### overlord mv
@@ -307,7 +310,9 @@ The registry (`~/.config/overlord/registry.json`) stores project metadata:
 
 ## Tmux Integration
 
-Each project can have a `.tmux.local` file for custom workspace setup. Templates are provided per language in `~/.config/overlord/tmux/`.
+Each project can have a `.tmux.local` file for custom workspace setup. Templates are provided per language in `~/.config/overlord/tmux/`:
+- `base.tmux` - Used for non-language-specific projects
+- Language-specific templates - `python.tmux`, `typescript.tmux`, `solidity.tmux`
 
 **Template variables:**
 - `$TMUX_SESSION` - Session name
