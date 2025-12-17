@@ -21,18 +21,22 @@ usage() {
 Usage:
   overlord sync [options]
 
-Propagates Makefile templates to all registered projects.
-Combines base.mk with language-specific template (python.mk, typescript.mk, solidity.mk).
+Propagates Makefile templates and opencode.jsonc to all registered projects.
+Creates thoughts/ directory structure if missing.
+
+By default, only creates files if they don't exist. Use --force to overwrite.
 
 Options:
   --py, --python       Sync only Python projects
   --ts, --typescript   Sync only TypeScript projects
   --sol, --solidity    Sync only Solidity projects
+  --force              Overwrite existing Makefile and opencode.jsonc
   --dry-run            Show what would be done without making changes
   --help               Show this help
 
 Examples:
-  overlord sync                  # Sync all projects
+  overlord sync                  # Sync all projects (create if missing)
+  overlord sync --force          # Sync all projects (overwrite existing)
   overlord sync --py             # Sync only Python projects
   overlord sync --dry-run        # Preview changes
 EOF
@@ -47,6 +51,7 @@ log_dim() { echo -e "${DIM}  $*${NC}"; }
 # Parse arguments
 FILTER_LANG=""
 DRY_RUN=false
+FORCE=false
 
 parse_args() {
   while [[ $# -gt 0 ]]; do
@@ -62,6 +67,9 @@ parse_args() {
         ;;
       --dry-run)
         DRY_RUN=true
+        ;;
+      --force)
+        FORCE=true
         ;;
       --help|-h)
         usage
@@ -110,6 +118,28 @@ generate_makefile() {
   cat "$lang_file"
 }
 
+# Generate opencode.jsonc content for a language
+generate_opencode() {
+  local lang="$1"
+  local template="$OVERLORD_CONFIG/templates/opencode-${lang}.jsonc"
+  
+  if [[ -f "$template" ]]; then
+    cat "$template"
+  else
+    return 1
+  fi
+}
+
+# Create thoughts directory structure (always additive)
+create_thoughts_dirs() {
+  local dir="$1"
+  local thoughts_dir="$dir/thoughts"
+  
+  for subdir in tickets plans logs research handoffs; do
+    mkdir -p "$thoughts_dir/$subdir"
+  done
+}
+
 # Sync a single project
 sync_project() {
   local name="$1"
@@ -122,20 +152,57 @@ sync_project() {
   fi
   
   local makefile_path="$path/Makefile"
+  local opencode_path="$path/opencode.jsonc"
+  local thoughts_path="$path/thoughts"
   
   if [[ "$DRY_RUN" == true ]]; then
     log_info "[dry-run] Would sync: $name ($lang)"
-    log_dim "  -> $makefile_path"
+    if [[ ! -f "$makefile_path" ]] || [[ "$FORCE" == true ]]; then
+      log_dim "  -> $makefile_path"
+    fi
+    if [[ ! -f "$opencode_path" ]] || [[ "$FORCE" == true ]]; then
+      log_dim "  -> $opencode_path"
+    fi
+    if [[ ! -d "$thoughts_path/tickets" ]]; then
+      log_dim "  -> $thoughts_path/"
+    fi
     return 0
   fi
   
-  # Generate and write Makefile
-  if generate_makefile "$lang" > "$makefile_path"; then
-    log_success "Synced: $name ($lang)"
-  else
-    log_error "Failed to sync: $name"
-    return 1
+  local synced_something=false
+  
+  # Sync Makefile
+  if [[ ! -f "$makefile_path" ]] || [[ "$FORCE" == true ]]; then
+    if generate_makefile "$lang" > "$makefile_path"; then
+      log_success "Synced Makefile: $name"
+      synced_something=true
+    else
+      log_error "Failed to sync Makefile: $name"
+    fi
   fi
+  
+  # Sync opencode.jsonc
+  if [[ ! -f "$opencode_path" ]] || [[ "$FORCE" == true ]]; then
+    if generate_opencode "$lang" > "$opencode_path"; then
+      log_success "Synced opencode.jsonc: $name"
+      synced_something=true
+    else
+      log_warning "No opencode template for $lang: $name"
+    fi
+  fi
+  
+  # Create thoughts directories (always additive)
+  if [[ ! -d "$thoughts_path/tickets" ]]; then
+    create_thoughts_dirs "$path"
+    log_success "Created thoughts/: $name"
+    synced_something=true
+  fi
+  
+  if [[ "$synced_something" == false ]]; then
+    log_dim "  $name: up to date"
+  fi
+  
+  return 0
 }
 
 # Main sync logic
@@ -179,11 +246,12 @@ sync_projects() {
   
   echo ""
   if [[ "$DRY_RUN" == true ]]; then
-    log_info "Would sync $synced_count project(s)"
+    log_info "Would process $synced_count project(s)"
   else
-    log_success "Synced $synced_count project(s)"
-    if [[ $failed_count -gt 0 ]]; then
-      log_warning "Failed: $failed_count"
+    if [[ "$FORCE" == true ]]; then
+      log_success "Synced $synced_count project(s) (force mode)"
+    else
+      log_success "Processed $synced_count project(s)"
     fi
   fi
 }
