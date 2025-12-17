@@ -37,6 +37,7 @@ Overlord is a CLI-based project management system for organizing Python, TypeScr
 ~/bin/overlord/
 ├── overlord             # Main dispatcher
 ├── overlord-new         # Create new project
+├── overlord-add         # Register existing project
 ├── overlord-list        # List projects
 ├── overlord-mv          # Move project status
 ├── overlord-open        # Open workspace
@@ -58,6 +59,7 @@ Main dispatcher. Running `overlord` with no arguments lists active projects.
 overlord                    # List active projects
 overlord --help             # Show help
 overlord --version          # Show version
+overlord add <name> <path>  # Register existing project
 ```
 
 ### overlord new
@@ -116,6 +118,35 @@ overlord list --py --lib           # Python libraries
 overlord list --py --ts            # Python OR TypeScript active projects
 overlord list --py --ts --all      # All Python and TypeScript projects
 overlord list --archive            # Archived projects
+```
+
+### overlord add
+
+Register existing project directories in the Overlord registry.
+
+```bash
+overlord add <name> <path> [options]
+
+# Arguments:
+name      # Project name (must be unique)
+path      # Path to existing project directory
+
+# Language flags (optional, auto-detects if omitted):
+--py, --python       # Python project
+--ts, --typescript   # TypeScript project
+--sol, --solidity    # Solidity project
+
+# Options:
+--lib                # Mark as library instead of active
+--alias <name>       # Add alias (can be used multiple times)
+--force              # Overwrite existing project entry
+```
+
+**Examples:**
+```bash
+overlord add myproject /path/to/project                    # Auto-detect
+overlord add mylib . --lib --alias ml --alias mylib        # Add current dir as library
+overlord add overlord ~/bin/overlord --force                # Overwrite existing
 ```
 
 ### overlord mv
@@ -298,7 +329,7 @@ The registry (`~/.config/overlord/registry.json`) stores project metadata:
 {
   "projects": {
     "project-name": {
-      "lang": "python|typescript|solidity",
+      "lang": "python|typescript|solidity|base",
       "status": "active|lib|archive",
       "path": "/absolute/path/to/project",
       "created": "YYYY-MM-DD",
@@ -363,6 +394,7 @@ overlord-migrate-init --execute
 This system is designed to be operated by an AI agent. Each subcommand can be invoked as a tool:
 
 - `overlord-new` - Create projects
+- `overlord-add` - Register existing projects
 - `overlord-list` - Query project state
 - `overlord-mv` - Change project status
 - `overlord-open` - Launch workspaces
