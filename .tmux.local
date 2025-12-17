@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Base project tmux layout (no language-specific options)
+# MODE can be "override" (default) or "merge"
+MODE=override
+set -euo pipefail
+
+S="$TMUX_SESSION"
+ROOT="$TMUX_PROJECT_DIR"
+
+# Rename the starter window (created by overlord-open)
+tmux rename-window -t "${S}:base" "editor"
+tmux send-keys -t "${S}:editor" "nvim" C-m
+
+# Shell window
+tmux new-window -t "$S:" -n shell -c "$ROOT"
+
+# Git window
+tmux new-window -t "$S:" -n git -c "$ROOT"
+tmux send-keys -t "${S}:git" "git status" C-m
+
+# --- Generic options ---
+# Additional shell window
+# tmux new-window -t "$S:" -n shell2 -c "$ROOT"
+
+# Logs window
+# tmux new-window -t "$S:" -n logs -c "$ROOT"
+# tmux send-keys -t "${S}:logs" "tail -f /var/log/syslog" C-m
+
+# System monitoring
+# tmux new-window -t "$S:" -n htop -c "$ROOT"
+# tmux send-keys -t "${S}:htop" "htop" C-m
+
+# Docker logs (if applicable)
+# tmux new-window -t "$S:" -n docker -c "$ROOT"
+# tmux send-keys -t "${S}:docker" "docker compose logs -f" C-m
+
+tmux select-window -t "${S}:editor"

@@ -2,7 +2,7 @@
 type: feature
 priority: high
 created: 2025-12-16T00:00:00Z
-status: created
+status: planned
 tags: [worktree, tmux, automation, makefile, base.mk]
 keywords: [worktree, tmux, base.mk, session management, counter-based naming, overlord sync]
 patterns: [makefile targets, tmux session creation, git worktree, cross-session commands]
@@ -170,7 +170,7 @@ NOUNS: fix task work dev patch branch code build test run
 ### Implementation Steps
 1. Read current `base.mk` to understand existing structure
 2. Read `overlord-open` lines 140-204 for tmux session creation pattern
-3. Replace `base.mk` with complete implementation (see plan.md lines 220-468)
+3. Replace `base.mk` with complete implementation 
 4. Ensure `.worktrees/.counter` is gitignored (check if `.worktrees/` pattern covers it)
 5. Run `overlord sync` to propagate changes to all projects
 6. Test in sample project (see Testing Plan below)
@@ -211,7 +211,6 @@ make worktree-remove BRANCH=test-feature
 ```
 
 ## Notes
-- Complete implementation is provided in `/home/thomas/bin/overlord/plan.md` lines 220-468
 - This is a **breaking change** to `base.mk` - replaces existing content entirely
 - Must run `overlord sync` after implementation to propagate to all registered projects
 - Counter file (`.worktrees/.counter`) should be added to `.gitignore` if not covered by `.worktrees/` pattern
@@ -225,7 +224,7 @@ make worktree-remove BRANCH=test-feature
 ## Checklist for Implementation
 - [ ] Read `~/.config/overlord/makefiles/base.mk` (current state)
 - [ ] Read `/home/thomas/bin/overlord/overlord-open` lines 140-204 (tmux reference)
-- [ ] Replace `base.mk` with implementation from plan.md
+- [ ] Replace `base.mk` with implementation from 
 - [ ] Verify `.worktrees/.counter` is gitignored
 - [ ] Run `overlord sync` to propagate changes
 - [ ] Test in sample project using Testing Plan

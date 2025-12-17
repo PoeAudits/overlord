@@ -2,7 +2,7 @@
 type: feature
 priority: medium
 created: 2025-12-16T00:00:00Z
-status: implemented
+status: archived
 tags: [cli, registry, project-management]
 keywords: [overlord-rm, remove, unregister, registry.json, jq delete]
 patterns: [confirmation prompt, jq deletion, lookup by name/path/alias]
