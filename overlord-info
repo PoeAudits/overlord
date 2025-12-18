@@ -3,18 +3,18 @@
 
 set -euo pipefail
 
-OVERLORD_CONFIG="${OVERLORD_CONFIG:-$HOME/.config/overlord}"
+OVERLORD_REPO="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
+OVERLORD_CONFIG="${OVERLORD_CONFIG:-$OVERLORD_REPO}"
 OVERLORD_REGISTRY="$OVERLORD_CONFIG/registry.json"
+OVERLORD_BIN="${OVERLORD_BIN:-$OVERLORD_REPO}"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
+# Source common library
+source "$OVERLORD_BIN/lib/common.sh"
+
+# Colors for info specifically
+BOLD='\033[1m'
 CYAN='\033[0;36m'
 DIM='\033[2m'
-BOLD='\033[1m'
-NC='\033[0m'
 
 usage() {
   cat <<'EOF'
@@ -35,8 +35,6 @@ Examples:
   overlord info myproject
 EOF
 }
-
-log_error() { echo -e "${RED}✗${NC} $*" >&2; }
 
 # Find project by name or alias
 find_project() {

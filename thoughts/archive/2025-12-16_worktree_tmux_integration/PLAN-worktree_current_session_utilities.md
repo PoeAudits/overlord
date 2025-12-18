@@ -131,20 +131,20 @@ make tmux-send WINDOW=editor CMD=":w"
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Parameter validation: Call without WINDOW, verify error message
-- [ ] Parameter validation: Call without CMD, verify error message
-- [ ] Tmux detection: Run outside tmux, verify error with helpful message
-- [ ] Session auto-detection: Run inside session, verify correct session targeted
-- [ ] Window validation: Send to non-existent window, verify error and window list
-- [ ] Command execution: Send `echo test`, verify command executes
+- [x] Parameter validation: Call without WINDOW, verify error message
+- [x] Parameter validation: Call without CMD, verify error message
+- [x] Tmux detection: Run outside tmux, verify error with helpful message
+- [x] Session auto-detection: Run inside session, verify correct session targeted
+- [x] Window validation: Send to non-existent window, verify error and window list
+- [x] Command execution: Send `echo test`, verify command executes
 
 #### Manual Verification:
-- [ ] Command executes in correct window of current session
-- [ ] Error message outside tmux is clear and actionable
-- [ ] Window list in error shows all available windows
-- [ ] Session name correctly detected in various session contexts
-- [ ] Works in main project sessions and worktree sessions
-- [ ] Complex commands work (same as `worktree-send`)
+- [x] Command executes in correct window of current session
+- [x] Error message outside tmux is clear and actionable
+- [x] Window list in error shows all available windows
+- [x] Session name correctly detected in various session contexts
+- [x] Works in main project sessions and worktree sessions
+- [x] Complex commands work (same as `worktree-send`)
 
 ---
 
@@ -213,19 +213,19 @@ make tmux-read WINDOW=editor
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Parameter validation: Call without WINDOW, verify error message
-- [ ] Tmux detection: Run outside tmux, verify error with helpful message
-- [ ] Session auto-detection: Run inside session, verify correct session targeted
-- [ ] Window validation: Read from non-existent window, verify error and window list
-- [ ] Content capture: Send command, then read, verify output captured
+- [x] Parameter validation: Call without WINDOW, verify error message
+- [x] Tmux detection: Run outside tmux, verify error with helpful message
+- [x] Session auto-detection: Run inside session, verify correct session targeted
+- [x] Window validation: Read from non-existent window, verify error and window list
+- [x] Content capture: Send command, then read, verify output captured
 
 #### Manual Verification:
-- [ ] Captured content matches visible pane
-- [ ] Only visible content captured (not scrollback)
-- [ ] Output is readable and properly formatted
-- [ ] Error messages consistent with `tmux-send`
-- [ ] Works in different window types
-- [ ] Separator line improves readability
+- [x] Captured content matches visible pane
+- [x] Only visible content captured (not scrollback)
+- [x] Output is readable and properly formatted
+- [x] Error messages consistent with `tmux-send`
+- [x] Works in different window types
+- [x] Separator line improves readability
 
 ---
 
@@ -284,17 +284,17 @@ Windows in session 'myproject':
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Tmux detection: Run outside tmux, verify error with helpful message
-- [ ] Session auto-detection: Run inside session, verify correct session name shown
-- [ ] Window listing: Create session with 3 windows, verify all listed
-- [ ] Active marker: Verify active window marked correctly
+- [x] Tmux detection: Run outside tmux, verify error with helpful message
+- [x] Session auto-detection: Run inside session, verify correct session name shown
+- [x] Window listing: Create session with 3 windows, verify all listed
+- [x] Active marker: Verify active window marked correctly
 
 #### Manual Verification:
-- [ ] Output is clean and readable
-- [ ] Window names match actual windows
-- [ ] Active window correctly identified
-- [ ] Session name shown for context
-- [ ] Works with custom window names from `.tmux.local`
+- [x] Output is clean and readable
+- [x] Window names match actual windows
+- [x] Active window correctly identified
+- [x] Session name shown for context
+- [x] Works with custom window names from `.tmux.local`
 
 ---
 
@@ -381,18 +381,18 @@ overlord sync --force
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] .PHONY includes new targets: `grep tmux-send base.mk`
-- [ ] Help text includes new section: `make help | grep "Current Session Utilities"`
-- [ ] Help shows all three commands: `make help | grep -E "tmux-(send|read|list)"`
-- [ ] Sync completes: `overlord sync --force` exits with code 0
-- [ ] Sample project updated: `grep tmux-send ~/Work/Python/active/*/Makefile`
+- [x] .PHONY includes new targets: `grep tmux-send base.mk`
+- [x] Help text includes new section: `make help | grep "Current Session Utilities"`
+- [x] Help shows all three commands: `make help | grep -E "tmux-(send|read|list)"`
+- [x] Sync completes: `overlord sync --force` exits with code 0
+- [x] Sample project updated: `grep tmux-send ~/Work/Python/active/*/Makefile`
 
 #### Manual Verification:
-- [ ] Help text is well-organized with clear sections
-- [ ] Examples demonstrate practical usage
-- [ ] All registered projects received updates
-- [ ] No syntax errors in generated Makefiles
-- [ ] Current session utilities note is clear
+- [x] Help text is well-organized with clear sections
+- [x] Examples demonstrate practical usage
+- [x] All registered projects received updates
+- [x] No syntax errors in generated Makefiles
+- [x] Current session utilities note is clear
 
 ---
 

@@ -4,6 +4,41 @@
 
 Overlord is a CLI-based project management system for organizing Python, TypeScript, and Solidity projects. It manages project lifecycle through status categories (active, lib, archive) and provides tmux workspace integration.
 
+## Installation
+
+### Fresh Installation
+
+1. Clone the repository:
+   ```bash
+   git clone <repo-url> ~/overlord
+   cd ~/overlord
+   ```
+
+2. Run the setup script:
+   ```bash
+   ./setup.sh
+   ```
+
+3. Verify installation:
+   ```bash
+   overlord --version
+   overlord list
+   ```
+
+The setup script will:
+- Create a symlink at `/usr/local/bin/overlord`
+- Initialize an empty registry file
+- Verify the installation
+
+### Requirements
+
+- Bash 4.0+
+- Git
+- Write access to `/usr/local/bin` (or sudo)
+- `jq` for JSON processing
+- `tmux` for workspace management
+- `fzf` for fuzzy search (optional but recommended)
+
 ## Directory Structure
 
 ```
@@ -21,21 +56,10 @@ Overlord is a CLI-based project management system for organizing Python, TypeScr
 │   ├── libs/
 │   └── archive/
 
-~/.config/overlord/
-├── registry.json        # Project metadata
-├── tmux/
-│   ├── base.tmux        # Base tmux template (non-language projects)
-│   ├── python.tmux      # Python tmux template
-│   ├── typescript.tmux  # TypeScript tmux template
-│   └── solidity.tmux    # Solidity tmux template
-└── makefiles/
-    ├── base.mk          # Git worktree commands (shared)
-    ├── python.mk        # Python/uv commands
-    ├── typescript.mk    # TypeScript/pnpm/bun commands
-    └── solidity.mk      # Solidity/forge commands
-
 ~/bin/overlord/
 ├── overlord             # Main dispatcher
+├── lib/
+│   └── common.sh        # Shared helper functions
 ├── overlord-new         # Create new project
 ├── overlord-add         # Register existing project
 ├── overlord-init        # Initialize existing directory
@@ -47,7 +71,22 @@ Overlord is a CLI-based project management system for organizing Python, TypeScr
 ├── overlord-sync        # Propagate files to projects
 ├── overlord-config      # Edit registry.json
 ├── overlord-edit        # Edit overlord scripts
-└── AGENTS.md            # This documentation
+├── setup.sh             # Installation script
+├── registry.json        # Project metadata (created by setup)
+├── templates/
+│   └── opencode-*.jsonc
+├── tmux/
+│   ├── base.tmux        # Base tmux template (non-language projects)
+│   ├── python.tmux      # Python tmux template
+│   ├── typescript.tmux  # TypeScript tmux template
+│   └── solidity.tmux    # Solidity tmux template
+├── makefiles/
+│   ├── base.mk          # Git worktree commands (shared)
+│   ├── python.mk        # Python/uv commands
+│   ├── typescript.mk    # TypeScript/pnpm/bun commands
+│   └── solidity.mk      # Solidity/forge commands
+├── AGENTS.md            # This documentation
+└── thoughts/
 ```
 
 ## Commands
@@ -171,7 +210,7 @@ path      # Directory to initialize (default: current directory)
 --name <name>        # Override project name (default: directory basename)
 --alias <alias>      # Add alias (can be used multiple times)
 --no-git             # Skip git initialization
---force              # Overwrite existing .tmux.local, Makefile, and opencode.jsonc
+--force              # Overwrite existing .tmux.local, Makefile, and .opencode/opencode.jsonc
 ```
 
 **Language auto-detection:**
@@ -183,7 +222,7 @@ path      # Directory to initialize (default: current directory)
 **Creates:**
 - `.tmux.local` - Workspace configuration
 - `Makefile` - Build/test commands
-- `opencode.jsonc` - AI assistant instructions
+- `.opencode/opencode.jsonc` - AI assistant instructions (migrates existing from root if found)
 - `thoughts/` - Development artifact structure (never overwritten)
 
 **Examples:**
@@ -234,7 +273,7 @@ name      # Project name, alias, or absolute path
 3. Absolute path
 
 **Behavior:**
-- Creates registry backup at `~/.config/overlord/registry.json.bak`
+- Creates registry backup at `~/bin/overlord/registry.json.bak`
 - Shows confirmation prompt with project details (unless `--force` is used)
 - Removes project from registry only; project files remain on disk
 
@@ -315,7 +354,8 @@ overlord edit
 
 ### overlord sync
 
-Propagate Makefile templates, opencode.jsonc, and thoughts/ directory to all registered projects.
+Propagate Makefile templates, .opencode/opencode.jsonc, and thoughts/ directory to all registered projects.
+Handles migration of legacy root-level `opencode.jsonc` to the `.opencode/` directory.
 By default, only creates files if missing. Use `--force` to overwrite existing files.
 
 ```bash
@@ -351,11 +391,71 @@ Each project gets a generated `Makefile` combining:
 
 ```bash
 make help                           # Show available commands
-make worktree-new BRANCH=feature    # Create worktree at .worktrees/feature
+make worktree-new [BRANCH=feature]  # Create worktree + tmux session (auto-names if omitted)
 make worktree-list                  # List all worktrees
-make worktree-remove BRANCH=feature # Remove worktree
+make worktree-attach BRANCH=feature # Attach to worktree's tmux session
+make worktree-sessions              # List tmux sessions for all worktrees
+make worktree-remove BRANCH=feature # Remove worktree and kill tmux session
 make worktree-setup                 # Run .worktree-setup.sh if present
 ```
+
+**Auto-naming examples:**
+```bash
+make worktree-new                   # Creates swift_fix_00, bright_fix_01, etc.
+make worktree-new BRANCH=my-feature # Creates my-feature worktree
+```
+
+**Naming system:**
+- Auto-generated names follow the pattern: `{adjective}_{noun}_{counter:02d}`
+- Provides 400 unique combinations (20 adjectives × 20 nouns)
+- Counter file stored at `.worktrees/.counter` (automatically gitignored)
+
+### Cross-Session Communication Commands
+
+Send commands to and read output from worktree sessions without leaving your main workspace:
+
+```bash
+make worktree-send BRANCH=<name> WINDOW=<window> CMD="<command>"  # Send command to worktree session
+make worktree-read BRANCH=<name> WINDOW=<window>                  # Capture visible pane content from worktree
+```
+
+**Examples:**
+```bash
+# Send test command from main repo to worktree
+make worktree-send BRANCH=feature-auth WINDOW=shell CMD="make test"
+
+# Read test output without attaching
+make worktree-read BRANCH=feature-auth WINDOW=shell
+
+# Send git command to git window
+make worktree-send BRANCH=feature-auth WINDOW=git CMD="git status"
+```
+
+**Window validation:** Non-existent windows show helpful error messages with list of available windows in the session.
+
+### Current Session Utilities Commands (run from within tmux)
+
+Convenient shortcuts for working within your active tmux session without specifying session names:
+
+```bash
+make tmux-send WINDOW=<window> CMD="<command>"  # Send command to window in current session
+make tmux-read WINDOW=<window>                  # Capture visible pane content from current session
+make tmux-list                                  # List all windows in current tmux session
+```
+
+**Examples:**
+```bash
+# Send test command to shell window in current session
+make tmux-send WINDOW=shell CMD="make test"
+
+# Read test output
+make tmux-read WINDOW=shell
+
+# Show all available windows with active marker
+make tmux-list
+```
+
+**Requirements:** Commands must be run from within an active tmux session. Running outside tmux will show a helpful error message.
 
 ### Python Commands
 
@@ -404,7 +504,7 @@ uv sync
 
 ## OpenCode Configuration
 
-Each project gets an `opencode.jsonc` file with language-specific AI assistant instructions:
+Each project gets an `.opencode/opencode.jsonc` file with language-specific AI assistant instructions:
 
 ### Python Projects
 ```json
@@ -434,7 +534,7 @@ Each project gets an `opencode.jsonc` file with language-specific AI assistant i
 }
 ```
 
-Templates are stored in `~/.config/overlord/templates/opencode-{lang}.jsonc`.
+Templates are stored in `~/bin/overlord/templates/opencode-{lang}.jsonc`.
 
 ## Thoughts Directory
 
@@ -453,10 +553,13 @@ This directory is always created additively - existing content is never removed 
 
 ## Registry Format
 
-The registry (`~/.config/overlord/registry.json`) stores project metadata:
+The registry (`~/bin/overlord/registry.json`) stores project metadata:
 
 ```json
 {
+  "settings": {
+    "base_dir": "/home/thomas/Work"
+  },
   "projects": {
     "project-name": {
       "lang": "python|typescript|solidity|base",
@@ -471,7 +574,7 @@ The registry (`~/.config/overlord/registry.json`) stores project metadata:
 
 ## Tmux Integration
 
-Each project can have a `.tmux.local` file for custom workspace setup. Templates are provided per language in `~/.config/overlord/tmux/`:
+Each project can have a `.tmux.local` file for custom workspace setup. Templates are provided per language in `~/bin/overlord/tmux/`:
 - `base.tmux` - Used for non-language-specific projects
 - Language-specific templates - `python.tmux`, `typescript.tmux`, `solidity.tmux`
 
@@ -502,6 +605,9 @@ overlord-migrate-init --execute
 - Generates registry.json
 - Backs up existing registry
 
+**Configuration Migration:**
+Newer versions of Overlord automatically move `opencode.jsonc` to the `.opencode/` directory during `overlord init` or `overlord sync` operations.
+
 ## Design Decisions
 
 1. **Status categories**: Three tiers (active/lib/archive) balance organization with simplicity
@@ -510,13 +616,20 @@ overlord-migrate-init --execute
 4. **Registry-based**: JSON registry enables metadata and aliases without filesystem complexity
 5. **Language templates**: Per-language tmux configurations for appropriate dev environments
 6. **Subcommand architecture**: Each command is a separate script for modularity and AI tool integration
+7. **Worktree auto-naming**: Counter-based naming generates unique worktree names (400 combinations from 20 adjectives × 20 nouns), with tmux sessions created automatically for each worktree
+8. **Integrated cleanup**: Removing a worktree automatically kills its associated tmux session, ensuring no orphaned sessions
+9. **Cross-session communication**: `worktree-send` and `worktree-read` allow coordinating multiple worktrees from the main session without switching
+10. **Session-local shortcuts**: `tmux-send`, `tmux-read`, and `tmux-list` provide convenient shortcuts for operations within the current session
+11. **Centralized Helpers**: `lib/common.sh` provides unified logging, language detection, and template handling logic across all subcommands.
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OVERLORD_CONFIG` | `~/.config/overlord` | Config directory |
-| `OVERLORD_BIN` | `~/bin/overlord` | Scripts directory |
+| `OVERLORD_BASE_DIR` | Registry or `$HOME/Work` | Root directory for project categories |
+| `OVERLORD_CONFIG` | script location | Directory for registry and templates |
+| `OVERLORD_BIN` | script location | Directory for overlord scripts |
+| `OVERLORD_STRICT` | `false` | Enable strict error handling for templates |
 | `EDITOR` | `nvim` | Editor for config/edit |
 
 ## Future Considerations

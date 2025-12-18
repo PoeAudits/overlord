@@ -4,17 +4,17 @@
 
 set -euo pipefail
 
-OVERLORD_CONFIG="${OVERLORD_CONFIG:-$HOME/.config/overlord}"
+OVERLORD_REPO="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
+OVERLORD_CONFIG="${OVERLORD_CONFIG:-$OVERLORD_REPO}"
 OVERLORD_REGISTRY="$OVERLORD_CONFIG/registry.json"
-MAKEFILE_DIR="$OVERLORD_CONFIG/makefiles"
+OVERLORD_BIN="${OVERLORD_BIN:-$OVERLORD_REPO}"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
+# Source common library
+source "$OVERLORD_BIN/lib/common.sh"
+
+# Colors for sync specifically
 DIM='\033[2m'
-NC='\033[0m'
+log_dim() { echo -e "${DIM}  $*${NC}"; }
 
 usage() {
   cat <<'EOF'
@@ -41,12 +41,6 @@ Examples:
   overlord sync --dry-run        # Preview changes
 EOF
 }
-
-log_info() { echo -e "${BLUE}>${NC} $*"; }
-log_success() { echo -e "${GREEN}✓${NC} $*"; }
-log_error() { echo -e "${RED}✗${NC} $*" >&2; }
-log_warning() { echo -e "${YELLOW}!${NC} $*"; }
-log_dim() { echo -e "${DIM}  $*${NC}"; }
 
 # Parse arguments
 FILTER_LANG=""
@@ -84,62 +78,6 @@ parse_args() {
   done
 }
 
-# Get language-specific makefile name
-get_lang_makefile() {
-  case "$1" in
-    python)     echo "python.mk" ;;
-    typescript) echo "typescript.mk" ;;
-    solidity)   echo "solidity.mk" ;;
-  esac
-}
-
-# Generate combined Makefile content
-generate_makefile() {
-  local lang="$1"
-  local lang_mk
-  lang_mk=$(get_lang_makefile "$lang")
-  
-  local base_file="$MAKEFILE_DIR/base.mk"
-  local lang_file="$MAKEFILE_DIR/$lang_mk"
-  
-  if [[ ! -f "$base_file" ]]; then
-    log_error "Base makefile not found: $base_file"
-    return 1
-  fi
-  
-  if [[ ! -f "$lang_file" ]]; then
-    log_error "Language makefile not found: $lang_file"
-    return 1
-  fi
-  
-  # Combine base + language-specific
-  cat "$base_file"
-  echo ""
-  cat "$lang_file"
-}
-
-# Generate opencode.jsonc content for a language
-generate_opencode() {
-  local lang="$1"
-  local template="$OVERLORD_CONFIG/templates/opencode-${lang}.jsonc"
-  
-  if [[ -f "$template" ]]; then
-    cat "$template"
-  else
-    return 1
-  fi
-}
-
-# Create thoughts directory structure (always additive)
-create_thoughts_dirs() {
-  local dir="$1"
-  local thoughts_dir="$dir/thoughts"
-  
-  for subdir in tickets plans logs research handoffs; do
-    mkdir -p "$thoughts_dir/$subdir"
-  done
-}
-
 # Sync a single project
 sync_project() {
   local name="$1"
@@ -152,13 +90,17 @@ sync_project() {
   fi
   
   local makefile_path="$path/Makefile"
-  local opencode_path="$path/opencode.jsonc"
+  local opencode_path="$path/.opencode/opencode.jsonc"
+  local legacy_opencode="$path/opencode.jsonc"
   local thoughts_path="$path/thoughts"
   
   if [[ "$DRY_RUN" == true ]]; then
     log_info "[dry-run] Would sync: $name ($lang)"
     if [[ ! -f "$makefile_path" ]] || [[ "$FORCE" == true ]]; then
       log_dim "  -> $makefile_path"
+    fi
+    if [[ -f "$legacy_opencode" ]]; then
+      log_dim "  -> Migrate $legacy_opencode to $opencode_path"
     fi
     if [[ ! -f "$opencode_path" ]] || [[ "$FORCE" == true ]]; then
       log_dim "  -> $opencode_path"
@@ -170,31 +112,31 @@ sync_project() {
   fi
   
   local synced_something=false
+
+  # Migrate legacy opencode.jsonc if found
+  if [[ -f "$legacy_opencode" ]]; then
+    log_info "  Migrating $name: opencode.jsonc -> .opencode/opencode.jsonc"
+    mkdir -p "$path/.opencode"
+    mv "$legacy_opencode" "$opencode_path"
+    synced_something=true
+  fi
   
   # Sync Makefile
   if [[ ! -f "$makefile_path" ]] || [[ "$FORCE" == true ]]; then
-    if generate_makefile "$lang" > "$makefile_path"; then
-      log_success "Synced Makefile: $name"
-      synced_something=true
-    else
-      log_error "Failed to sync Makefile: $name"
-    fi
+    # overlord-sync should fail if base.mk is missing
+    OVERLORD_STRICT=true generate_makefile "$path" "$lang"
+    synced_something=true
   fi
   
   # Sync opencode.jsonc
   if [[ ! -f "$opencode_path" ]] || [[ "$FORCE" == true ]]; then
-    if generate_opencode "$lang" > "$opencode_path"; then
-      log_success "Synced opencode.jsonc: $name"
-      synced_something=true
-    else
-      log_warning "No opencode template for $lang: $name"
-    fi
+    copy_opencode_template "$path" "$lang"
+    synced_something=true
   fi
   
   # Create thoughts directories (always additive)
   if [[ ! -d "$thoughts_path/tickets" ]]; then
     create_thoughts_dirs "$path"
-    log_success "Created thoughts/: $name"
     synced_something=true
   fi
   
@@ -228,8 +170,6 @@ sync_projects() {
   fi
   
   local synced_count=0
-  local failed_count=0
-  local skipped_count=0
   
   if [[ "$DRY_RUN" == true ]]; then
     log_info "Dry run mode - no changes will be made"
@@ -238,9 +178,7 @@ sync_projects() {
   
   while IFS=$'\t' read -r name lang path; do
     if sync_project "$name" "$lang" "$path"; then
-      ((synced_count++))
-    else
-      ((failed_count++))
+      ((synced_count++ || 1))
     fi
   done <<< "$projects"
   

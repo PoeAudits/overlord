@@ -1,0 +1,7 @@
+# Worktrees directory (used for testing)
+.worktrees/
+
+# User-specific registry (created by setup.sh)
+registry.json
+registry.json.bak
+registry.json.pre-migration.*

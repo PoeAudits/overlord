@@ -5,9 +5,16 @@
 set -euo pipefail
 
 OVERLORD_VERSION="1.0.0"
-OVERLORD_CONFIG="${OVERLORD_CONFIG:-$HOME/.config/overlord}"
+# Auto-detect repository directory (handles symlinked installation)
+OVERLORD_REPO="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
+OVERLORD_CONFIG="${OVERLORD_CONFIG:-$OVERLORD_REPO}"
 OVERLORD_REGISTRY="$OVERLORD_CONFIG/registry.json"
-OVERLORD_BIN="${OVERLORD_BIN:-$HOME/bin/overlord}"
+OVERLORD_BIN="$OVERLORD_REPO"
+
+# Resolve BASE_DIR with priority: ENV > Registry > Default
+OVERLORD_BASE_DIR="${OVERLORD_BASE_DIR:-$(jq -r '.settings.base_dir // empty' "$OVERLORD_REGISTRY" 2>/dev/null || echo "$HOME/Work")}"
+
+export OVERLORD_CONFIG OVERLORD_BIN OVERLORD_BASE_DIR
 
 # Colors
 RED='\033[0;31m'
@@ -41,8 +48,8 @@ Subcommand Help:
   overlord <command> --help             Show help for specific command
 
 Environment:
-  OVERLORD_CONFIG   Config directory (default: ~/.config/overlord)
-  OVERLORD_BIN      Scripts directory (default: ~/bin)
+  OVERLORD_CONFIG   Config directory (default: auto-detected from script location)
+  OVERLORD_BIN      Scripts directory (default: auto-detected from script location)
   EDITOR            Editor for config/edit commands
 EOF
 }

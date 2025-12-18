@@ -3,8 +3,11 @@
 
 set -euo pipefail
 
-OVERLORD_BIN="${OVERLORD_BIN:-$HOME/bin/overlord}"
+OVERLORD_BIN="${OVERLORD_BIN:-$(cd "$(dirname "$(realpath "$0")")" && pwd)}"
 EDITOR="${EDITOR:-nvim}"
+
+# Source common library
+source "$OVERLORD_BIN/lib/common.sh"
 
 usage() {
   cat <<'EOF'
@@ -16,8 +19,6 @@ Opens the overlord scripts directory in your editor ($EDITOR or nvim).
 Use this to:
   - View or modify overlord scripts
   - Check AGENTS.md documentation
-
-The scripts are located at: ~/bin/overlord*
 EOF
 }
 

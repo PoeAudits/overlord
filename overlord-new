@@ -4,16 +4,13 @@
 
 set -euo pipefail
 
-OVERLORD_CONFIG="${OVERLORD_CONFIG:-$HOME/.config/overlord}"
+OVERLORD_REPO="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
+OVERLORD_CONFIG="${OVERLORD_CONFIG:-$OVERLORD_REPO}"
 OVERLORD_REGISTRY="$OVERLORD_CONFIG/registry.json"
-WORK_DIR="$HOME/Work"
+OVERLORD_BIN="${OVERLORD_BIN:-$OVERLORD_REPO}"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# Source common library
+source "$OVERLORD_BIN/lib/common.sh"
 
 usage() {
   cat <<'EOF'
@@ -38,11 +35,6 @@ Examples:
   overlord new mycontract --sol --no-open
 EOF
 }
-
-log_info() { echo -e "${BLUE}>${NC} $*"; }
-log_success() { echo -e "${GREEN}✓${NC} $*"; }
-log_error() { echo -e "${RED}✗${NC} $*" >&2; }
-log_warning() { echo -e "${YELLOW}!${NC} $*"; }
 
 # Parse arguments
 LANGUAGE=""
@@ -122,22 +114,6 @@ validate_project_name() {
   fi
 }
 
-get_lang_dir() {
-  case "$1" in
-    python)     echo "Python" ;;
-    typescript) echo "Typescript" ;;
-    solidity)   echo "Solidity" ;;
-  esac
-}
-
-get_status_dir() {
-  case "$1" in
-    active)  echo "active" ;;
-    lib)     echo "libs" ;;
-    archive) echo "archive" ;;
-  esac
-}
-
 # Initialize Python project
 init_python() {
   local dir="$1"
@@ -148,8 +124,10 @@ init_python() {
     exit 1
   fi
 
-  cd "$dir"
-  uv init
+  (
+    cd "$dir"
+    uv init
+  )
   log_success "Python project initialized"
 }
 
@@ -163,12 +141,13 @@ init_typescript() {
     exit 1
   fi
 
-  cd "$dir"
-  pnpm init
-  pnpm add -D typescript @types/node
+  (
+    cd "$dir"
+    pnpm init
+    pnpm add -D typescript @types/node
 
-  if [[ ! -f "tsconfig.json" ]]; then
-    cat > tsconfig.json <<'TSCONFIG'
+    if [[ ! -f "tsconfig.json" ]]; then
+      cat > tsconfig.json <<'TSCONFIG'
 {
   "compilerOptions": {
     "target": "ES2022",
@@ -187,9 +166,10 @@ init_typescript() {
   "exclude": ["node_modules", "dist"]
 }
 TSCONFIG
-  fi
-  
-  mkdir -p src
+    fi
+    
+    mkdir -p src
+  )
   log_success "TypeScript project initialized"
 }
 
@@ -203,8 +183,10 @@ init_solidity() {
     exit 1
   fi
 
-  cd "$dir"
-  forge init --no-commit
+  (
+    cd "$dir"
+    forge init --no-commit
+  )
   log_success "Solidity project initialized"
 }
 
@@ -213,98 +195,17 @@ init_git() {
   local dir="$1"
   log_info "Initializing git repository..."
   
-  cd "$dir"
-  if [[ ! -d ".git" ]]; then
-    git init
-    git add .
-    git commit -m "Initial commit" 2>/dev/null || log_warning "No changes to commit"
-    log_success "Git repository initialized"
-  else
-    log_warning "Git repository already exists"
-  fi
-}
-
-# Copy tmux template
-copy_tmux_template() {
-  local dir="$1"
-  local lang="$2"
-  local template="$OVERLORD_CONFIG/tmux/${lang}.tmux"
-  
-  if [[ -f "$template" ]]; then
-    cp "$template" "$dir/.tmux.local"
-    chmod +x "$dir/.tmux.local"
-    log_success "Copied ${lang} tmux template"
-  else
-    log_warning "No tmux template found for ${lang}"
-  fi
-}
-
-# Get language-specific makefile name
-get_lang_makefile() {
-  case "$1" in
-    python)     echo "python.mk" ;;
-    typescript) echo "typescript.mk" ;;
-    solidity)   echo "solidity.mk" ;;
-  esac
-}
-
-# Generate Makefile from templates
-generate_makefile() {
-  local dir="$1"
-  local lang="$2"
-  local makefile_dir="$OVERLORD_CONFIG/makefiles"
-  local lang_mk
-  lang_mk=$(get_lang_makefile "$lang")
-  
-  local base_file="$makefile_dir/base.mk"
-  local lang_file="$makefile_dir/$lang_mk"
-  
-  if [[ ! -f "$base_file" ]]; then
-    log_warning "Base makefile template not found"
-    return 0
-  fi
-  
-  if [[ ! -f "$lang_file" ]]; then
-    log_warning "Language makefile template not found for ${lang}"
-    return 0
-  fi
-  
-  # Combine base + language-specific
-  {
-    cat "$base_file"
-    echo ""
-    cat "$lang_file"
-  } > "$dir/Makefile"
-  
-  log_success "Generated Makefile"
-}
-
-# Copy opencode.jsonc template
-copy_opencode_template() {
-  local dir="$1"
-  local lang="$2"
-  local template="$OVERLORD_CONFIG/templates/opencode-${lang}.jsonc"
-  
-  if [[ -f "$template" ]]; then
-    cp "$template" "$dir/opencode.jsonc"
-    log_success "Created opencode.jsonc"
-  else
-    log_warning "No opencode template found for ${lang}"
-  fi
-}
-
-# Create thoughts directory structure
-create_thoughts_dirs() {
-  local dir="$1"
-  local thoughts_dir="$dir/thoughts"
-  
-  mkdir -p "$thoughts_dir/tickets"
-  mkdir -p "$thoughts_dir/plans"
-  mkdir -p "$thoughts_dir/logs"
-  mkdir -p "$thoughts_dir/research"
-  mkdir -p "$thoughts_dir/handoffs"
-  
-  log_success "Created thoughts/ directory structure"
+  (
+    cd "$dir"
+    if [[ ! -d ".git" ]]; then
+      git init
+      git add .
+      git commit -m "Initial commit" 2>/dev/null || log_warning "No changes to commit"
+      log_success "Git repository initialized"
+    else
+      log_warning "Git repository already exists"
+    fi
+  )
 }
 
 # Register project in registry
@@ -345,7 +246,7 @@ main() {
   local status_dir
   status_dir=$(get_status_dir "$STATUS")
   
-  local project_dir="$WORK_DIR/$lang_dir/$status_dir/$PROJECT_NAME"
+  local project_dir="$OVERLORD_BASE_DIR/$lang_dir/$status_dir/$PROJECT_NAME"
 
   log_info "Creating ${LANGUAGE} project: ${PROJECT_NAME}"
   log_info "Location: $project_dir"
@@ -381,16 +282,10 @@ main() {
     echo ""
   fi
 
-  # Copy tmux template
+  # Copy templates and initialize
   copy_tmux_template "$project_dir" "$LANGUAGE"
-
-  # Generate Makefile
   generate_makefile "$project_dir" "$LANGUAGE"
-
-  # Create opencode.jsonc
   copy_opencode_template "$project_dir" "$LANGUAGE"
-
-  # Create thoughts directory structure
   create_thoughts_dirs "$project_dir"
 
   # Register in registry
@@ -403,7 +298,7 @@ main() {
   # Open workspace
   if [[ "$OPEN_WS" == true ]]; then
     log_info "Opening workspace..."
-    exec "$HOME/bin/overlord-open" "$PROJECT_NAME"
+    exec "$OVERLORD_BIN/overlord-open" "$PROJECT_NAME"
   else
     log_info "Run 'overlord open ${PROJECT_NAME}' to open workspace"
   fi

@@ -2,7 +2,7 @@
 type: feature
 priority: high
 created: 2025-12-16T00:00:00Z
-status: planned
+status: archived
 tags: [worktree, tmux, automation, makefile, base.mk]
 keywords: [worktree, tmux, base.mk, session management, counter-based naming, overlord sync]
 patterns: [makefile targets, tmux session creation, git worktree, cross-session commands]

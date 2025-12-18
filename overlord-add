@@ -4,15 +4,14 @@
 
 set -euo pipefail
 
-OVERLORD_CONFIG="${OVERLORD_CONFIG:-$HOME/.config/overlord}"
+# Use parent-provided OVERLORD_CONFIG or auto-detect
+OVERLORD_REPO="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
+OVERLORD_CONFIG="${OVERLORD_CONFIG:-$OVERLORD_REPO}"
 OVERLORD_REGISTRY="$OVERLORD_CONFIG/registry.json"
+OVERLORD_BIN="${OVERLORD_BIN:-$OVERLORD_REPO}"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# Source common library
+source "$OVERLORD_BIN/lib/common.sh"
 
 usage() {
   cat <<'EOF'
@@ -41,114 +40,10 @@ Examples:
 EOF
 }
 
-log_info() { echo -e "${BLUE}>${NC} $*"; }
-log_success() { echo -e "${GREEN}✓${NC} $*"; }
-log_error() { echo -e "${RED}✗${NC} $*" >&2; }
-log_warning() { echo -e "${YELLOW}!${NC} $*"; }
-
-# Detect language from project files
-detect_language() {
-  local dir="$1"
-  if [[ -f "$dir/pyproject.toml" ]] || [[ -f "$dir/setup.py" ]]; then
-    echo "python"
-  elif [[ -f "$dir/package.json" ]]; then
-    echo "typescript"
-  elif [[ -f "$dir/foundry.toml" ]]; then
-    echo "solidity"
-  else
-    echo "base"
-  fi
-}
-
 # Check if project name exists in registry
 check_registry_exists() {
   local name="$1"
   jq -e --arg name "$name" '.projects[$name]' "$OVERLORD_REGISTRY" >/dev/null 2>&1
-}
-
-# Copy tmux template
-copy_tmux_template() {
-  local dir="$1"
-  local lang="$2"
-  local template="$OVERLORD_CONFIG/tmux/${lang}.tmux"
-  local base_template="$OVERLORD_CONFIG/tmux/base.tmux"
-  
-  # Skip if .tmux.local already exists
-  if [[ -f "$dir/.tmux.local" ]]; then
-    log_info ".tmux.local already exists, skipping template copy"
-    return 0
-  fi
-  
-  # Try language-specific template first
-  if [[ -f "$template" ]]; then
-    cp "$template" "$dir/.tmux.local"
-    chmod +x "$dir/.tmux.local"
-    log_success "Copied ${lang} tmux template"
-  elif [[ -f "$base_template" ]]; then
-    # Fall back to base template
-    cp "$base_template" "$dir/.tmux.local"
-    chmod +x "$dir/.tmux.local"
-    log_success "Copied base tmux template"
-  else
-    log_warning "No tmux template found for ${lang} or base"
-  fi
-}
-
-# Get language-specific makefile name
-get_lang_makefile() {
-  case "$1" in
-    python)     echo "python.mk" ;;
-    typescript) echo "typescript.mk" ;;
-    solidity)   echo "solidity.mk" ;;
-    base)       echo "" ;;
-  esac
-}
-
-# Generate Makefile from templates
-generate_makefile() {
-  local dir="$1"
-  local lang="$2"
-  local makefile_dir="$OVERLORD_CONFIG/makefiles"
-  local base_file="$makefile_dir/base.mk"
-  
-  # Skip if Makefile already exists
-  if [[ -f "$dir/Makefile" ]]; then
-    log_info "Makefile already exists, skipping generation"
-    return 0
-  fi
-  
-  if [[ ! -f "$base_file" ]]; then
-    log_warning "Base makefile template not found"
-    return 0
-  fi
-  
-  # For base language, use only base.mk
-  if [[ "$lang" == "base" ]]; then
-    cp "$base_file" "$dir/Makefile"
-    log_success "Generated Makefile (base only)"
-    return 0
-  fi
-  
-  # For other languages, combine base + language-specific
-  local lang_mk
-  lang_mk=$(get_lang_makefile "$lang")
-  local lang_file="$makefile_dir/$lang_mk"
-  
-  if [[ ! -f "$lang_file" ]]; then
-    log_warning "Language makefile template not found for ${lang}, using base only"
-    cp "$base_file" "$dir/Makefile"
-    log_success "Generated Makefile (base only)"
-    return 0
-  fi
-  
-  # Combine base + language-specific
-  {
-    cat "$base_file"
-    echo ""
-    cat "$lang_file"
-  } > "$dir/Makefile"
-  
-  log_success "Generated Makefile"
 }
 
 # Register project in registry with aliases
@@ -333,10 +228,18 @@ main() {
   fi
 
   # Copy tmux template if missing
-  copy_tmux_template "$PROJECT_PATH" "$LANGUAGE"
+  if [[ ! -f "$PROJECT_PATH/.tmux.local" ]]; then
+    copy_tmux_template "$PROJECT_PATH" "$LANGUAGE"
+  else
+    log_info ".tmux.local already exists, skipping template copy"
+  fi
 
   # Generate Makefile if missing
-  generate_makefile "$PROJECT_PATH" "$LANGUAGE"
+  if [[ ! -f "$PROJECT_PATH/Makefile" ]]; then
+    generate_makefile "$PROJECT_PATH" "$LANGUAGE"
+  else
+    log_info "Makefile already exists, skipping generation"
+  fi
 
   # Register in registry with aliases
   register_project "$PROJECT_NAME" "$LANGUAGE" "$STATUS" "$PROJECT_PATH" "${ALIASES[@]}"

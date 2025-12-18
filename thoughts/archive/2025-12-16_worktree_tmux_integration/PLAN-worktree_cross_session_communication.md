@@ -133,20 +133,20 @@ make worktree-send BRANCH=swift_fix_00 WINDOW=editor CMD=":q"
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Parameter validation: Call without BRANCH, verify error message
-- [ ] Parameter validation: Call without WINDOW, verify error message
-- [ ] Parameter validation: Call without CMD, verify error message
-- [ ] Session validation: Send to non-existent session, verify error and session list shown
-- [ ] Window validation: Send to non-existent window, verify error and window list shown
-- [ ] Command execution: Send `echo test`, verify command executes in target window
+- [x] Parameter validation: Call without BRANCH, verify error message
+- [x] Parameter validation: Call without WINDOW, verify error message
+- [x] Parameter validation: Call without CMD, verify error message
+- [x] Session validation: Send to non-existent session, verify error and session list shown
+- [x] Window validation: Send to non-existent window, verify error and window list shown
+- [x] Command execution: Send `echo test`, verify command executes in target window
 
 #### Manual Verification:
-- [ ] Command executes in correct window of correct session
-- [ ] Error messages are clear and actionable
-- [ ] Window list in error shows all available windows correctly
-- [ ] Session list in error shows all worktree sessions
-- [ ] Complex commands work (pipes, quotes, multiple arguments)
-- [ ] Commands execute immediately (auto-Enter with C-m)
+- [x] Command executes in correct window of correct session
+- [x] Error messages are clear and actionable
+- [x] Window list in error shows all available windows correctly
+- [x] Session list in error shows all worktree sessions
+- [x] Complex commands work (pipes, quotes, multiple arguments)
+- [x] Commands execute immediately (auto-Enter with C-m)
 
 ---
 
@@ -218,19 +218,19 @@ make worktree-read BRANCH=swift_fix_00 WINDOW=editor
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Parameter validation: Call without BRANCH, verify error message
-- [ ] Parameter validation: Call without WINDOW, verify error message
-- [ ] Session validation: Read from non-existent session, verify error and session list
-- [ ] Window validation: Read from non-existent window, verify error and window list
-- [ ] Content capture: Send command, then read, verify output captured
+- [x] Parameter validation: Call without BRANCH, verify error message
+- [x] Parameter validation: Call without WINDOW, verify error message
+- [x] Session validation: Read from non-existent session, verify error and session list
+- [x] Window validation: Read from non-existent window, verify error and window list
+- [x] Content capture: Send command, then read, verify output captured
 
 #### Manual Verification:
-- [ ] Captured content matches visible pane when attached
-- [ ] Only visible content captured (not full scrollback)
-- [ ] Output is readable and properly formatted
-- [ ] Error messages match `worktree-send` style (consistent UX)
-- [ ] Works with different window types (editor, shell, git)
-- [ ] Separator line improves readability
+- [x] Captured content matches visible pane when attached
+- [x] Only visible content captured (not full scrollback)
+- [x] Output is readable and properly formatted
+- [x] Error messages match `worktree-send` style (consistent UX)
+- [x] Works with different window types (editor, shell, git)
+- [x] Separator line improves readability
 
 ---
 
@@ -308,17 +308,17 @@ overlord sync --force
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] .PHONY includes new targets: `grep worktree-send base.mk`
-- [ ] Help text includes new section: `make help | grep "Cross-Session Communication"`
-- [ ] Help shows examples: `make help | grep worktree-send`
-- [ ] Sync completes: `overlord sync --force` exits with code 0
-- [ ] Sample project updated: `grep worktree-send ~/Work/Python/active/*/Makefile`
+- [x] .PHONY includes new targets: `grep worktree-send base.mk`
+- [x] Help text includes new section: `make help | grep "Cross-Session Communication"`
+- [x] Help shows examples: `make help | grep worktree-send`
+- [x] Sync completes: `overlord sync --force` exits with code 0
+- [x] Sample project updated: `grep worktree-send ~/Work/Python/active/*/Makefile`
 
 #### Manual Verification:
-- [ ] Help text is well-organized and readable
-- [ ] Examples are practical and clear
-- [ ] All registered projects received updates
-- [ ] No syntax errors in any generated Makefiles
+- [x] Help text is well-organized and readable
+- [x] Examples are practical and clear
+- [x] All registered projects received updates
+- [x] No syntax errors in any generated Makefiles
 
 ---
 

@@ -3,9 +3,14 @@
 
 set -euo pipefail
 
-OVERLORD_CONFIG="${OVERLORD_CONFIG:-$HOME/.config/overlord}"
+OVERLORD_REPO="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
+OVERLORD_CONFIG="${OVERLORD_CONFIG:-$OVERLORD_REPO}"
 OVERLORD_REGISTRY="$OVERLORD_CONFIG/registry.json"
+OVERLORD_BIN="${OVERLORD_BIN:-$OVERLORD_REPO}"
 EDITOR="${EDITOR:-nvim}"
+
+# Source common library
+source "$OVERLORD_BIN/lib/common.sh"
 
 usage() {
   cat <<'EOF'
@@ -18,8 +23,6 @@ Use this to:
   - Add or modify project aliases
   - Manually edit project metadata
   - Fix registry issues
-
-The registry is located at: ~/.config/overlord/registry.json
 EOF
 }
 
@@ -30,7 +33,7 @@ main() {
   fi
 
   if [[ ! -f "$OVERLORD_REGISTRY" ]]; then
-    echo "Creating registry at $OVERLORD_REGISTRY"
+    log_info "Creating registry at $OVERLORD_REGISTRY"
     mkdir -p "$OVERLORD_CONFIG"
     echo '{"projects":{}}' > "$OVERLORD_REGISTRY"
   fi

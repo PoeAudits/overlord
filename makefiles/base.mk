@@ -5,6 +5,7 @@
 
 .PHONY: help worktree-new worktree-list worktree-remove worktree-setup \
         worktree-attach worktree-sessions worktree-send worktree-read \
+        tmux-send tmux-read tmux-list \
         _create_worktree_session
 
 # Default worktree directory (inside project)
@@ -89,13 +90,20 @@ help:
 	@echo "  make worktree-read BRANCH=<name> WINDOW=<window>"
 	@echo "                                           Read visible pane content from worktree"
 	@echo ""
+	@echo "Current Session Utilities (run from within tmux):"
+	@echo "  make tmux-send WINDOW=<window> CMD=\"<command>\""
+	@echo "                                           Send command to current session window"
+	@echo "  make tmux-read WINDOW=<window>           Read visible pane content from window"
+	@echo "  make tmux-list                           List all windows in current session"
+	@echo ""
 	@echo "Examples:"
 	@echo "  make worktree-new                        Create worktree with auto-generated name"
 	@echo "  make worktree-new BRANCH=fix-auth        Create worktree named 'fix-auth'"
+	@echo "  make tmux-send WINDOW=shell CMD=\"make test\""
+	@echo "  make tmux-read WINDOW=shell              Read test output"
+	@echo "  make tmux-list                           Show available windows"
 	@echo "  make worktree-send BRANCH=fix-auth WINDOW=shell CMD=\"make test\""
-	@echo "  make worktree-read BRANCH=fix-auth WINDOW=shell"
 	@echo "  make worktree-attach BRANCH=fix-auth     Attach to 'fix-auth' session"
-	@echo "  make worktree-remove BRANCH=fix-auth     Remove worktree and session"
 	@echo ""
 
 # Create a new worktree with tmux session
@@ -356,3 +364,85 @@ endif
 	echo "Reading from $$SESSION:$$WINDOW_NAME:"; \
 	echo "----------------------------------------"; \
 	tmux capture-pane -t "$$SESSION:$$WINDOW_NAME" -p
+
+# Send command to window in current tmux session
+# Usage: make tmux-send WINDOW=<window> CMD="<command>"
+tmux-send:
+ifndef WINDOW
+	$(error WINDOW is required. Usage: make tmux-send WINDOW=<window> CMD="<command>")
+endif
+ifndef CMD
+	$(error CMD is required. Usage: make tmux-send WINDOW=<window> CMD="<command>")
+endif
+	@if [ -z "$$TMUX" ]; then \
+		echo "Error: Not running inside tmux session"; \
+		echo ""; \
+		echo "This command must be run from within a tmux session."; \
+		echo "Use 'overlord open' or 'make worktree-attach' to enter a session."; \
+		exit 1; \
+	fi; \
+	\
+	SESSION=$$(tmux display-message -p '#S'); \
+	WINDOW_NAME="$(WINDOW)"; \
+	COMMAND="$(CMD)"; \
+	\
+	if ! tmux list-windows -t "$$SESSION" 2>/dev/null | grep -q "^[0-9]*: $$WINDOW_NAME"; then \
+		echo "Error: Window '$$WINDOW_NAME' does not exist in current session '$$SESSION'"; \
+		echo ""; \
+		echo "Available windows:"; \
+		tmux list-windows -t "$$SESSION" 2>/dev/null | awk '{print "  " $$2}' | sed 's/\*$$//'; \
+		exit 1; \
+	fi; \
+	\
+	echo "Sending to $$SESSION:$$WINDOW_NAME: $$COMMAND"; \
+	tmux send-keys -t "$$SESSION:$$WINDOW_NAME" "$$COMMAND" C-m
+
+# Read visible pane content from window in current tmux session
+# Usage: make tmux-read WINDOW=<window>
+tmux-read:
+ifndef WINDOW
+	$(error WINDOW is required. Usage: make tmux-read WINDOW=<window>)
+endif
+	@if [ -z "$$TMUX" ]; then \
+		echo "Error: Not running inside tmux session"; \
+		echo ""; \
+		echo "This command must be run from within a tmux session."; \
+		echo "Use 'overlord open' or 'make worktree-attach' to enter a session."; \
+		exit 1; \
+	fi; \
+	\
+	SESSION=$$(tmux display-message -p '#S'); \
+	WINDOW_NAME="$(WINDOW)"; \
+	\
+	if ! tmux list-windows -t "$$SESSION" 2>/dev/null | grep -q "^[0-9]*: $$WINDOW_NAME"; then \
+		echo "Error: Window '$$WINDOW_NAME' does not exist in current session '$$SESSION'"; \
+		echo ""; \
+		echo "Available windows:"; \
+		tmux list-windows -t "$$SESSION" 2>/dev/null | awk '{print "  " $$2}' | sed 's/\*$$//'; \
+		exit 1; \
+	fi; \
+	\
+	echo "Reading from $$SESSION:$$WINDOW_NAME:"; \
+	echo "----------------------------------------"; \
+	tmux capture-pane -t "$$SESSION:$$WINDOW_NAME" -p
+
+# List all windows in current tmux session
+# Usage: make tmux-list
+tmux-list:
+	@if [ -z "$$TMUX" ]; then \
+		echo "Error: Not running inside tmux session"; \
+		echo ""; \
+		echo "This command must be run from within a tmux session."; \
+		echo "Use 'overlord open' or 'make worktree-attach' to enter a session."; \
+		exit 1; \
+	fi; \
+	\
+	SESSION=$$(tmux display-message -p '#S'); \
+	echo "Windows in session '$$SESSION':"; \
+	echo ""; \
+	tmux list-windows -t "$$SESSION" | while IFS=: read -r index rest; do \
+		NAME=$$(echo "$$rest" | awk '{print $$1}' | sed 's/\*$$//'); \
+		IS_ACTIVE=$$(echo "$$rest" | grep -q '\*' && echo " (active)" || echo ""); \
+		printf "  %s%s\n" "$$NAME" "$$IS_ACTIVE"; \
+	done; \
+	echo ""

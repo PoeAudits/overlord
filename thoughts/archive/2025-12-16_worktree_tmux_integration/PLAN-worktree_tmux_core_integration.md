@@ -89,13 +89,13 @@ Create a `.gitignore` file in the overlord repository to prevent committing the 
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `.gitignore` file exists: `test -f /home/thomas/bin/overlord/.gitignore`
-- [ ] File contains `.worktrees/` pattern: `grep -q '\.worktrees/' /home/thomas/bin/overlord/.gitignore`
-- [ ] Git ignores worktrees directory: `cd /home/thomas/bin/overlord && mkdir -p .worktrees && git status --porcelain | grep -qv '.worktrees'`
+- [x] `.gitignore` file exists: `test -f /home/thomas/bin/overlord/.gitignore`
+- [x] File contains `.worktrees/` pattern: `grep -q '\.worktrees/' /home/thomas/bin/overlord/.gitignore`
+- [x] Git ignores worktrees directory: `cd /home/thomas/bin/overlord && mkdir -p .worktrees && git status --porcelain | grep -qv '.worktrees'`
 
 #### Manual Verification:
-- [ ] Creating `.worktrees/` directory in overlord repo doesn't show in `git status`
-- [ ] Creating `.worktrees/.counter` file doesn't show in `git status`
+- [x] Creating `.worktrees/` directory in overlord repo doesn't show in `git status`
+- [x] Creating `.worktrees/.counter` file doesn't show in `git status`
 
 ---
 
