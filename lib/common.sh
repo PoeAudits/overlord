@@ -150,3 +150,35 @@ create_thoughts_dirs() {
     log_success "Created thoughts/ directory structure"
   fi
 }
+
+# Find project by exact name or alias
+find_project_exact() {
+  local query="$1"
+  
+  # Try exact name match
+  local result
+  result=$(jq -r --arg q "$query" '
+    .projects | to_entries[] | 
+    select(.key == $q) | 
+    [.key, .value.lang, .value.status, .value.path] | @tsv
+  ' "$OVERLORD_REGISTRY" 2>/dev/null || true)
+  
+  if [[ -n "$result" ]]; then
+    echo "$result"
+    return 0
+  fi
+  
+  # Try alias match
+  result=$(jq -r --arg q "$query" '
+    .projects | to_entries[] | 
+    select(.value.aliases != null and (.value.aliases[] == $q)) | 
+    [.key, .value.lang, .value.status, .value.path] | @tsv
+  ' "$OVERLORD_REGISTRY" 2>/dev/null || true)
+  
+  if [[ -n "$result" ]]; then
+    echo "$result"
+    return 0
+  fi
+  
+  return 1
+}

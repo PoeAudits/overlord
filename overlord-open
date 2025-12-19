@@ -16,54 +16,27 @@ source "$OVERLORD_BIN/lib/common.sh"
 usage() {
   cat <<'EOF'
 Usage:
-  overlord open [name]
+  overlord open [name] [--fuzzy|-f]
 
 Arguments:
   name      Project name or alias (optional)
+
+Options:
+  --fuzzy, -f    Force fuzzy search (skip exact match)
 
 Behavior:
   - No argument: Launch fzf picker with active/lib projects
   - Exact match: Open project immediately
   - No exact match: Launch fzf pre-filtered with query
+  - With --fuzzy: Skip exact match and launch fzf immediately
   - Archived projects cannot be opened (must move to active first)
 
 Examples:
   overlord open              # Interactive picker
   overlord open myproject    # Open exact match
   overlord open mypr         # Fuzzy search if no exact match
+  overlord open mypr --fuzzy # Force fuzzy search
 EOF
-}
-
-# Find project by exact name or alias
-find_project_exact() {
-  local query="$1"
-  
-  # Try exact name match
-  local result
-  result=$(jq -r --arg q "$query" '
-    .projects | to_entries[] | 
-    select(.key == $q) | 
-    [.key, .value.lang, .value.status, .value.path] | @tsv
-  ' "$OVERLORD_REGISTRY" 2>/dev/null || true)
-  
-  if [[ -n "$result" ]]; then
-    echo "$result"
-    return 0
-  fi
-  
-  # Try alias match
-  result=$(jq -r --arg q "$query" '
-    .projects | to_entries[] | 
-    select(.value.aliases != null and (.value.aliases[] == $q)) | 
-    [.key, .value.lang, .value.status, .value.path] | @tsv
-  ' "$OVERLORD_REGISTRY" 2>/dev/null || true)
-  
-  if [[ -n "$result" ]]; then
-    echo "$result"
-    return 0
-  fi
-  
-  return 1
 }
 
 # Get all openable projects (active and lib only)
@@ -202,19 +175,34 @@ main() {
 
   local query="${1:-}"
   shift || true
+  
+  # Check for fuzzy flag
+  local force_fuzzy=false
+  if [[ "${1:-}" == "--fuzzy" || "${1:-}" == "-f" ]]; then
+    force_fuzzy=true
+    shift || true
+  fi
 
   local project_name=""
   local project_info=""
 
   if [[ -n "$query" ]]; then
-    # Try exact match first
-    if project_info=$(find_project_exact "$query"); then
-      project_name=$(echo "$project_info" | cut -f1)
-    else
-      # No exact match, use fzf with query
+    # If fuzzy flag is set, skip exact match and go straight to fzf
+    if [[ "$force_fuzzy" == true ]]; then
       project_name=$(run_fzf_picker "$query")
       if [[ -n "$project_name" ]]; then
         project_info=$(find_project_exact "$project_name")
+      fi
+    else
+      # Try exact match first
+      if project_info=$(find_project_exact "$query"); then
+        project_name=$(echo "$project_info" | cut -f1)
+      else
+        # No exact match, use fzf with query
+        project_name=$(run_fzf_picker "$query")
+        if [[ -n "$project_name" ]]; then
+          project_info=$(find_project_exact "$project_name")
+        fi
       fi
     fi
   else
