@@ -22,15 +22,35 @@ DIM='\033[2m'
 usage() {
   cat <<'EOF'
 Usage:
+<<<<<<< HEAD
   overlord detect
+=======
+  overlord detect [options]
+>>>>>>> 685c960 (Local setup script changes)
 
 Displays all projects found on disk in $OVERLORD_BASE_DIR that are not
 registered in the Overlord registry.
 
+<<<<<<< HEAD
 Output shows: NAME | LANG | STATUS | PATH
 
 Examples:
   overlord detect          # Show unregistered projects
+=======
+Options:
+  --register               Register all detected projects into the registry
+  --force                  Overwrite existing registry entries (with --register)
+  --dry-run                Preview what would be registered (with --register)
+  --help                   Show this help
+
+Output shows: NAME | LANG | STATUS | PATH
+
+Examples:
+  overlord detect                    # Show unregistered projects
+  overlord detect --register         # Register all unregistered projects
+  overlord detect --register --force # Register and overwrite existing entries
+  overlord detect --register --dry-run # Preview what would be registered
+>>>>>>> 685c960 (Local setup script changes)
 EOF
 }
 
@@ -146,6 +166,100 @@ lang_short() {
   esac
 }
 
+<<<<<<< HEAD
+=======
+# Check if project name exists in registry
+check_registry_exists() {
+  local name="$1"
+  jq -e --arg name "$name" '.projects[$name]' "$OVERLORD_REGISTRY" >/dev/null 2>&1 || return 1
+}
+
+# Register a single project in the registry
+register_single_project() {
+  local name="$1"
+  local lang="$2"
+  local status="$3"
+  local path="$4"
+  local date
+  date=$(date +%Y-%m-%d)
+  
+  local tmp_file
+  tmp_file=$(mktemp)
+  
+  # Build jq command to register project with empty aliases
+  local jq_cmd
+  jq_cmd=$(cat <<'JQ_CMD'
+.projects[$name] = {
+  "lang": $lang,
+  "status": $status,
+  "path": $path,
+  "created": $date,
+  "aliases": []
+}
+JQ_CMD
+)
+  
+  jq --arg name "$name" \
+     --arg lang "$lang" \
+     --arg status "$status" \
+     --arg path "$path" \
+     --arg date "$date" \
+     "$jq_cmd" "$OVERLORD_REGISTRY" > "$tmp_file" && \
+  mv "$tmp_file" "$OVERLORD_REGISTRY" || \
+  rm -f "$tmp_file"
+}
+
+# Register all detected projects
+register_all_projects() {
+  local projects="$1"      # newline-separated: "name|lang|status|path"
+  local force="${2:-false}"
+  local dry_run="${3:-false}"
+  
+  if [[ -z "$projects" ]]; then
+    echo -e "${DIM}No unregistered projects found.${NC}"
+    return 0
+  fi
+  
+  # Need to disable -e for while-read-heredoc due to bash behavior with set -e
+  set +e
+  
+  local registered_count=0
+  local skipped_count=0
+  
+  # Process each project
+  while IFS='|' read -r name lang status path; do
+    # Check if project already exists in registry
+    if check_registry_exists "$name" 2>/dev/null; then
+      if [[ "$force" == true ]]; then
+        if [[ "$dry_run" == true ]]; then
+          echo -e "${YELLOW}~${NC} $name ($lang, $status) - would overwrite existing entry"
+        else
+          register_single_project "$name" "$lang" "$status" "$path"
+          echo -e "${GREEN}✓${NC} $name ($lang, $status) - overwritten"
+        fi
+        ((registered_count++))
+      else
+        if [[ "$dry_run" != true ]]; then
+          echo -e "${YELLOW}!${NC} $name ($lang, $status) - skipped (already registered)"
+        fi
+        ((skipped_count++))
+      fi
+    else
+      if [[ "$dry_run" == true ]]; then
+        echo -e "${GREEN}+${NC} $name ($lang, $status) - would register"
+      else
+        register_single_project "$name" "$lang" "$status" "$path"
+        echo -e "${GREEN}✓${NC} $name ($lang, $status)"
+      fi
+      ((registered_count++))
+    fi
+  done <<< "$projects"
+  
+  set -e
+  return 0
+}
+
+>>>>>>> 685c960 (Local setup script changes)
 # Format unregistered projects as table
 format_output() {
   local projects="$1"  # newline-separated: "name|lang|status|path"
@@ -192,8 +306,26 @@ format_output() {
 
 main() {
   # Parse arguments
+<<<<<<< HEAD
   if [[ $# -gt 0 ]]; then
     case "$1" in
+=======
+  local register=false
+  local force=false
+  local dry_run=false
+  
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --register)
+        register=true
+        ;;
+      --force)
+        force=true
+        ;;
+      --dry-run)
+        dry_run=true
+        ;;
+>>>>>>> 685c960 (Local setup script changes)
       --help|-h)
         usage
         exit 0
@@ -204,7 +336,12 @@ main() {
         exit 1
         ;;
     esac
+<<<<<<< HEAD
   fi
+=======
+    shift
+  done
+>>>>>>> 685c960 (Local setup script changes)
   
   # Verify base_dir exists
   if [[ ! -d "$OVERLORD_BASE_DIR" ]]; then
@@ -213,7 +350,11 @@ main() {
     exit 1
   fi
   
+<<<<<<< HEAD
   # Discover projects, compare against registry, display
+=======
+  # Discover projects
+>>>>>>> 685c960 (Local setup script changes)
   local discovered
   discovered=$(discover_projects "$OVERLORD_BASE_DIR")
   
@@ -222,10 +363,36 @@ main() {
     exit 0
   fi
   
+<<<<<<< HEAD
   local unregistered
   unregistered=$(find_unregistered "$discovered")
   
   format_output "$unregistered"
+=======
+  # If --register flag is set, register projects instead of displaying them
+  if [[ "$register" == true ]]; then
+    # When using --force, work with all projects; otherwise only unregistered
+    local projects_to_register
+    if [[ "$force" == true ]]; then
+      projects_to_register="$discovered"
+    else
+      projects_to_register=$(find_unregistered "$discovered")
+    fi
+    
+    if [[ "$dry_run" == true ]]; then
+      echo -e "${DIM}Dry-run mode: Previewing what would be registered...${NC}"
+      echo ""
+    else
+      echo -e "${DIM}Registering projects...${NC}"
+    fi
+    register_all_projects "$projects_to_register" "$force" "$dry_run"
+  else
+    # Display unregistered projects
+    local unregistered
+    unregistered=$(find_unregistered "$discovered")
+    format_output "$unregistered"
+  fi
+>>>>>>> 685c960 (Local setup script changes)
 }
 
 main "$@"
