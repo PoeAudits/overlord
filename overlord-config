@@ -15,29 +15,292 @@ source "$OVERLORD_BIN/lib/common.sh"
 usage() {
   cat <<'EOF'
 Usage:
-  overlord config
+  overlord config [options]
 
-Opens the registry.json file in your editor ($EDITOR or nvim).
+Options:
+  --import <path>   Import registry from backup file
+  --help            Show this help
 
-Use this to:
+Description:
+  Opens registry.json in your editor ($EDITOR or nvim) for manual editing.
+  Use --import to restore a previously backed-up registry file.
+
+Use Cases:
   - Add or modify project aliases
   - Manually edit project metadata
   - Fix registry issues
+  - Import/restore registry from backup
+
+Examples:
+  overlord config                           # Edit registry in editor
+  overlord config --import /tmp/registry.json
+  overlord config --import ~/backups/old-registry.json
+
+Import Behavior:
+  - Validates imported registry structure and all project paths
+  - Detects project name conflicts with current registry
+  - Preserves current base_dir setting
+  - Creates backup of current registry before import
+  - Shows all validation issues before prompting for confirmation
+  - Does not open editor after successful import
 EOF
 }
 
+# Helper: Resolve path (absolute or home directory expansion)
+resolve_import_path() {
+  local path="$1"
+  if [[ "$path" == ~* ]]; then
+    eval echo "$path"
+  else
+    echo "$path"
+  fi
+}
+
+# Helper: Validate file exists and is readable
+validate_import_file() {
+  local path="$1"
+  if [[ ! -f "$path" ]]; then
+    log_error "Import file not found: $path"
+    return 1
+  fi
+  if [[ ! -r "$path" ]]; then
+    log_error "Import file not readable: $path"
+    return 1
+  fi
+  return 0
+}
+
+# Helper: Validate JSON structure
+validate_registry_json() {
+  local path="$1"
+  if ! jq empty "$path" 2>/dev/null; then
+    log_error "Invalid JSON in import file: $path"
+    return 1
+  fi
+  # Check required structure
+  if ! jq -e '.projects' "$path" &>/dev/null; then
+    log_error "Invalid registry structure: missing 'projects' section"
+    return 1
+  fi
+  return 0
+}
+
+# Helper: Validate all project paths exist
+validate_project_paths() {
+  local path="$1"
+  local missing_paths=()
+  
+  while IFS= read -r proj_path; do
+    if [[ ! -d "$proj_path" ]]; then
+      missing_paths+=("$proj_path")
+    fi
+  done < <(jq -r '.projects[].path' "$path" 2>/dev/null)
+  
+  if [[ ${#missing_paths[@]} -gt 0 ]]; then
+    printf '%s\n' "${missing_paths[@]}"
+    return 1
+  fi
+  return 0
+}
+
+# Helper: Detect project name conflicts
+detect_name_conflicts() {
+  local import_path="$1"
+  local current_path="$2"
+  local conflicts=()
+  
+  while IFS= read -r name; do
+    if jq -e --arg name "$name" '.projects[$name]' "$current_path" &>/dev/null; then
+      conflicts+=("$name")
+    fi
+  done < <(jq -r '.projects | keys[]' "$import_path" 2>/dev/null)
+  
+  if [[ ${#conflicts[@]} -gt 0 ]]; then
+    printf '%s\n' "${conflicts[@]}"
+    return 1
+  fi
+  return 0
+}
+
+# Helper: Collect all validation issues in one pass
+collect_validation_issues() {
+  local import_file="$1"
+  local current_registry="$2"
+  local issues=()
+  
+  # Validate JSON structure
+  if ! jq -e '.projects' "$import_file" &>/dev/null; then
+    issues+=("JSON validation: missing 'projects' section")
+  fi
+  
+  # Validate project paths exist
+  local missing_paths
+  missing_paths=$(validate_project_paths "$import_file" 2>/dev/null || true)
+  if [[ -n "$missing_paths" ]]; then
+    while IFS= read -r path; do
+      issues+=("Missing path: $path")
+    done <<< "$missing_paths"
+  fi
+  
+  # Detect name conflicts (only if current registry exists)
+  if [[ -f "$current_registry" ]]; then
+    local conflicts
+    conflicts=$(detect_name_conflicts "$import_file" "$current_registry" 2>/dev/null || true)
+    if [[ -n "$conflicts" ]]; then
+      while IFS= read -r name; do
+        issues+=("Name conflict: '$name' already exists in current registry")
+      done <<< "$conflicts"
+    fi
+  fi
+  
+  # Return issues as newline-separated string
+  if [[ ${#issues[@]} -gt 0 ]]; then
+    printf '%s\n' "${issues[@]}"
+    return 1
+  fi
+  return 0
+}
+
+# Helper: Show summary and ask for confirmation
+show_import_summary() {
+  local import_file="$1"
+  local issue_list="$2"
+  local project_count
+  project_count=$(jq '.projects | length' "$import_file")
+  
+  echo ""
+  log_info "Import Summary"
+  echo ""
+  echo "  File: $import_file"
+  echo "  Projects: $project_count"
+  echo ""
+  
+  if [[ -n "$issue_list" ]]; then
+    log_warning "Issues detected:"
+    echo ""
+    while IFS= read -r issue; do
+      echo "  ! $issue"
+    done <<< "$issue_list"
+    echo ""
+    read -r -p "Continue with import despite issues? (y/N): " response
+  else
+    log_success "All validations passed"
+    echo ""
+    read -r -p "Proceed with import? (y/N): " response
+  fi
+  
+  case "$response" in
+    [yY]|[yY][eE][sS])
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+# Helper: Import registry (copy file and preserve base_dir)
+import_registry() {
+  local import_file="$1"
+  local target_registry="$2"
+  
+  # Create backup of current registry if it exists
+  if [[ -f "$target_registry" ]]; then
+    cp "$target_registry" "$target_registry.bak"
+    log_info "Backed up current registry to ${target_registry}.bak"
+  fi
+  
+  # Get current base_dir (if registry exists)
+  local current_base_dir
+  if [[ -f "$target_registry" ]]; then
+    current_base_dir=$(jq -r '.settings.base_dir // empty' "$target_registry")
+  fi
+  
+  # Copy imported registry
+  cp "$import_file" "$target_registry"
+  
+  # Restore base_dir if it existed
+  if [[ -n "$current_base_dir" ]]; then
+    local tmp_file
+    tmp_file=$(mktemp)
+    jq --arg base_dir "$current_base_dir" '.settings.base_dir = $base_dir' \
+      "$target_registry" > "$tmp_file"
+    mv "$tmp_file" "$target_registry"
+    log_info "Preserved base_dir setting: $current_base_dir"
+  fi
+}
+
 main() {
-  if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-    usage
+  local import_file=""
+  
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --import)
+        if [[ -z "${2:-}" ]]; then
+          log_error "Missing path argument for --import"
+          echo ""
+          usage >&2
+          exit 1
+        fi
+        import_file="$2"
+        shift 2
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        log_error "Unknown option: $1"
+        echo ""
+        usage >&2
+        exit 1
+        ;;
+    esac
+  done
+  
+  # Handle import if --import flag was provided
+  if [[ -n "$import_file" ]]; then
+    # Resolve path
+    import_file=$(resolve_import_path "$import_file")
+    
+    # Validate import file exists
+    if ! validate_import_file "$import_file"; then
+      exit 1
+    fi
+    
+    # Validate JSON structure
+    if ! validate_registry_json "$import_file"; then
+      exit 1
+    fi
+    
+    # Collect all validation issues
+    local issues
+    issues=$(collect_validation_issues "$import_file" "$OVERLORD_REGISTRY" 2>/dev/null || true)
+    
+    # Show summary and ask for confirmation
+    if ! show_import_summary "$import_file" "$issues"; then
+      log_warning "Import cancelled"
+      exit 0
+    fi
+    
+    # If validation failed but user confirmed, still proceed with import
+    # (user acknowledged the issues)
+    import_registry "$import_file" "$OVERLORD_REGISTRY"
+    
+    echo ""
+    log_success "Registry imported successfully"
+    log_info "Registry: $OVERLORD_REGISTRY"
     exit 0
   fi
-
+  
+  # Default behavior: open editor
   if [[ ! -f "$OVERLORD_REGISTRY" ]]; then
     log_info "Creating registry at $OVERLORD_REGISTRY"
     mkdir -p "$OVERLORD_CONFIG"
     echo '{"projects":{}}' > "$OVERLORD_REGISTRY"
   fi
-
+  
   exec "$EDITOR" "$OVERLORD_REGISTRY"
 }
 
