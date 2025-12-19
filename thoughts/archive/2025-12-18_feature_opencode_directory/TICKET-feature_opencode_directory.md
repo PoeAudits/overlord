@@ -2,7 +2,7 @@
 type: feature
 priority: medium
 created: 2025-12-18
-status: implemented
+status: archived
 tags: [opencode, configuration, directory-structure]
 keywords: [opencode.jsonc, .opencode, directory, projects, overlord-init, overlord-sync]
 patterns: [configuration file placement, project initialization]

@@ -2,7 +2,7 @@
 type: debt
 priority: medium
 created: 2025-12-18
-status: implemented
+status: archived
 tags: [consistency, refactoring, templates, configuration]
 keywords: [configuration variables, template usage, function duplication, error handling]
 patterns: [bash scripts, template files, helper functions]

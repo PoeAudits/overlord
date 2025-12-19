@@ -2,7 +2,7 @@
 type: feature
 priority: high
 created: 2025-12-18T10:30:00Z
-status: created
+status: implemented
 tags: [cli, command-dispatch, user-experience]
 keywords: [command dispatch, project lookup, overlord main script, fuzzy search flag]
 patterns: [case statement, jq project queries, argument parsing]
