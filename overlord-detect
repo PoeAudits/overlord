@@ -22,21 +22,11 @@ DIM='\033[2m'
 usage() {
   cat <<'EOF'
 Usage:
-<<<<<<< HEAD
-  overlord detect
-=======
   overlord detect [options]
->>>>>>> 685c960 (Local setup script changes)
 
 Displays all projects found on disk in $OVERLORD_BASE_DIR that are not
 registered in the Overlord registry.
 
-<<<<<<< HEAD
-Output shows: NAME | LANG | STATUS | PATH
-
-Examples:
-  overlord detect          # Show unregistered projects
-=======
 Options:
   --register               Register all detected projects into the registry
   --force                  Overwrite existing registry entries (with --register)
@@ -50,7 +40,6 @@ Examples:
   overlord detect --register         # Register all unregistered projects
   overlord detect --register --force # Register and overwrite existing entries
   overlord detect --register --dry-run # Preview what would be registered
->>>>>>> 685c960 (Local setup script changes)
 EOF
 }
 
@@ -166,8 +155,6 @@ lang_short() {
   esac
 }
 
-<<<<<<< HEAD
-=======
 # Check if project name exists in registry
 check_registry_exists() {
   local name="$1"
@@ -258,8 +245,6 @@ register_all_projects() {
   set -e
   return 0
 }
-
->>>>>>> 685c960 (Local setup script changes)
 # Format unregistered projects as table
 format_output() {
   local projects="$1"  # newline-separated: "name|lang|status|path"
@@ -306,10 +291,6 @@ format_output() {
 
 main() {
   # Parse arguments
-<<<<<<< HEAD
-  if [[ $# -gt 0 ]]; then
-    case "$1" in
-=======
   local register=false
   local force=false
   local dry_run=false
@@ -325,7 +306,6 @@ main() {
       --dry-run)
         dry_run=true
         ;;
->>>>>>> 685c960 (Local setup script changes)
       --help|-h)
         usage
         exit 0
@@ -336,12 +316,8 @@ main() {
         exit 1
         ;;
     esac
-<<<<<<< HEAD
-  fi
-=======
     shift
   done
->>>>>>> 685c960 (Local setup script changes)
   
   # Verify base_dir exists
   if [[ ! -d "$OVERLORD_BASE_DIR" ]]; then
@@ -350,11 +326,7 @@ main() {
     exit 1
   fi
   
-<<<<<<< HEAD
-  # Discover projects, compare against registry, display
-=======
   # Discover projects
->>>>>>> 685c960 (Local setup script changes)
   local discovered
   discovered=$(discover_projects "$OVERLORD_BASE_DIR")
   
@@ -363,12 +335,6 @@ main() {
     exit 0
   fi
   
-<<<<<<< HEAD
-  local unregistered
-  unregistered=$(find_unregistered "$discovered")
-  
-  format_output "$unregistered"
-=======
   # If --register flag is set, register projects instead of displaying them
   if [[ "$register" == true ]]; then
     # When using --force, work with all projects; otherwise only unregistered
@@ -392,7 +358,6 @@ main() {
     unregistered=$(find_unregistered "$discovered")
     format_output "$unregistered"
   fi
->>>>>>> 685c960 (Local setup script changes)
 }
 
 main "$@"
