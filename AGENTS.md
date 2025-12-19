@@ -256,11 +256,14 @@ overlord init --ts --alias mp --lib        # TypeScript library with alias
 Move project between status categories. Physically moves directory and updates registry.
 
 ```bash
-overlord mv <name> <status>
+overlord mv <name> <status> [options]
 
 # Arguments:
 name      # Project name or alias
 status    # Target: active, lib, or archive
+
+# Options:
+--help, -h          # Show this help
 ```
 
 **Examples:**
@@ -308,7 +311,10 @@ overlord rm myproject --force          # Skip confirmation
 Find projects in the work directory that are not registered in the Overlord registry.
 
 ```bash
-overlord detect
+overlord detect [options]
+
+# Options:
+--help, -h          # Show this help
 ```
 
 **Output includes:**
@@ -360,7 +366,13 @@ overlord open mypr         # Fuzzy search
 Show detailed project information.
 
 ```bash
-overlord info <name>
+overlord info <name> [options]
+
+# Arguments:
+name      # Project name or alias
+
+# Options:
+--help, -h          # Show this help
 ```
 
 **Output includes:**
@@ -418,7 +430,10 @@ overlord config --import ~/backup/registry.json                           # Home
 Open overlord scripts directory in editor.
 
 ```bash
-overlord edit
+overlord edit [options]
+
+# Options:
+--help, -h          # Show this help
 ```
 
 ### overlord sync
@@ -682,26 +697,8 @@ Each project can have a `.tmux.local` file for custom workspace setup. Templates
 - `MODE=override` (default) - Template fully controls layout
 - `MODE=merge` - Default layout first, then template additions
 
-## Migration
+## Configuration Migration
 
-For existing projects, use the migration script:
-
-```bash
-# Preview changes (default)
-overlord-migrate-init --dry-run
-
-# Execute migration
-overlord-migrate-init --execute
-```
-
-**Migration behavior:**
-- Creates active/, libs/, archive/ under each language
-- Moves all projects to archive/ by default
-- Moves `poe-*-utils` projects to libs/
-- Generates registry.json
-- Backs up existing registry
-
-**Configuration Migration:**
 Newer versions of Overlord automatically move `opencode.jsonc` to the `.opencode/` directory during `overlord init` or `overlord sync` operations.
 
 ## Design Decisions
