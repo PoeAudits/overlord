@@ -1,0 +1,558 @@
+#!/usr/bin/env bash
+# overlord-inject: Add registered Overlord projects as path-based dependencies
+# Supports Python (uv) and TypeScript (pnpm/bun) projects
+
+set -euo pipefail
+
+# Use parent-provided OVERLORD_CONFIG or auto-detect
+OVERLORD_REPO="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
+OVERLORD_CONFIG="${OVERLORD_CONFIG:-$OVERLORD_REPO}"
+OVERLORD_REGISTRY="$OVERLORD_CONFIG/registry.json"
+OVERLORD_BIN="${OVERLORD_BIN:-$OVERLORD_REPO}"
+
+# Source common library
+source "$OVERLORD_BIN/lib/common.sh"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  overlord inject <project-name-or-alias>
+
+Arguments:
+  project-name-or-alias    Name or alias of registered project to inject
+
+Description:
+  Adds a registered Overlord project as a path-based local dependency to the
+  current project. Supports Python (uv) and TypeScript (pnpm/bun) projects.
+  
+  The command modifies:
+    - Python: pyproject.toml ([project.dependencies] and [tool.uv.sources])
+    - TypeScript: package.json (dependencies object with file: protocol)
+
+Behavior:
+  - Auto-detects language from current directory
+  - Validates language match between projects
+  - Idempotent: safe to run multiple times
+  - Does NOT auto-sync (run 'uv sync' or 'pnpm install' separately)
+
+Examples:
+  overlord inject mylib          # Inject Python lib into current Python project
+  overlord inject shared-utils   # Inject TypeScript lib into current TS project
+
+EOF
+}
+
+# Validate that current directory has a valid config file
+validate_current_directory() {
+  local current_dir="$(pwd)"
+  
+  # Check for Python or TypeScript config files
+  if [[ -f "$current_dir/pyproject.toml" ]]; then
+    echo "python"
+    return 0
+  elif [[ -f "$current_dir/package.json" ]]; then
+    echo "typescript"
+    return 0
+  else
+    log_error "Current directory is not a valid project"
+    log_error "No pyproject.toml or package.json found in: $current_dir"
+    exit 1
+  fi
+}
+
+# Lookup injected project in registry
+lookup_injected_project() {
+  local query="$1"
+  local project_info
+  
+  # Use common.sh find_project_exact function
+  if ! project_info=$(find_project_exact "$query"); then
+    log_error "Project not found in registry: $query"
+    log_info "Use 'overlord list' to see available projects"
+    exit 1
+  fi
+  
+  echo "$project_info"
+}
+
+# Validate language match between target and injected project
+validate_language_match() {
+  local target_lang="$1"
+  local injected_lang="$2"
+  local injected_name="$3"
+  
+  if [[ "$target_lang" != "$injected_lang" ]]; then
+    log_error "Language mismatch: cannot inject $injected_lang project into $target_lang project"
+    log_error "Target project: $target_lang"
+    log_error "Injected project '$injected_name': $injected_lang"
+    exit 1
+  fi
+}
+
+# Extract package name from Python project
+extract_python_package_name() {
+  local project_path="$1"
+  local project_name="$2"
+  local pyproject_file="$project_path/pyproject.toml"
+  
+  if [[ ! -f "$pyproject_file" ]]; then
+    log_warning "No pyproject.toml found at: $pyproject_file"
+    log_warning "Using registry project name as package name: $project_name"
+    echo "$project_name"
+    return 0
+  fi
+  
+  # Extract name from [project] section using grep/sed
+  # Look for: name = "package-name" or name = 'package-name'
+  local package_name
+  package_name=$(grep -A 20 '^\[project\]' "$pyproject_file" | \
+                 grep -m1 '^name[[:space:]]*=' | \
+                 sed -E 's/^name[[:space:]]*=[[:space:]]*["\x27]([^"\x27]+)["\x27].*/\1/' | \
+                 head -n1)
+  
+  if [[ -z "$package_name" ]]; then
+    log_warning "Could not extract package name from pyproject.toml"
+    log_warning "Using registry project name as package name: $project_name"
+    echo "$project_name"
+    return 0
+  fi
+  
+  echo "$package_name"
+}
+
+# Extract package name from TypeScript project
+extract_typescript_package_name() {
+  local project_path="$1"
+  local project_name="$2"
+  local package_file="$project_path/package.json"
+  
+  if [[ ! -f "$package_file" ]]; then
+    log_warning "No package.json found at: $package_file"
+    log_warning "Using registry project name as package name: $project_name"
+    echo "$project_name"
+    return 0
+  fi
+  
+  # Use jq to extract package name
+  local package_name
+  package_name=$(jq -r '.name // empty' "$package_file" 2>/dev/null)
+  
+  if [[ -z "$package_name" ]]; then
+    log_warning "Could not extract package name from package.json"
+    log_warning "Using registry project name as package name: $project_name"
+    echo "$project_name"
+    return 0
+  fi
+  
+  echo "$package_name"
+}
+
+# Extract package name based on language
+extract_package_name() {
+  local lang="$1"
+  local project_path="$2"
+  local project_name="$3"
+  
+  case "$lang" in
+    python)
+      extract_python_package_name "$project_path" "$project_name"
+      ;;
+    typescript)
+      extract_typescript_package_name "$project_path" "$project_name"
+      ;;
+    *)
+      log_error "Unsupported language: $lang"
+      exit 1
+      ;;
+  esac
+}
+
+# Check if package exists in Python project
+check_python_dependency_exists() {
+  local pyproject_file="$1"
+  local package_name="$2"
+  local injected_path="$3"
+  
+  # Check if package in [project.dependencies] array
+  # Look for "package-name" in the dependencies list
+  local in_dependencies=false
+  if grep -A 100 '^\[project\]' "$pyproject_file" | \
+     grep -E '^\s*dependencies\s*=' | head -n1 | grep -q '\['; then
+    # Has dependencies array, check if package is in it
+    if grep -A 100 '^\[project\]' "$pyproject_file" | \
+       sed -n '/dependencies\s*=\s*\[/,/\]/p' | \
+       grep -qE "[\"']${package_name}[\"']"; then
+      in_dependencies=true
+    fi
+  fi
+  
+  # Check if package in [tool.uv.sources]
+  # Look for: package-name = { path = "/absolute/path" }
+  local existing_path=""
+  if grep -q '^\[tool\.uv\.sources\]' "$pyproject_file"; then
+    existing_path=$(grep -A 100 '^\[tool\.uv\.sources\]' "$pyproject_file" | \
+                    grep -E "^${package_name}\s*=" | \
+                    sed -E 's/.*path\s*=\s*["\x27]([^"\x27]+)["\x27].*/\1/' | \
+                    head -n1)
+  fi
+  
+  if [[ "$in_dependencies" == true && -n "$existing_path" ]]; then
+    # Dependency exists, check if path matches
+    if [[ "$existing_path" == "$injected_path" ]]; then
+      echo "same"
+    else
+      echo "different:$existing_path"
+    fi
+  elif [[ "$in_dependencies" == true || -n "$existing_path" ]]; then
+    # Partial state - treat as different for safety
+    echo "different:partial"
+  else
+    echo "none"
+  fi
+}
+
+# Check if package exists in TypeScript project
+check_typescript_dependency_exists() {
+  local package_file="$1"
+  local package_name="$2"
+  local injected_path="$3"
+  
+  local existing_value
+  existing_value=$(jq -r --arg pkg "$package_name" '.dependencies[$pkg] // empty' "$package_file" 2>/dev/null)
+  
+  if [[ -z "$existing_value" ]]; then
+    echo "none"
+    return 0
+  fi
+  
+  # Expected format: "file:/absolute/path"
+  local expected_value="file:$injected_path"
+  
+  if [[ "$existing_value" == "$expected_value" ]]; then
+    echo "same"
+  else
+    echo "different:$existing_value"
+  fi
+}
+
+# Check dependency existence based on language
+check_dependency_exists() {
+  local lang="$1"
+  local target_dir="$2"
+  local package_name="$3"
+  local injected_path="$4"
+  
+  case "$lang" in
+    python)
+      check_python_dependency_exists "$target_dir/pyproject.toml" "$package_name" "$injected_path"
+      ;;
+    typescript)
+      check_typescript_dependency_exists "$target_dir/package.json" "$package_name" "$injected_path"
+      ;;
+    *)
+      log_error "Unsupported language: $lang"
+      exit 1
+      ;;
+  esac
+}
+
+# Inject dependency into Python project
+inject_python_dependency() {
+  local pyproject_file="$1"
+  local package_name="$2"
+  local injected_path="$3"
+  
+  log_info "Modifying pyproject.toml..."
+  
+  local tmp_file
+  tmp_file=$(mktemp)
+  
+  # Check if dependency already exists in dependencies array
+  local dep_exists=false
+  if grep -A 100 '^\[project\]' "$pyproject_file" | \
+     sed -n '/dependencies\s*=\s*\[/,/\]/p' | \
+     grep -qE "[\"']${package_name}[\"']"; then
+    dep_exists=true
+  fi
+  
+  # Check what sections exist
+  local has_dependencies=false
+  local has_tool_uv=false
+  local has_tool_uv_sources=false
+  
+  if grep -A 100 '^\[project\]' "$pyproject_file" | grep -qE '^\s*dependencies\s*='; then
+    has_dependencies=true
+  fi
+  if grep -q '^\[tool\.uv\]' "$pyproject_file"; then
+    has_tool_uv=true
+  fi
+  if grep -q '^\[tool\.uv\.sources\]' "$pyproject_file"; then
+    has_tool_uv_sources=true
+  fi
+  
+  # Track state
+  local in_project=false
+  local in_dependencies=false
+  local in_tool_uv=false
+  local in_tool_uv_sources=false
+  local dependencies_added=false
+  local sources_added=false
+  local found_deps_line=false
+  
+  # Process the file line by line
+  while IFS= read -r line; do
+    # Track section changes
+    if [[ "$line" =~ ^\[project\] ]]; then
+      in_project=true
+      in_tool_uv=false
+      in_tool_uv_sources=false
+      echo "$line" >> "$tmp_file"
+      
+      # If dependencies don't exist, add them now
+      if [[ "$has_dependencies" == false && "$dep_exists" == false && "$dependencies_added" == false ]]; then
+        echo "dependencies = [" >> "$tmp_file"
+        echo "    \"$package_name\"," >> "$tmp_file"
+        echo "]" >> "$tmp_file"
+        dependencies_added=true
+      fi
+      continue
+    elif [[ "$line" =~ ^\[tool\.uv\.sources\] ]]; then
+      in_project=false
+      in_tool_uv=false
+      in_tool_uv_sources=true
+      echo "$line" >> "$tmp_file"
+      
+      # Add source entry after header
+      if [[ "$sources_added" == false ]]; then
+        echo "$package_name = { path = \"$injected_path\" }" >> "$tmp_file"
+        sources_added=true
+      fi
+      continue
+    elif [[ "$line" =~ ^\[tool\.uv\] ]]; then
+      in_project=false
+      in_tool_uv=true
+      in_tool_uv_sources=false
+      echo "$line" >> "$tmp_file"
+      
+      # If sources section doesn't exist, add it now
+      if [[ "$has_tool_uv_sources" == false && "$sources_added" == false ]]; then
+        echo "" >> "$tmp_file"
+        echo "[tool.uv.sources]" >> "$tmp_file"
+        echo "$package_name = { path = \"$injected_path\" }" >> "$tmp_file"
+        sources_added=true
+      fi
+      continue
+    elif [[ "$line" =~ ^\[ ]]; then
+      in_project=false
+      in_tool_uv=false
+      in_tool_uv_sources=false
+    fi
+    
+    # Handle dependencies array
+    if [[ "$in_project" == true && "$line" =~ dependencies[[:space:]]*=[[:space:]]*\[ ]]; then
+      in_dependencies=true
+      found_deps_line=true
+      
+      # Check if it's inline empty array: dependencies = []
+      if [[ "$line" =~ dependencies[[:space:]]*=[[:space:]]*\[\] ]]; then
+        # Replace empty array with array containing our package
+        if [[ "$dep_exists" == false && "$dependencies_added" == false ]]; then
+          echo "dependencies = [" >> "$tmp_file"
+          echo "    \"$package_name\"," >> "$tmp_file"
+          echo "]" >> "$tmp_file"
+          dependencies_added=true
+        else
+          echo "$line" >> "$tmp_file"
+        fi
+        in_dependencies=false
+        continue
+      else
+        echo "$line" >> "$tmp_file"
+        continue
+      fi
+    fi
+    
+    # Add dependency before closing bracket of multiline array
+    if [[ "$in_dependencies" == true && "$line" =~ ^\] ]]; then
+      if [[ "$dep_exists" == false && "$dependencies_added" == false ]]; then
+        echo "    \"$package_name\"," >> "$tmp_file"
+        dependencies_added=true
+      fi
+      in_dependencies=false
+    fi
+    
+    # Write the current line
+    echo "$line" >> "$tmp_file"
+    
+  done < "$pyproject_file"
+  
+  # If we haven't added [tool.uv.sources] yet, add at end
+  if [[ "$sources_added" == false ]]; then
+    if [[ "$has_tool_uv" == false ]]; then
+      echo "" >> "$tmp_file"
+      echo "[tool.uv]" >> "$tmp_file"
+    fi
+    echo "" >> "$tmp_file"
+    echo "[tool.uv.sources]" >> "$tmp_file"
+    echo "$package_name = { path = \"$injected_path\" }" >> "$tmp_file"
+  fi
+  
+  # Atomic update
+  mv "$tmp_file" "$pyproject_file"
+  log_success "Updated pyproject.toml"
+}
+
+# Inject dependency into TypeScript project
+inject_typescript_dependency() {
+  local package_file="$1"
+  local package_name="$2"
+  local injected_path="$3"
+  
+  log_info "Modifying package.json..."
+  
+  local tmp_file
+  tmp_file=$(mktemp)
+  
+  local dependency_value="file:$injected_path"
+  
+  # Use jq to add/update dependency
+  jq --arg pkg "$package_name" \
+     --arg val "$dependency_value" \
+     '.dependencies = (.dependencies // {}) | .dependencies[$pkg] = $val' \
+     "$package_file" > "$tmp_file"
+  
+  if [[ $? -ne 0 ]]; then
+    rm -f "$tmp_file"
+    log_error "Failed to modify package.json"
+    exit 1
+  fi
+  
+  # Atomic update
+  mv "$tmp_file" "$package_file"
+  log_success "Updated package.json"
+}
+
+# Inject dependency based on language
+inject_dependency() {
+  local lang="$1"
+  local target_dir="$2"
+  local package_name="$3"
+  local injected_path="$4"
+  
+  case "$lang" in
+    python)
+      inject_python_dependency "$target_dir/pyproject.toml" "$package_name" "$injected_path"
+      ;;
+    typescript)
+      inject_typescript_dependency "$target_dir/package.json" "$package_name" "$injected_path"
+      ;;
+    *)
+      log_error "Unsupported language: $lang"
+      exit 1
+      ;;
+  esac
+}
+
+# Argument parsing
+parse_args() {
+  if [[ $# -eq 0 ]]; then
+    usage
+    exit 0
+  fi
+  
+  if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    usage
+    exit 0
+  fi
+  
+  if [[ "$1" == -* ]]; then
+    log_error "Unknown option: $1"
+    usage >&2
+    exit 1
+  fi
+  
+  PROJECT_QUERY="$1"
+}
+
+main() {
+  parse_args "$@"
+  
+  # Validate current directory
+  TARGET_LANG=$(validate_current_directory)
+  TARGET_DIR="$(pwd)"
+  
+  log_info "Target project directory: $TARGET_DIR"
+  log_info "Target project language: $TARGET_LANG"
+  echo ""
+  
+  # Lookup injected project in registry
+  log_info "Looking up project: $PROJECT_QUERY"
+  PROJECT_INFO=$(lookup_injected_project "$PROJECT_QUERY")
+  
+  # Parse project info (TSV format: name<TAB>lang<TAB>status<TAB>path)
+  IFS=$'\t' read -r INJECTED_NAME INJECTED_LANG INJECTED_STATUS INJECTED_PATH <<< "$PROJECT_INFO"
+  
+  log_success "Found project: $INJECTED_NAME"
+  log_info "Injected project language: $INJECTED_LANG"
+  log_info "Injected project path: $INJECTED_PATH"
+  echo ""
+  
+  # Validate language match
+  validate_language_match "$TARGET_LANG" "$INJECTED_LANG" "$INJECTED_NAME"
+  log_success "Language compatibility verified"
+  echo ""
+  
+  # Extract package name from injected project
+  log_info "Extracting package name from injected project..."
+  PACKAGE_NAME=$(extract_package_name "$INJECTED_LANG" "$INJECTED_PATH" "$INJECTED_NAME")
+  log_success "Package name: $PACKAGE_NAME"
+  echo ""
+  
+  # Check if dependency already exists
+  log_info "Checking for existing dependency..."
+  DEPENDENCY_STATUS=$(check_dependency_exists "$TARGET_LANG" "$TARGET_DIR" "$PACKAGE_NAME" "$INJECTED_PATH")
+  
+  case "$DEPENDENCY_STATUS" in
+    same)
+      log_success "Dependency already exists with correct path"
+      log_info "Package '$PACKAGE_NAME' already points to: $INJECTED_PATH"
+      log_info "No changes needed"
+      exit 0
+      ;;
+    different:*)
+      EXISTING_PATH="${DEPENDENCY_STATUS#different:}"
+      log_error "Dependency conflict detected"
+      log_error "Package '$PACKAGE_NAME' already exists but points to different location:"
+      log_error "  Existing: $EXISTING_PATH"
+      log_error "  Requested: $INJECTED_PATH"
+      log_error "Please resolve this conflict manually before injecting"
+      exit 1
+      ;;
+    none)
+      log_info "No existing dependency found - proceeding with injection"
+      echo ""
+      ;;
+  esac
+  
+  # Inject dependency into target project
+  inject_dependency "$TARGET_LANG" "$TARGET_DIR" "$PACKAGE_NAME" "$INJECTED_PATH"
+  
+  echo ""
+  log_success "Successfully injected dependency: $PACKAGE_NAME"
+  log_info "Injected project: $INJECTED_NAME"
+  log_info "Package name: $PACKAGE_NAME"
+  log_info "Path: $INJECTED_PATH"
+  echo ""
+  
+  # Remind user to sync
+  case "$TARGET_LANG" in
+    python)
+      log_info "Next step: Run 'uv sync' to install the dependency"
+      ;;
+    typescript)
+      log_info "Next step: Run 'pnpm install' or 'bun install' to install the dependency"
+      ;;
+  esac
+}
+
+main "$@"

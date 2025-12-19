@@ -99,7 +99,7 @@ main() {
       echo "overlord v${OVERLORD_VERSION}"
       exit 0
       ;;
-    new|add|init|list|mv|open|info|sync|config|edit|rm|uninstall|detect)
+    new|add|init|list|mv|open|info|sync|config|edit|rm|uninstall|detect|inject)
       local cmd="$1"
       shift
       local subcmd="$OVERLORD_BIN/overlord-$cmd"

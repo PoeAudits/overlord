@@ -16,6 +16,7 @@ overlord rm <name> [--force]
 overlord open [name] [--fuzzy]
 overlord info <name>
 overlord sync [--py|--ts|--sol] [--force] [--dry-run]
+overlord inject <name>       # Add project as path-based dependency
 overlord detect              # Find unregistered projects
 overlord config [--import <path>]
 overlord edit
