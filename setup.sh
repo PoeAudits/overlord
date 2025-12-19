@@ -106,14 +106,21 @@ if [[ -d "$INSTALL_DIR" ]]; then
   esac
 fi
 
-# Copy repository to ~/.config/overlord
-mkdir -p "$INSTALL_DIR"
-cp -r "$REPO_DIR"/* "$INSTALL_DIR/" 2>/dev/null || {
-  log_error "Failed to copy files to $INSTALL_DIR"
-  rm -rf "$INSTALL_DIR"
-  exit 1
-}
-log_success "Copied overlord to $INSTALL_DIR"
+# Move repository to ~/.config/overlord to preserve git history
+mkdir -p "$(dirname "$INSTALL_DIR")"
+if [[ "$REPO_DIR" != "$INSTALL_DIR" ]]; then
+  mv "$REPO_DIR" "$INSTALL_DIR" 2>/dev/null || {
+    # If move fails (e.g., cross-filesystem), copy files but preserve .git
+    mkdir -p "$INSTALL_DIR"
+    cp -r "$REPO_DIR"/.git "$INSTALL_DIR/" 2>/dev/null || true
+    cp -r "$REPO_DIR"/* "$INSTALL_DIR/" 2>/dev/null || {
+      log_error "Failed to copy files to $INSTALL_DIR"
+      rm -rf "$INSTALL_DIR"
+      exit 1
+    }
+  }
+fi
+log_success "Installed overlord to $INSTALL_DIR"
 
 # Create or update symlink at /usr/local/bin/overlord
 if [[ -L "$INSTALL_TARGET" ]]; then
@@ -205,23 +212,35 @@ else
   exit 1
 fi
 
-# Clean up the temporary clone directory
+# Clean up the temporary clone directory (only if it wasn't moved)
 echo ""
 log_info "Cleaning up temporary installation files..."
 
-CLONE_MARKER="$REPO_DIR/.overlord-clone-marker"
-if [[ -f "$CLONE_MARKER" ]] || [[ ! -f "$REPO_DIR/registry.json" ]]; then
-  # This looks like a temporary clone (has marker or no registry)
-  if rm -rf "$REPO_DIR" 2>/dev/null; then
-    log_success "Removed temporary installation directory"
+if [[ -d "$REPO_DIR" ]]; then
+  # Repository still exists, check if it was moved or if we need to delete it
+  CLONE_MARKER="$REPO_DIR/.overlord-clone-marker"
+  if [[ -f "$CLONE_MARKER" ]]; then
+    # Has explicit marker indicating it's a temporary clone
+    if rm -rf "$REPO_DIR" 2>/dev/null; then
+      log_success "Removed temporary installation directory"
+    else
+      log_warning "Could not remove temporary directory at $REPO_DIR"
+      log_warning "You can safely delete it manually: rm -rf $REPO_DIR"
+    fi
+  elif [[ ! -f "$REPO_DIR/registry.json" ]]; then
+    # No registry means it's likely a temporary clone
+    if rm -rf "$REPO_DIR" 2>/dev/null; then
+      log_success "Removed temporary installation directory"
+    else
+      log_warning "Could not remove temporary directory at $REPO_DIR"
+      log_warning "You can safely delete it manually: rm -rf $REPO_DIR"
+    fi
   else
-    log_warning "Could not remove temporary directory at $REPO_DIR"
-    log_warning "You can safely delete it manually: rm -rf $REPO_DIR"
+    log_info "Repository was moved to $INSTALL_DIR"
+    log_info "Your git history and remote configuration are preserved"
   fi
 else
-  log_info "Skipping deletion of $REPO_DIR (appears to be the original repository)"
-  log_info "You can delete this directory if you cloned it temporarily:"
-  log_info "  rm -rf $REPO_DIR"
+  log_info "Repository was moved to $INSTALL_DIR"
 fi
 
 # Show base directory info
