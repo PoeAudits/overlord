@@ -22,19 +22,23 @@ overlord edit
 overlord uninstall [--dry-run] [--force]
 ```
 
-## Directory Layout
+## Installation & Directory Layout
+
+Overlord installs to `~/.config/overlord` with a symlink at `/usr/local/bin/overlord`:
 
 ```
-~/Work/{Python,Typescript,Solidity}/{active,libs,archive}/
+/usr/local/bin/overlord           # Symlink to ~/.config/overlord/overlord
 
-~/bin/overlord/
-├── overlord              # Main dispatcher
-├── overlord-*            # Subcommands
-├── lib/common.sh         # Shared helpers (logging, detection, templates)
-├── registry.json         # Project metadata
+~/.config/overlord/
+├── overlord                       # Main dispatcher
+├── overlord-*                     # Subcommands
+├── lib/common.sh                  # Shared helpers (logging, detection, templates)
+├── registry.json                  # Project metadata
 ├── templates/opencode-{base,python,typescript,solidity}.jsonc
 ├── tmux/{base,python,typescript,solidity}.tmux
 └── makefiles/{base,python,typescript,solidity}.mk
+
+~/Work/{Python,Typescript,Solidity}/{active,libs,archive}/  # Projects directory
 ```
 
 ## Registry Format
@@ -94,9 +98,32 @@ Templates use variables `$TMUX_SESSION` and `$TMUX_PROJECT_DIR`. Modes: `MODE=ov
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OVERLORD_BASE_DIR` | Registry or `$HOME/Work` | Project root |
-| `OVERLORD_CONFIG` | script location | Registry/templates dir |
-| `OVERLORD_BIN` | script location | Scripts dir |
+| `OVERLORD_CONFIG` | auto-detected from symlink | `~/.config/overlord` |
+| `OVERLORD_BIN` | auto-detected from symlink | `~/.config/overlord` |
 | `EDITOR` | `nvim` | Editor for config/edit |
+
+## Installation & Uninstallation
+
+**Installation:**
+```bash
+git clone <repo> ~/tmp/overlord-setup
+~/tmp/overlord-setup/setup.sh
+# Script will:
+# 1. Move repo to ~/.config/overlord
+# 2. Create symlink: /usr/local/bin/overlord → ~/.config/overlord/overlord
+# 3. Initialize registry at ~/.config/overlord/registry.json
+# 4. Automatically delete the temporary clone when done
+```
+
+**Updating:**
+Simply re-run the setup.sh from a fresh clone to update to the latest version.
+
+**Uninstalling:**
+```bash
+overlord uninstall [--dry-run] [--force]
+# Removes: ~/.config/overlord/, /usr/local/bin/overlord symlink
+# Preserves: All project directories and files
+```
 
 ## Key Behaviors
 
