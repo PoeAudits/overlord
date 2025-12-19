@@ -75,7 +75,13 @@ log_success "All required dependencies found"
 # Check if /usr/local/bin is writable (or use sudo)
 NEED_SUDO=false
 if [[ ! -w "/usr/local/bin" ]]; then
-  log_warning "/usr/local/bin requires sudo access"
+  echo ""
+  log_info "Symlink Installation Requires Administrator Access"
+  echo "Overlord needs to create a symlink at /usr/local/bin/overlord to make the"
+  echo "'overlord' command available globally from your terminal. This directory"
+  echo "requires administrator (sudo) privileges to write to for system-wide commands."
+  echo ""
+  log_warning "You will be prompted for your password to complete the installation"
   NEED_SUDO=true
 fi
 

@@ -30,6 +30,22 @@ The setup script will:
 - Initialize an empty registry file
 - Verify the installation
 
+### Uninstalling
+
+To remove overlord from your system:
+
+```bash
+overlord uninstall [--dry-run] [--force]
+```
+
+This will:
+- Remove the symlink at `/usr/local/bin/overlord`
+- Remove the repository directory
+- Create a registry backup in `/tmp/` (for recovery if needed)
+- Preserve all project directories and their configurations
+
+See the `overlord uninstall` command section for full details.
+
 ### Requirements
 
 - Bash 4.0+
@@ -99,6 +115,8 @@ Main dispatcher. Running `overlord` with no arguments lists active projects.
 overlord                    # List active projects
 overlord --help             # Show help
 overlord --version          # Show version
+overlord <name>             # Open workspace (passes through to 'overlord open <name>')
+overlord <name> --fuzzy     # Open with fuzzy search (passes through to 'overlord open')
 overlord add <name> <path>  # Register existing project
 ```
 
@@ -285,16 +303,47 @@ overlord rm /path/to/project          # Remove by path
 overlord rm myproject --force          # Skip confirmation
 ```
 
+### overlord detect
+
+Find projects in the work directory that are not registered in the Overlord registry.
+
+```bash
+overlord detect
+```
+
+**Output includes:**
+- Project name
+- Inferred language (Python, Typescript, Solidity)
+- Inferred status (active, lib, archive)
+- Full project path
+
+**Behavior:**
+- Scans Python/, Typescript/, Solidity/ subdirectories
+- Compares discovered projects against registry entries
+- Displays only projects not currently registered
+- Shows "No unregistered projects found" when all projects are registered
+- Errors gracefully if base directory doesn't exist
+
+**Examples:**
+```bash
+overlord detect          # Show all unregistered projects
+```
+
+**Note:** Language and status are inferred from directory structure only. The command does not validate if directories are actual projects.
+
 ### overlord open
 
 Open project workspace with tmux. Uses fzf for fuzzy search.
 
 ```bash
-overlord open [name]
+overlord open [name] [options]
+
+# Options:
+--fuzzy, -f      # Force fuzzy search (skip exact match check)
 
 # Behavior:
 # - No argument: Launch fzf picker (active/lib projects)
-# - Exact match: Open immediately
+# - Exact match: Open immediately (unless --fuzzy flag is used)
 # - No exact match: fzf pre-filtered with query
 # - Archived projects cannot be opened (must move to active first)
 ```
@@ -323,13 +372,27 @@ overlord info <name>
 
 ### overlord config
 
-Open registry.json in editor ($EDITOR or nvim).
+Edit registry.json or restore from backup.
 
 ```bash
-overlord config
+overlord config [options]
+
+# Options:
+--import <path>     # Import/restore registry from backup file
+--help, -h          # Show this help
 ```
 
-Use this to manually add aliases to projects:
+**Behavior:**
+- Without options: Opens `registry.json` in editor ($EDITOR or nvim)
+- With `--import`: Validates and imports projects from a backup file with comprehensive validation:
+  - Checks JSON validity
+  - Verifies all project paths exist on disk
+  - Detects name conflicts with existing projects
+  - Creates automatic backup of current registry before import
+  - Preserves `settings.base_dir` from current registry
+
+**Editing manually:**
+You can manually edit the registry to add aliases:
 ```json
 {
   "projects": {
@@ -342,6 +405,12 @@ Use this to manually add aliases to projects:
     }
   }
 }
+```
+
+**Importing from backup:**
+```bash
+overlord config --import /tmp/overlord-registry-backup-2025-12-18.json   # Absolute path
+overlord config --import ~/backup/registry.json                           # Home directory path
 ```
 
 ### overlord edit
@@ -380,6 +449,33 @@ overlord sync --dry-run        # Preview what would be synced
 ```
 
 **Note:** Sync respects existing files by default. The `thoughts/` directory is always additive - existing content is never removed, even with `--force`.
+
+### overlord uninstall
+
+Remove overlord from the system and clean up installation artifacts.
+
+```bash
+overlord uninstall [options]
+
+# Options:
+--dry-run           # Show what would be deleted without deleting
+--force, -f         # Skip confirmation prompt
+--help, -h          # Show this help
+```
+
+**Behavior:**
+- Removes the symlink at `/usr/local/bin/overlord`
+- Removes the repository directory
+- Creates a registry backup in `/tmp/` with timestamp (format: `overlord-registry-backup-YYYY-MM-DD-HHMMSS.json`)
+- Preserves all project directories and their configurations
+- Confirmation prompt defaults to "No" for safety
+
+**Examples:**
+```bash
+overlord uninstall              # Show prompt before uninstalling
+overlord uninstall --dry-run    # Preview what would be deleted
+overlord uninstall --force      # Skip confirmation, proceed with uninstall
+```
 
 ## Makefile System
 
@@ -621,6 +717,7 @@ Newer versions of Overlord automatically move `opencode.jsonc` to the `.opencode
 9. **Cross-session communication**: `worktree-send` and `worktree-read` allow coordinating multiple worktrees from the main session without switching
 10. **Session-local shortcuts**: `tmux-send`, `tmux-read`, and `tmux-list` provide convenient shortcuts for operations within the current session
 11. **Centralized Helpers**: `lib/common.sh` provides unified logging, language detection, and template handling logic across all subcommands.
+12. **Project name shortcut**: `overlord <name>` dispatches to `overlord open`, reducing typing for the most common operation. Subcommands take priority to prevent conflicts.
 
 ## Environment Variables
 
@@ -638,11 +735,13 @@ This system is designed to be operated by an AI agent. Each subcommand can be in
 
 - `overlord-new` - Create projects
 - `overlord-add` - Register existing projects
+- `overlord-detect` - Find unregistered projects
 - `overlord-list` - Query project state
 - `overlord-mv` - Change project status
 - `overlord-open` - Launch workspaces
 - `overlord-info` - Get project details
 - `overlord-sync` - Propagate Makefiles
-- `overlord-config` - Modify registry
+- `overlord-config` - Modify registry or import backups
+- `overlord-uninstall` - Remove overlord from system
 
 The `--json` flag on `overlord list` provides machine-readable output for AI consumption.
