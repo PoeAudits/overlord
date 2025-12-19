@@ -30,15 +30,19 @@ overlord - Project Management System v${OVERLORD_VERSION}
 
 Usage:
   overlord                              List active projects (default)
+  overlord <name>                       Open workspace (same as 'overlord open')
+  overlord <name> --fuzzy|-f            Open workspace with fuzzy search
   overlord new <name> --py|--ts|--sol   Create new project
   overlord add <name> <path> [options]  Register existing directory
   overlord init [path] [options]        Initialize existing dir with config
   overlord list [options]               List projects
+  overlord detect                       Find unregistered projects in work directory
   overlord mv <name> <status>           Move project (active|lib|archive)
   overlord open [name]                  Open workspace (fzf if no match)
   overlord info <name>                  Show project details
   overlord rm <name> [options]          Remove project from registry
   overlord sync [options]               Propagate Makefile templates to projects
+  overlord uninstall [options]          Remove overlord from system
   overlord config                       Edit registry.json in \$EDITOR
   overlord edit                         Edit overlord scripts in \$EDITOR
   overlord --help                       Show this help
@@ -54,6 +58,17 @@ Environment:
 EOF
 }
 
+# Check if argument is a valid project name or alias
+is_valid_project() {
+  local query="$1"
+  
+  # Check if find_project_exact returns a result (requires sourcing common.sh first)
+  if find_project_exact "$query" > /dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
 # Ensure config directory exists
 ensure_config() {
   if [[ ! -d "$OVERLORD_CONFIG" ]]; then
@@ -66,6 +81,9 @@ ensure_config() {
 
 main() {
   ensure_config
+
+  # Source common library
+  source "$OVERLORD_BIN/lib/common.sh"
 
   # No arguments: run list (active projects)
   if [[ $# -eq 0 ]]; then
@@ -81,7 +99,7 @@ main() {
       echo "overlord v${OVERLORD_VERSION}"
       exit 0
       ;;
-    new|add|init|list|mv|open|info|sync|config|edit|rm)
+    new|add|init|list|mv|open|info|sync|config|edit|rm|uninstall|detect)
       local cmd="$1"
       shift
       local subcmd="$OVERLORD_BIN/overlord-$cmd"
@@ -93,10 +111,35 @@ main() {
       fi
       ;;
     *)
-      echo -e "${RED}Error:${NC} Unknown command: $1" >&2
-      echo ""
-      usage >&2
-      exit 1
+      # Try project name lookup before showing error
+      if is_valid_project "$1"; then
+        local project_name="$1"
+        shift
+        
+        # Check for fuzzy flag: --fuzzy or -f
+        local fuzzy_flag=""
+        if [[ "${1:-}" == "--fuzzy" || "${1:-}" == "-f" ]]; then
+          fuzzy_flag="--fuzzy"
+          shift
+        fi
+        
+        # Dispatch to overlord-open with project name, optional fuzzy flag, and remaining args
+        local open_args=("$project_name")
+        if [[ -n "$fuzzy_flag" ]]; then
+          open_args+=("$fuzzy_flag")
+        fi
+        open_args+=("$@")
+        
+        exec "$OVERLORD_BIN/overlord-open" "${open_args[@]}"
+      else
+        # Project not found - show warning, help, and suggestion
+        log_warning "Project '$1' not found"
+        echo ""
+        usage >&2
+        echo ""
+        log_info "Use 'overlord list' to see available projects"
+        exit 1
+      fi
       ;;
   esac
 }
