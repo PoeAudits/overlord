@@ -2,7 +2,7 @@
 type: feature
 priority: medium
 created: 2025-01-18T10:00:00Z
-status: implemented
+status: archived
 tags: [cli, registry, detection]
 keywords: [overlord detect, unregistered projects, work directory scanning]
 patterns: [registry.json lookup, directory traversal]
