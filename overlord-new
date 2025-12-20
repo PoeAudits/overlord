@@ -185,7 +185,7 @@ init_solidity() {
 
   (
     cd "$dir"
-    forge init --no-commit
+    forge init
   )
   log_success "Solidity project initialized"
 }

@@ -16,26 +16,28 @@ source "$OVERLORD_BIN/lib/common.sh"
 usage() {
   cat <<'EOF'
 Usage:
-  overlord open [name] [--fuzzy|-f]
+  overlord open [name] [--fuzzy|-f] [--force]
 
 Arguments:
   name      Project name or alias (optional)
 
 Options:
   --fuzzy, -f    Force fuzzy search (skip exact match)
+  --force        Open archived projects without moving to active first
 
 Behavior:
   - No argument: Launch fzf picker with active/lib projects
   - Exact match: Open project immediately
   - No exact match: Launch fzf pre-filtered with query
   - With --fuzzy: Skip exact match and launch fzf immediately
-  - Archived projects cannot be opened (must move to active first)
+  - With --force: Allow opening archived projects (normally requires moving to active first)
 
 Examples:
   overlord open              # Interactive picker
   overlord open myproject    # Open exact match
   overlord open mypr         # Fuzzy search if no exact match
   overlord open mypr --fuzzy # Force fuzzy search
+  overlord open myarchived --force  # Open archived project without moving
 EOF
 }
 
@@ -44,6 +46,15 @@ get_openable_projects() {
   jq -r '
     .projects | to_entries[] | 
     select(.value.status == "active" or .value.status == "lib") |
+    "\(.key)\t\(.value.lang)\t\(.value.status)\t\(.value.path)"
+  ' "$OVERLORD_REGISTRY" 2>/dev/null || true
+}
+
+# Get all openable projects including archived (when --force is used)
+get_openable_projects_with_force() {
+  jq -r '
+    .projects | to_entries[] | 
+    select(.value.status == "active" or .value.status == "lib" or .value.status == "archive") |
     "\(.key)\t\(.value.lang)\t\(.value.status)\t\(.value.path)"
   ' "$OVERLORD_REGISTRY" 2>/dev/null || true
 }
@@ -67,24 +78,39 @@ format_for_fzf() {
 # Run fzf picker
 run_fzf_picker() {
   local query="${1:-}"
+  local include_archived="${2:-false}"
   local projects
-  projects=$(get_openable_projects)
+  
+  if [[ "$include_archived" == true ]]; then
+    projects=$(get_openable_projects_with_force)
+  else
+    projects=$(get_openable_projects)
+  fi
   
   if [[ -z "$projects" ]]; then
-    log_error "No active or lib projects found"
-    log_info "Create a project with 'overlord new' or activate archived projects with 'overlord mv'"
+    if [[ "$include_archived" == true ]]; then
+      log_error "No projects found"
+    else
+      log_error "No active or lib projects found"
+      log_info "Create a project with 'overlord new' or activate archived projects with 'overlord mv'"
+    fi
     exit 1
   fi
   
   local formatted
   formatted=$(format_for_fzf "$projects")
   
-  local fzf_args=(
-    --height=40%
-    --reverse
-    --header="Select project (active/lib only)"
-    --prompt="project> "
-  )
+   local header="Select project (active/lib only)"
+   if [[ "$include_archived" == true ]]; then
+     header="Select project (active/lib/archive)"
+   fi
+   
+   local fzf_args=(
+     --height=40%
+     --reverse
+     --header="$header"
+     --prompt="project> "
+   )
   
   if [[ -n "$query" ]]; then
     fzf_args+=(--query="$query")
@@ -176,12 +202,18 @@ main() {
   local query="${1:-}"
   shift || true
   
-  # Check for fuzzy flag
+  # Check for flags
   local force_fuzzy=false
-  if [[ "${1:-}" == "--fuzzy" || "${1:-}" == "-f" ]]; then
-    force_fuzzy=true
+  local force_open=false
+  
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --fuzzy|-f) force_fuzzy=true ;;
+      --force) force_open=true ;;
+      *) log_error "Unknown option: $1"; exit 1 ;;
+    esac
     shift || true
-  fi
+  done
 
   local project_name=""
   local project_info=""
@@ -189,7 +221,7 @@ main() {
   if [[ -n "$query" ]]; then
     # If fuzzy flag is set, skip exact match and go straight to fzf
     if [[ "$force_fuzzy" == true ]]; then
-      project_name=$(run_fzf_picker "$query")
+      project_name=$(run_fzf_picker "$query" "$force_open")
       if [[ -n "$project_name" ]]; then
         project_info=$(find_project_exact "$project_name")
       fi
@@ -199,7 +231,7 @@ main() {
         project_name=$(echo "$project_info" | cut -f1)
       else
         # No exact match, use fzf with query
-        project_name=$(run_fzf_picker "$query")
+        project_name=$(run_fzf_picker "$query" "$force_open")
         if [[ -n "$project_name" ]]; then
           project_info=$(find_project_exact "$project_name")
         fi
@@ -207,7 +239,7 @@ main() {
     fi
   else
     # No query, launch fzf picker
-    project_name=$(run_fzf_picker)
+    project_name=$(run_fzf_picker "" "$force_open")
     if [[ -n "$project_name" ]]; then
       project_info=$(find_project_exact "$project_name")
     fi
@@ -221,10 +253,11 @@ main() {
   local name lang status path
   IFS=$'\t' read -r name lang status path <<< "$project_info"
 
-  # Check if archived
-  if [[ "$status" == "archive" ]]; then
+  # Check if archived (unless --force is used)
+  if [[ "$status" == "archive" && "$force_open" == false ]]; then
     log_error "Cannot open archived project: $name"
     log_info "Move to active first: overlord mv $name active"
+    log_info "Or use --force to open without moving: overlord open $name --force"
     exit 1
   fi
 
