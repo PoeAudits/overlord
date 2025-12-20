@@ -2,7 +2,7 @@
 type: feature
 priority: medium
 created: 2025-12-18T00:00:00Z
-status: implemented
+status: archived
 tags: [overlord, dependency-management, local-dependencies, python, typescript]
 keywords: [overlord inject, path-based dependencies, local file dependencies, uv, pnpm, bun, pyproject.toml, package.json]
 patterns: [dependency injection, registry lookup, language detection, configuration file modification, error handling]
