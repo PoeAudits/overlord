@@ -10,10 +10,10 @@ overlord <name>              # Open workspace (shortcut for 'overlord open')
 overlord new <name> --py|--ts|--sol [--lib] [--force]
 overlord add <name> <path> [--py|--ts|--sol] [--lib] [--alias <n>]
 overlord init [path] [--py|--ts|--sol|--base] [--lib] [--name <n>] [--force]
-overlord list [--py|--ts|--sol] [--active|--lib|--archive|--all] [--json]
+overlord list [--py|--ts|--sol] [--active|--lib|--archive|--all] [--json] [--edit|-e]
 overlord mv <name> active|lib|archive
 overlord rm <name> [--force]
-overlord open [name] [--fuzzy]
+overlord open [name] [--fuzzy] [--force]
 overlord info <name>
 overlord sync [--py|--ts|--sol] [--force] [--dry-run]
 overlord inject <name>       # Add project as path-based dependency
@@ -134,6 +134,8 @@ overlord uninstall [--dry-run] [--force]
 - **`thoughts/`** is always additive, never overwritten
 - **Lookup priority** for names: project name → alias → absolute path
 - **`--json`** on `overlord list` for machine-readable output
+- **`--edit`** / **`-e`** on `overlord list` to enter interactive project state editor
+- **`overlord inject`** adds a registered project as a path-based local dependency (bash-native TOML parsing, zero external dependencies)
 
 ## Script Patterns
 
