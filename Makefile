@@ -5,6 +5,8 @@
 
 .PHONY: help worktree-new worktree-list worktree-remove worktree-setup \
         worktree-attach worktree-sessions worktree-send worktree-read \
+        worktree-archive worktree-archive-remove \
+        tmux-send tmux-read tmux-list \
         _create_worktree_session
 
 # Default worktree directory (inside project)
@@ -77,6 +79,9 @@ help:
 	@echo "  make worktree-new [BRANCH=<name>]        Create worktree + tmux session (auto-names if BRANCH omitted)"
 	@echo "  make worktree-list                       List all worktrees"
 	@echo "  make worktree-remove BRANCH=<name>       Remove worktree and kill tmux session"
+	@echo "  make worktree-archive BRANCH=<name>      Archive logs from worktree to .worktrees/logs/"
+	@echo "  make worktree-archive-remove BRANCH=<name>"
+	@echo "                                           Archive logs then remove worktree"
 	@echo "  make worktree-setup                      Run .worktree-setup.sh in current directory"
 	@echo ""
 	@echo "Tmux Session Management:"
@@ -89,13 +94,20 @@ help:
 	@echo "  make worktree-read BRANCH=<name> WINDOW=<window>"
 	@echo "                                           Read visible pane content from worktree"
 	@echo ""
+	@echo "Current Session Utilities (run from within tmux):"
+	@echo "  make tmux-send WINDOW=<window> CMD=\"<command>\""
+	@echo "                                           Send command to current session window"
+	@echo "  make tmux-read WINDOW=<window>           Read visible pane content from window"
+	@echo "  make tmux-list                           List all windows in current session"
+	@echo ""
 	@echo "Examples:"
 	@echo "  make worktree-new                        Create worktree with auto-generated name"
 	@echo "  make worktree-new BRANCH=fix-auth        Create worktree named 'fix-auth'"
+	@echo "  make tmux-send WINDOW=shell CMD=\"make test\""
+	@echo "  make tmux-read WINDOW=shell              Read test output"
+	@echo "  make tmux-list                           Show available windows"
 	@echo "  make worktree-send BRANCH=fix-auth WINDOW=shell CMD=\"make test\""
-	@echo "  make worktree-read BRANCH=fix-auth WINDOW=shell"
 	@echo "  make worktree-attach BRANCH=fix-auth     Attach to 'fix-auth' session"
-	@echo "  make worktree-remove BRANCH=fix-auth     Remove worktree and session"
 	@echo ""
 
 # Create a new worktree with tmux session
@@ -232,6 +244,47 @@ endif
 	\
 	echo "Cleanup complete: $(BRANCH)"
 
+# Archive logs from a worktree to .worktrees/logs/<branch>/
+# Usage: make worktree-archive BRANCH=<name>
+worktree-archive:
+ifndef BRANCH
+	$(error BRANCH is required. Usage: make worktree-archive BRANCH=<branch-name>)
+endif
+	@WORKTREE_PATH="$(WORKTREE_DIR)/$(BRANCH)"; \
+	LOG_DIR="$(WORKTREE_DIR)/logs/$(BRANCH)"; \
+	\
+	if [ ! -d "$$WORKTREE_PATH" ]; then \
+		echo "Error: Worktree directory not found: $$WORKTREE_PATH"; \
+		exit 1; \
+	fi; \
+	\
+	mkdir -p "$$LOG_DIR"; \
+	\
+	echo "Archiving logs from $(BRANCH)..."; \
+	\
+	for LOG_FILE in WORKLOG.md REFLECTION.md TASK.md; do \
+		if [ -f "$$WORKTREE_PATH/$$LOG_FILE" ]; then \
+			cp "$$WORKTREE_PATH/$$LOG_FILE" "$$LOG_DIR/"; \
+			echo "  Archived: $$LOG_FILE"; \
+		fi; \
+	done; \
+	\
+	if [ -n "$$(git -C "$$WORKTREE_PATH" diff --name-only 2>/dev/null)" ]; then \
+		git -C "$$WORKTREE_PATH" diff > "$$LOG_DIR/changes.diff"; \
+		echo "  Archived: changes.diff"; \
+	fi; \
+	\
+	echo "Logs archived to: $$LOG_DIR"
+
+# Archive logs and then remove worktree
+# Usage: make worktree-archive-remove BRANCH=<name>
+worktree-archive-remove:
+ifndef BRANCH
+	$(error BRANCH is required. Usage: make worktree-archive-remove BRANCH=<branch-name>)
+endif
+	@$(MAKE) worktree-archive BRANCH=$(BRANCH) && \
+	$(MAKE) worktree-remove BRANCH=$(BRANCH)
+
 # Attach to worktree's tmux session
 # Usage: make worktree-attach BRANCH=<name>
 worktree-attach:
@@ -356,3 +409,124 @@ endif
 	echo "Reading from $$SESSION:$$WINDOW_NAME:"; \
 	echo "----------------------------------------"; \
 	tmux capture-pane -t "$$SESSION:$$WINDOW_NAME" -p
+
+# Send command to window in current tmux session
+# Usage: make tmux-send WINDOW=<window> CMD="<command>"
+tmux-send:
+ifndef WINDOW
+	$(error WINDOW is required. Usage: make tmux-send WINDOW=<window> CMD="<command>")
+endif
+ifndef CMD
+	$(error CMD is required. Usage: make tmux-send WINDOW=<window> CMD="<command>")
+endif
+	@if [ -z "$$TMUX" ]; then \
+		echo "Error: Not running inside tmux session"; \
+		echo ""; \
+		echo "This command must be run from within a tmux session."; \
+		echo "Use 'overlord open' or 'make worktree-attach' to enter a session."; \
+		exit 1; \
+	fi; \
+	\
+	SESSION=$$(tmux display-message -p '#S'); \
+	WINDOW_NAME="$(WINDOW)"; \
+	COMMAND="$(CMD)"; \
+	\
+	if ! tmux list-windows -t "$$SESSION" 2>/dev/null | grep -q "^[0-9]*: $$WINDOW_NAME"; then \
+		echo "Error: Window '$$WINDOW_NAME' does not exist in current session '$$SESSION'"; \
+		echo ""; \
+		echo "Available windows:"; \
+		tmux list-windows -t "$$SESSION" 2>/dev/null | awk '{print "  " $$2}' | sed 's/\*$$//'; \
+		exit 1; \
+	fi; \
+	\
+	echo "Sending to $$SESSION:$$WINDOW_NAME: $$COMMAND"; \
+	tmux send-keys -t "$$SESSION:$$WINDOW_NAME" "$$COMMAND" C-m
+
+# Read visible pane content from window in current tmux session
+# Usage: make tmux-read WINDOW=<window>
+tmux-read:
+ifndef WINDOW
+	$(error WINDOW is required. Usage: make tmux-read WINDOW=<window>)
+endif
+	@if [ -z "$$TMUX" ]; then \
+		echo "Error: Not running inside tmux session"; \
+		echo ""; \
+		echo "This command must be run from within a tmux session."; \
+		echo "Use 'overlord open' or 'make worktree-attach' to enter a session."; \
+		exit 1; \
+	fi; \
+	\
+	SESSION=$$(tmux display-message -p '#S'); \
+	WINDOW_NAME="$(WINDOW)"; \
+	\
+	if ! tmux list-windows -t "$$SESSION" 2>/dev/null | grep -q "^[0-9]*: $$WINDOW_NAME"; then \
+		echo "Error: Window '$$WINDOW_NAME' does not exist in current session '$$SESSION'"; \
+		echo ""; \
+		echo "Available windows:"; \
+		tmux list-windows -t "$$SESSION" 2>/dev/null | awk '{print "  " $$2}' | sed 's/\*$$//'; \
+		exit 1; \
+	fi; \
+	\
+	echo "Reading from $$SESSION:$$WINDOW_NAME:"; \
+	echo "----------------------------------------"; \
+	tmux capture-pane -t "$$SESSION:$$WINDOW_NAME" -p
+
+# List all windows in current tmux session
+# Usage: make tmux-list
+tmux-list:
+	@if [ -z "$$TMUX" ]; then \
+		echo "Error: Not running inside tmux session"; \
+		echo ""; \
+		echo "This command must be run from within a tmux session."; \
+		echo "Use 'overlord open' or 'make worktree-attach' to enter a session."; \
+		exit 1; \
+	fi; \
+	\
+	SESSION=$$(tmux display-message -p '#S'); \
+	echo "Windows in session '$$SESSION':"; \
+	echo ""; \
+	tmux list-windows -t "$$SESSION" | while IFS=: read -r index rest; do \
+		NAME=$$(echo "$$rest" | awk '{print $$1}' | sed 's/\*$$//'); \
+		IS_ACTIVE=$$(echo "$$rest" | grep -q '\*' && echo " (active)" || echo ""); \
+		printf "  %s%s\n" "$$NAME" "$$IS_ACTIVE"; \
+	done; \
+	echo ""
+
+# ==============================================================================
+# TypeScript Makefile - PNPM/Bun Commands
+# Generated by overlord - Do not edit manually (use overlord sync)
+# ==============================================================================
+
+.PHONY: install build dev test lint format clean
+
+# Detect package manager (prefer bun if bun.lockb exists, else pnpm)
+PM := $(shell if [ -f bun.lockb ]; then echo "bun"; else echo "pnpm"; fi)
+
+# Install dependencies
+install:
+	$(PM) install
+
+# Build the project
+build:
+	$(PM) run build
+
+# Run development server
+dev:
+	$(PM) run dev
+
+# Run tests
+test:
+	$(PM) run test
+
+# Lint code
+lint:
+	$(PM) run lint
+
+# Format code
+format:
+	$(PM) run format
+
+# Clean build artifacts
+clean:
+	rm -rf dist node_modules/.cache .turbo
+

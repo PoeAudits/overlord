@@ -5,6 +5,7 @@
 
 .PHONY: help worktree-new worktree-list worktree-remove worktree-setup \
         worktree-attach worktree-sessions worktree-send worktree-read \
+        worktree-archive worktree-archive-remove \
         tmux-send tmux-read tmux-list \
         _create_worktree_session
 
@@ -78,6 +79,9 @@ help:
 	@echo "  make worktree-new [BRANCH=<name>]        Create worktree + tmux session (auto-names if BRANCH omitted)"
 	@echo "  make worktree-list                       List all worktrees"
 	@echo "  make worktree-remove BRANCH=<name>       Remove worktree and kill tmux session"
+	@echo "  make worktree-archive BRANCH=<name>      Archive logs from worktree to .worktrees/logs/"
+	@echo "  make worktree-archive-remove BRANCH=<name>"
+	@echo "                                           Archive logs then remove worktree"
 	@echo "  make worktree-setup                      Run .worktree-setup.sh in current directory"
 	@echo ""
 	@echo "Tmux Session Management:"
@@ -239,6 +243,47 @@ endif
 	fi; \
 	\
 	echo "Cleanup complete: $(BRANCH)"
+
+# Archive logs from a worktree to .worktrees/logs/<branch>/
+# Usage: make worktree-archive BRANCH=<name>
+worktree-archive:
+ifndef BRANCH
+	$(error BRANCH is required. Usage: make worktree-archive BRANCH=<branch-name>)
+endif
+	@WORKTREE_PATH="$(WORKTREE_DIR)/$(BRANCH)"; \
+	LOG_DIR="$(WORKTREE_DIR)/logs/$(BRANCH)"; \
+	\
+	if [ ! -d "$$WORKTREE_PATH" ]; then \
+		echo "Error: Worktree directory not found: $$WORKTREE_PATH"; \
+		exit 1; \
+	fi; \
+	\
+	mkdir -p "$$LOG_DIR"; \
+	\
+	echo "Archiving logs from $(BRANCH)..."; \
+	\
+	for LOG_FILE in WORKLOG.md REFLECTION.md TASK.md; do \
+		if [ -f "$$WORKTREE_PATH/$$LOG_FILE" ]; then \
+			cp "$$WORKTREE_PATH/$$LOG_FILE" "$$LOG_DIR/"; \
+			echo "  Archived: $$LOG_FILE"; \
+		fi; \
+	done; \
+	\
+	if [ -n "$$(git -C "$$WORKTREE_PATH" diff --name-only 2>/dev/null)" ]; then \
+		git -C "$$WORKTREE_PATH" diff > "$$LOG_DIR/changes.diff"; \
+		echo "  Archived: changes.diff"; \
+	fi; \
+	\
+	echo "Logs archived to: $$LOG_DIR"
+
+# Archive logs and then remove worktree
+# Usage: make worktree-archive-remove BRANCH=<name>
+worktree-archive-remove:
+ifndef BRANCH
+	$(error BRANCH is required. Usage: make worktree-archive-remove BRANCH=<branch-name>)
+endif
+	@$(MAKE) worktree-archive BRANCH=$(BRANCH) && \
+	$(MAKE) worktree-remove BRANCH=$(BRANCH)
 
 # Attach to worktree's tmux session
 # Usage: make worktree-attach BRANCH=<name>
