@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # overlord-list: List projects from registry
-# Default: shows active projects only
+# Default: shows active and library projects
 
 set -euo pipefail
 
@@ -26,7 +26,7 @@ Options:
   --py, --python       Filter to Python projects
   --ts, --typescript   Filter to TypeScript projects
   --sol, --solidity    Filter to Solidity projects
-  --active             Show active projects (default)
+  --active             Show active projects
   --lib                Show library projects
   --archive            Show archived projects
   --all                Show all projects regardless of status
@@ -42,9 +42,9 @@ Language Filtering:
     --py --all         Show all Python projects (any status)
     --py --archive     Show archived Python projects only
 
-Examples:
-  overlord list                  # Active projects (default)
-  overlord list --all            # All projects
+ Examples:
+   overlord list                  # Active and library projects (default)
+   overlord list --all            # All projects (including archived)
   overlord list --py --lib       # Python libraries
   overlord list --py --ts        # Python and TypeScript active projects
   overlord list --py --ts --all  # All Python and TypeScript projects
@@ -55,7 +55,7 @@ EOF
 
 # Parse arguments
 FILTER_LANG=()
-FILTER_STATUS="active"
+FILTER_STATUS="active|lib"
 OUTPUT_JSON=false
 EDIT_MODE=false
 
@@ -764,7 +764,26 @@ list_projects() {
   # Build filter conditions
   local conditions=()
   if [[ -n "$FILTER_STATUS" ]]; then
-    conditions+=(".value.status == \"$FILTER_STATUS\"")
+    if [[ "$FILTER_STATUS" == *"|"* ]]; then
+      # Handle multiple statuses separated by |
+      local status_conditions=()
+      IFS='|' read -ra STATUSES <<< "$FILTER_STATUS"
+      for status in "${STATUSES[@]}"; do
+        status_conditions+=(".value.status == \"$status\"")
+      done
+      # Join with " or "
+      local status_filter=""
+      for i in "${!status_conditions[@]}"; do
+        if [[ $i -eq 0 ]]; then
+          status_filter="${status_conditions[$i]}"
+        else
+          status_filter="$status_filter or ${status_conditions[$i]}"
+        fi
+      done
+      conditions+=("($status_filter)")
+    else
+      conditions+=(".value.status == \"$FILTER_STATUS\"")
+    fi
   fi
   
   # Build language filter with OR logic for multiple languages
