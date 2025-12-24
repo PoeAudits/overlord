@@ -24,6 +24,7 @@ Language flags (required, one of):
 
 Options:
   --lib                Create in libs/ instead of active/
+  --alias <name>       Add alias (can be used multiple times)
   --no-git             Skip git initialization
   --no-open, -s        Don't open workspace after creation
   --force              Overwrite existing project directory
@@ -33,6 +34,7 @@ Examples:
   overlord new myapp --py
   overlord new mylib --ts --lib
   overlord new mycontract --sol --no-open
+  overlord new myproject --py --alias proj --alias mp
 EOF
 }
 
@@ -43,6 +45,7 @@ STATUS="active"
 INIT_GIT=true
 OPEN_WS=true
 FORCE=false
+ALIASES=()
 
 parse_args() {
   if [[ $# -lt 1 ]]; then
@@ -63,6 +66,14 @@ parse_args() {
         ;;
       --lib)
         STATUS="lib"
+        ;;
+      --alias)
+        if [[ $# -lt 2 ]]; then
+          log_error "--alias requires an argument"
+          exit 1
+        fi
+        shift
+        ALIASES+=("$1")
         ;;
       --no-git)
         INIT_GIT=false
@@ -208,29 +219,40 @@ init_git() {
   )
 }
 
-# Register project in registry
+# Register project in registry with aliases
 register_project() {
   local name="$1"
   local lang="$2"
   local status="$3"
   local path="$4"
+  shift 4
+  local aliases=("$@")
   local date
   date=$(date +%Y-%m-%d)
 
   local tmp_file
   tmp_file=$(mktemp)
   
+  # Convert bash array to JSON array
+  local aliases_json
+  if [[ ${#aliases[@]} -eq 0 ]]; then
+    aliases_json="[]"
+  else
+    aliases_json=$(printf '%s\n' "${aliases[@]}" | jq -R . | jq -s .)
+  fi
+  
   jq --arg name "$name" \
      --arg lang "$lang" \
      --arg status "$status" \
      --arg path "$path" \
      --arg date "$date" \
+     --argjson aliases "$aliases_json" \
      '.projects[$name] = {
        "lang": $lang,
        "status": $status,
        "path": $path,
        "created": $date,
-       "aliases": []
+       "aliases": $aliases
      }' "$OVERLORD_REGISTRY" > "$tmp_file"
   
   mv "$tmp_file" "$OVERLORD_REGISTRY"
@@ -288,8 +310,8 @@ main() {
   copy_opencode_template "$project_dir" "$LANGUAGE"
   create_thoughts_dirs "$project_dir"
 
-  # Register in registry
-  register_project "$PROJECT_NAME" "$LANGUAGE" "$STATUS" "$project_dir"
+   # Register in registry with aliases
+   register_project "$PROJECT_NAME" "$LANGUAGE" "$STATUS" "$project_dir" "${ALIASES[@]}"
 
   echo ""
   log_success "Project created successfully!"
