@@ -182,3 +182,22 @@ find_project_exact() {
   
   return 1
 }
+
+# Find project by absolute path
+find_project_by_path() {
+  local path="$1"
+  
+  local result
+  result=$(jq -r --arg q "$path" '
+    .projects | to_entries[] | 
+    select(.value.path == $q) | 
+    [.key, .value.lang, .value.status, .value.path] | @tsv
+  ' "$OVERLORD_REGISTRY" 2>/dev/null || true)
+  
+  if [[ -n "$result" ]]; then
+    echo "$result"
+    return 0
+  fi
+  
+  return 1
+}

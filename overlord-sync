@@ -19,26 +19,40 @@ log_dim() { echo -e "${DIM}  $*${NC}"; }
 usage() {
   cat <<'EOF'
 Usage:
-  overlord sync [options]
+  overlord sync <name>... [options]
+  overlord sync --all [options]
 
-Propagates Makefile templates and opencode.jsonc to all registered projects.
+Propagates Makefile, opencode.jsonc, and .tmux.local to registered projects.
 Creates thoughts/ directory structure if missing.
 
 By default, only creates files if they don't exist. Use --force to overwrite.
 
-Options:
-  --py, --python       Sync only Python projects
-  --ts, --typescript   Sync only TypeScript projects
-  --sol, --solidity    Sync only Solidity projects
-  --force              Overwrite existing Makefile and opencode.jsonc
-  --dry-run            Show what would be done without making changes
-  --help               Show this help
+Target Selection:
+  <name>                   Project name, alias, or '.' for current directory
+  --all                    Sync all registered projects
+
+File Selection (default: all files):
+  --makefile               Sync only Makefile
+  --opencode               Sync only .opencode/opencode.jsonc
+  --tmux                   Sync only .tmux.local
+  
+Language Filters (only with --all):
+  --py, --python           Sync only Python projects
+  --ts, --typescript       Sync only TypeScript projects
+  --sol, --solidity        Sync only Solidity projects
+
+Other Options:
+  --force                  Overwrite existing files
+  --dry-run                Show what would be done without making changes
+  --help                   Show this help
 
 Examples:
-  overlord sync                  # Sync all projects (create if missing)
-  overlord sync --force          # Sync all projects (overwrite existing)
-  overlord sync --py             # Sync only Python projects
-  overlord sync --dry-run        # Preview changes
+  overlord sync myproject                    # Sync all files for myproject
+  overlord sync . --makefile                 # Sync only Makefile for current dir
+  overlord sync proj1 proj2 --opencode       # Sync opencode.jsonc for two projects
+  overlord sync --all                        # Sync all files for all projects
+  overlord sync --all --py --makefile        # Sync Makefiles for Python projects
+  overlord sync --all --ts --tmux --force    # Sync .tmux.local for TypeScript projects
 EOF
 }
 
@@ -46,6 +60,11 @@ EOF
 FILTER_LANG=""
 DRY_RUN=false
 FORCE=false
+SYNC_ALL=false
+TARGET_NAMES=()
+SYNC_MAKEFILE=false
+SYNC_OPENCODE=false
+SYNC_TMUX=false
 
 parse_args() {
   while [[ $# -gt 0 ]]; do
@@ -65,17 +84,135 @@ parse_args() {
       --force)
         FORCE=true
         ;;
+      --all)
+        SYNC_ALL=true
+        ;;
+      --makefile)
+        SYNC_MAKEFILE=true
+        ;;
+      --opencode)
+        SYNC_OPENCODE=true
+        ;;
+      --tmux)
+        SYNC_TMUX=true
+        ;;
       --help|-h)
         usage
         exit 0
         ;;
-      *)
+      -*)
         log_error "Unknown option: $1"
         exit 1
+        ;;
+      *)
+        # Positional argument: project name
+        TARGET_NAMES+=("$1")
         ;;
     esac
     shift
   done
+  
+  # If no file flags specified, sync all types (backward compatible)
+  if [[ "$SYNC_MAKEFILE" == false ]] && [[ "$SYNC_OPENCODE" == false ]] && [[ "$SYNC_TMUX" == false ]]; then
+    SYNC_MAKEFILE=true
+    SYNC_OPENCODE=true
+    SYNC_TMUX=true
+  fi
+  
+  # Validate: must have either target names or --all
+  if [[ ${#TARGET_NAMES[@]} -eq 0 ]] && [[ "$SYNC_ALL" == false ]]; then
+    log_error "No targets specified. Provide project name(s) or use --all"
+    echo ""
+    usage >&2
+    exit 1
+  fi
+  
+  # Validate: can't use both target names and --all
+  if [[ ${#TARGET_NAMES[@]} -gt 0 ]] && [[ "$SYNC_ALL" == true ]]; then
+    log_error "Cannot specify both project names and --all flag"
+    exit 1
+  fi
+  
+  # Warning: language flags without --all are ignored
+  if [[ -n "$FILTER_LANG" ]] && [[ "$SYNC_ALL" == false ]]; then
+    log_warning "Language filter (--${FILTER_LANG:0:2}) ignored without --all flag"
+  fi
+}
+
+# Resolve a project target (name, alias, or path) to registry info
+# Returns TSV: name<TAB>lang<TAB>status<TAB>path
+resolve_project_target() {
+  local target="$1"
+  local resolved_path=""
+  
+  # Handle "." as current directory
+  if [[ "$target" == "." ]]; then
+    resolved_path="$(pwd)"
+    
+    # Look up by path in registry
+    local project_info
+    if ! project_info=$(find_project_by_path "$resolved_path"); then
+      log_error "Current directory is not a registered project: $resolved_path"
+      log_info "Hint: Use 'overlord init' or 'overlord new' to register this project"
+      exit 1
+    fi
+    
+    echo "$project_info"
+    return 0
+  fi
+  
+  # Try name/alias lookup using existing function
+  local project_info
+  if project_info=$(find_project_exact "$target"); then
+    echo "$project_info"
+    return 0
+  fi
+  
+  # Not found
+  log_error "Project not found: $target"
+  log_info "Hint: Use 'overlord list' to see registered projects"
+  exit 1
+}
+
+# Build list of projects to sync (TSV format)
+build_project_list() {
+  if [[ "$SYNC_ALL" == true ]]; then
+    # Use existing registry query logic with language filter
+    local jq_filter='.projects | to_entries[]'
+    if [[ -n "$FILTER_LANG" ]]; then
+      jq_filter="$jq_filter | select(.value.lang == \"$FILTER_LANG\")"
+    fi
+    
+    local projects
+    projects=$(jq -r "$jq_filter | [.key, .value.lang, .value.path] | @tsv" "$OVERLORD_REGISTRY" 2>/dev/null || true)
+    
+    if [[ -z "$projects" ]]; then
+      log_warning "No projects found to sync"
+      exit 0
+    fi
+    
+    echo "$projects"
+  else
+    # Resolve each target name individually
+    local projects=""
+    for target in "${TARGET_NAMES[@]}"; do
+      local project_info
+      project_info=$(resolve_project_target "$target")
+      
+      # Extract name, lang, path (skip status field)
+      local name lang status path
+      IFS=$'\t' read -r name lang status path <<< "$project_info"
+      
+      # Append to projects list in TSV format
+      if [[ -n "$projects" ]]; then
+        projects="${projects}"$'\n'"${name}"$'\t'"${lang}"$'\t'"${path}"
+      else
+        projects="${name}"$'\t'"${lang}"$'\t'"${path}"
+      fi
+    done
+    
+    echo "$projects"
+  fi
 }
 
 # Sync a single project
@@ -92,28 +229,49 @@ sync_project() {
   local makefile_path="$path/Makefile"
   local opencode_path="$path/.opencode/opencode.jsonc"
   local legacy_opencode="$path/opencode.jsonc"
+  local tmux_path="$path/.tmux.local"
   local thoughts_path="$path/thoughts"
   
   if [[ "$DRY_RUN" == true ]]; then
     log_info "[dry-run] Would sync: $name ($lang)"
-    if [[ ! -f "$makefile_path" ]] || [[ "$FORCE" == true ]]; then
-      log_dim "  -> $makefile_path"
+    
+    # Makefile
+    if [[ "$SYNC_MAKEFILE" == true ]]; then
+      if [[ ! -f "$makefile_path" ]] || [[ "$FORCE" == true ]]; then
+        log_dim "  -> $makefile_path"
+      fi
     fi
+    
+    # Legacy migration (always show if exists)
     if [[ -f "$legacy_opencode" ]]; then
       log_dim "  -> Migrate $legacy_opencode to $opencode_path"
     fi
-    if [[ ! -f "$opencode_path" ]] || [[ "$FORCE" == true ]]; then
-      log_dim "  -> $opencode_path"
+    
+    # Opencode
+    if [[ "$SYNC_OPENCODE" == true ]]; then
+      if [[ ! -f "$opencode_path" ]] || [[ "$FORCE" == true ]]; then
+        log_dim "  -> $opencode_path"
+      fi
     fi
+    
+    # Tmux
+    if [[ "$SYNC_TMUX" == true ]]; then
+      if [[ ! -f "$tmux_path" ]] || [[ "$FORCE" == true ]]; then
+        log_dim "  -> $tmux_path"
+      fi
+    fi
+    
+    # Thoughts (always show if missing)
     if [[ ! -d "$thoughts_path/tickets" ]]; then
       log_dim "  -> $thoughts_path/"
     fi
+    
     return 0
   fi
   
   local synced_something=false
 
-  # Migrate legacy opencode.jsonc if found
+  # Migrate legacy opencode.jsonc if found (always migrate regardless of flags)
   if [[ -f "$legacy_opencode" ]]; then
     log_info "  Migrating $name: opencode.jsonc -> .opencode/opencode.jsonc"
     mkdir -p "$path/.opencode"
@@ -122,19 +280,30 @@ sync_project() {
   fi
   
   # Sync Makefile
-  if [[ ! -f "$makefile_path" ]] || [[ "$FORCE" == true ]]; then
-    # overlord-sync should fail if base.mk is missing
-    OVERLORD_STRICT=true generate_makefile "$path" "$lang"
-    synced_something=true
+  if [[ "$SYNC_MAKEFILE" == true ]]; then
+    if [[ ! -f "$makefile_path" ]] || [[ "$FORCE" == true ]]; then
+      OVERLORD_STRICT=true generate_makefile "$path" "$lang"
+      synced_something=true
+    fi
   fi
   
   # Sync opencode.jsonc
-  if [[ ! -f "$opencode_path" ]] || [[ "$FORCE" == true ]]; then
-    copy_opencode_template "$path" "$lang"
-    synced_something=true
+  if [[ "$SYNC_OPENCODE" == true ]]; then
+    if [[ ! -f "$opencode_path" ]] || [[ "$FORCE" == true ]]; then
+      copy_opencode_template "$path" "$lang"
+      synced_something=true
+    fi
   fi
   
-  # Create thoughts directories (always additive)
+  # Sync .tmux.local
+  if [[ "$SYNC_TMUX" == true ]]; then
+    if [[ ! -f "$tmux_path" ]] || [[ "$FORCE" == true ]]; then
+      copy_tmux_template "$path" "$lang"
+      synced_something=true
+    fi
+  fi
+  
+  # Create thoughts directories (always additive, regardless of flags)
   if [[ ! -d "$thoughts_path/tickets" ]]; then
     create_thoughts_dirs "$path"
     synced_something=true
@@ -154,20 +323,9 @@ sync_projects() {
     exit 1
   fi
   
-  # Build jq filter
-  local jq_filter='.projects | to_entries[]'
-  if [[ -n "$FILTER_LANG" ]]; then
-    jq_filter="$jq_filter | select(.value.lang == \"$FILTER_LANG\")"
-  fi
-  
-  # Get projects
+  # Build list of projects to sync
   local projects
-  projects=$(jq -r "$jq_filter | [.key, .value.lang, .value.path] | @tsv" "$OVERLORD_REGISTRY" 2>/dev/null || true)
-  
-  if [[ -z "$projects" ]]; then
-    log_warning "No projects found to sync"
-    exit 0
-  fi
+  projects=$(build_project_list)
   
   local synced_count=0
   

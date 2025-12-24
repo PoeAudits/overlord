@@ -5,7 +5,7 @@ CLI for managing Python, TypeScript, and Solidity projects with tmux workspace i
 ## Quick Reference
 
 ```bash
-overlord                     # List active projects
+overlord                     # List active and library projects
 overlord <name>              # Open workspace (shortcut for 'overlord open')
 overlord new <name> --py|--ts|--sol [--lib] [--force]
 overlord add <name> <path> [--py|--ts|--sol] [--lib] [--alias <n>]
@@ -15,7 +15,8 @@ overlord mv <name> active|lib|archive
 overlord rm <name> [--force]
 overlord open [name] [--fuzzy] [--force]
 overlord info <name>
-overlord sync [--py|--ts|--sol] [--force] [--dry-run]
+overlord sync <name>... [--makefile] [--opencode] [--tmux] [--force] [--dry-run]
+overlord sync --all [--py|--ts|--sol] [--makefile] [--opencode] [--tmux] [--force] [--dry-run]
 overlord inject <name>       # Add project as path-based dependency
 overlord detect              # Find unregistered projects
 overlord config [--import <path>]
@@ -130,7 +131,9 @@ overlord uninstall [--dry-run] [--force]
 
 - **Archived projects** must be moved to active/lib before opening
 - **`overlord rm`** only removes from registry, not disk
-- **`overlord sync`** creates files only if missing unless `--force`
+- **`overlord sync`** supports selective file creation with `--makefile`, `--opencode`, `--tmux` flags; creates files only if missing unless `--force`; thoughts/ always created
+- **`overlord sync`** requires explicit project targeting (names or `--all`) or errors
+- Language filters (--py, --ts, --sol) work only with --all flag on overlord sync
 - **`thoughts/`** is always additive, never overwritten
 - **Lookup priority** for names: project name → alias → absolute path
 - **`--json`** on `overlord list` for machine-readable output
