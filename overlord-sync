@@ -304,10 +304,7 @@ sync_project() {
   fi
   
   # Create thoughts directories (always additive, regardless of flags)
-  if [[ ! -d "$thoughts_path/tickets" ]]; then
-    create_thoughts_dirs "$path"
-    synced_something=true
-  fi
+  create_thoughts_dirs "$path"
   
   if [[ "$synced_something" == false ]]; then
     log_dim "  $name: up to date"
