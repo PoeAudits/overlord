@@ -151,6 +151,83 @@ create_thoughts_dirs() {
   fi
 }
 
+# Copy AGENTS.md template with fallback
+# Combines base.md + language-specific.md (like makefiles)
+# Never overwrites existing file - only appends Makefile Commands section if missing
+copy_agents_template() {
+  local dir="$1"
+  local lang="$2"
+  local target_file="$dir/AGENTS.md"
+  local base_template="$OVERLORD_BIN/agents/base.md"
+  local lang_template="$OVERLORD_BIN/agents/${lang}.md"
+  local project_name
+  project_name=$(basename "$dir")
+  
+  if [[ ! -f "$base_template" ]]; then
+    if [[ "${OVERLORD_STRICT:-false}" == "true" ]]; then
+        log_error "Base agents template not found at $base_template"
+        exit 1
+    fi
+    log_warning "Base agents template not found"
+    return 1
+  fi
+  
+  # For base language or if language-specific is missing, use base only
+  if [[ "$lang" == "base" ]] || [[ ! -f "$lang_template" ]]; then
+    if [[ -f "$target_file" ]]; then
+      if grep -q "## Makefile Commands" "$target_file"; then
+        log_success "AGENTS.md already has Makefile Commands section"
+        return 0
+      fi
+      
+      # Append Makefile Commands section from base
+      local makefile_commands=""
+      makefile_commands=$(sed -n '/## Makefile Commands/,$p' "$base_template")
+      
+      if [[ -n "$makefile_commands" ]]; then
+        {
+          echo ""
+          echo "$makefile_commands"
+        } >> "$target_file"
+        log_success "Appended Makefile Commands section to AGENTS.md (base)"
+      fi
+      return 0
+    fi
+    
+    # Create new AGENTS.md from base
+    sed "s/\[PROJECT NAME\]/$project_name/g" "$base_template" > "$target_file"
+    log_success "Created AGENTS.md (base only)"
+    return 0
+  fi
+  
+  # Combine base + language-specific
+  if [[ -f "$target_file" ]]; then
+    # Check if Makefile Commands section exists
+    if grep -q "## Makefile Commands" "$target_file"; then
+      log_success "AGENTS.md already has Makefile Commands section"
+      return 0
+    fi
+    
+    # Append combined Makefile Commands section
+    {
+      echo ""
+      sed "s/\[PROJECT NAME\]/$project_name/g" "$base_template"
+      cat "$lang_template"
+    } >> "$target_file"
+    log_success "Appended Makefile Commands section to AGENTS.md (${lang})"
+    return 0
+  fi
+  
+  # Create new AGENTS.md from combined templates
+  {
+    sed "s/\[PROJECT NAME\]/$project_name/g" "$base_template"
+    echo ""
+    cat "$lang_template"
+  } > "$target_file"
+  
+  log_success "Created AGENTS.md (${lang})"
+}
+
 # Find project by exact name or alias
 find_project_exact() {
   local query="$1"

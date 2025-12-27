@@ -309,6 +309,7 @@ main() {
   generate_makefile "$project_dir" "$LANGUAGE"
   copy_opencode_template "$project_dir" "$LANGUAGE"
   create_thoughts_dirs "$project_dir"
+  copy_agents_template "$project_dir" "$LANGUAGE"
 
    # Register in registry with aliases
    register_project "$PROJECT_NAME" "$LANGUAGE" "$STATUS" "$project_dir" "${ALIASES[@]}"

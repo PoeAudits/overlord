@@ -226,6 +226,9 @@ main() {
   # Create thoughts directory structure (always additive, ignores --force)
   create_thoughts_dirs "$PROJECT_PATH"
   
+  # Create AGENTS.md (never overwrites, only appends Makefile Commands if missing)
+  copy_agents_template "$PROJECT_PATH" "$LANGUAGE"
+  
   # Initialize git if needed
   if [[ "$INIT_GIT" == true ]]; then
     init_git "$PROJECT_PATH"

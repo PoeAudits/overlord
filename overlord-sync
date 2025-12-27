@@ -22,7 +22,7 @@ Usage:
   overlord sync <name>... [options]
   overlord sync --all [options]
 
-Propagates Makefile, opencode.jsonc, and .tmux.local to registered projects.
+Propagates Makefile, opencode.jsonc, .tmux.local, and thoughts/ to registered projects.
 Creates thoughts/ directory structure if missing.
 
 By default, only creates files if they don't exist. Use --force to overwrite.
@@ -31,10 +31,12 @@ Target Selection:
   <name>                   Project name, alias, or '.' for current directory
   --all                    Sync all registered projects
 
-File Selection (default: all files):
-  --makefile               Sync only Makefile
-  --opencode               Sync only .opencode/opencode.jsonc
-  --tmux                   Sync only .tmux.local
+ File Selection (default: all files):
+   --makefile               Sync only Makefile
+   --opencode               Sync only .opencode/opencode.jsonc
+   --tmux                   Sync only .tmux.local
+   --thoughts               Sync only thoughts/ directory structure
+   --agents                 Sync only AGENTS.md (requires explicit flag)
   
 Language Filters (only with --all):
   --py, --python           Sync only Python projects
@@ -46,25 +48,30 @@ Other Options:
   --dry-run                Show what would be done without making changes
   --help                   Show this help
 
-Examples:
-  overlord sync myproject                    # Sync all files for myproject
-  overlord sync . --makefile                 # Sync only Makefile for current dir
-  overlord sync proj1 proj2 --opencode       # Sync opencode.jsonc for two projects
-  overlord sync --all                        # Sync all files for all projects
-  overlord sync --all --py --makefile        # Sync Makefiles for Python projects
-  overlord sync --all --ts --tmux --force    # Sync .tmux.local for TypeScript projects
+ Examples:
+   overlord sync myproject                    # Sync all files for myproject
+   overlord sync . --makefile                 # Sync only Makefile for current dir
+   overlord sync proj1 proj2 --opencode       # Sync opencode.jsonc for two projects
+   overlord sync --all                        # Sync all files for all projects
+   overlord sync --all --py --makefile        # Sync Makefiles for Python projects
+   overlord sync --all --ts --tmux --force    # Sync .tmux.local for TypeScript projects
+   overlord sync myproject --thoughts         # Sync only thoughts/ directory structure
+   overlord sync myproject --agents           # Sync only AGENTS.md for myproject
+   overlord sync --all --agents               # Sync AGENTS.md for all projects
 EOF
 }
 
 # Parse arguments
 FILTER_LANG=""
-DRY_RUN=false
-FORCE=false
-SYNC_ALL=false
-TARGET_NAMES=()
-SYNC_MAKEFILE=false
-SYNC_OPENCODE=false
-SYNC_TMUX=false
+ DRY_RUN=false
+ FORCE=false
+ SYNC_ALL=false
+ TARGET_NAMES=()
+ SYNC_MAKEFILE=false
+ SYNC_OPENCODE=false
+ SYNC_TMUX=false
+ SYNC_THOUGHTS=false
+ SYNC_AGENTS=false
 
 parse_args() {
   while [[ $# -gt 0 ]]; do
@@ -96,7 +103,13 @@ parse_args() {
       --tmux)
         SYNC_TMUX=true
         ;;
-      --help|-h)
+       --thoughts)
+         SYNC_THOUGHTS=true
+         ;;
+       --agents)
+         SYNC_AGENTS=true
+         ;;
+       --help|-h)
         usage
         exit 0
         ;;
@@ -112,12 +125,13 @@ parse_args() {
     shift
   done
   
-  # If no file flags specified, sync all types (backward compatible)
-  if [[ "$SYNC_MAKEFILE" == false ]] && [[ "$SYNC_OPENCODE" == false ]] && [[ "$SYNC_TMUX" == false ]]; then
-    SYNC_MAKEFILE=true
-    SYNC_OPENCODE=true
-    SYNC_TMUX=true
-  fi
+   # If no file flags specified, sync all types EXCEPT --agents (requires explicit flag)
+   if [[ "$SYNC_MAKEFILE" == false ]] && [[ "$SYNC_OPENCODE" == false ]] && [[ "$SYNC_TMUX" == false ]] && [[ "$SYNC_THOUGHTS" == false ]] && [[ "$SYNC_AGENTS" == false ]]; then
+     SYNC_MAKEFILE=true
+     SYNC_OPENCODE=true
+     SYNC_TMUX=true
+     SYNC_THOUGHTS=true
+   fi
   
   # Validate: must have either target names or --all
   if [[ ${#TARGET_NAMES[@]} -eq 0 ]] && [[ "$SYNC_ALL" == false ]]; then
@@ -226,11 +240,12 @@ sync_project() {
     return 0
   fi
   
-  local makefile_path="$path/Makefile"
-  local opencode_path="$path/.opencode/opencode.jsonc"
-  local legacy_opencode="$path/opencode.jsonc"
-  local tmux_path="$path/.tmux.local"
-  local thoughts_path="$path/thoughts"
+   local makefile_path="$path/Makefile"
+   local opencode_path="$path/.opencode/opencode.jsonc"
+   local legacy_opencode="$path/opencode.jsonc"
+   local tmux_path="$path/.tmux.local"
+   local thoughts_path="$path/thoughts"
+   local agents_path="$path/AGENTS.md"
   
   if [[ "$DRY_RUN" == true ]]; then
     log_info "[dry-run] Would sync: $name ($lang)"
@@ -261,9 +276,20 @@ sync_project() {
       fi
     fi
     
-    # Thoughts (always show if missing)
-    if [[ ! -d "$thoughts_path/tickets" ]]; then
-      log_dim "  -> $thoughts_path/"
+     # Thoughts
+     if [[ "$SYNC_THOUGHTS" == true ]]; then
+       if [[ ! -d "$thoughts_path/tickets" ]]; then
+         log_dim "  -> $thoughts_path/"
+       fi
+     fi
+    
+    # AGENTS.md
+    if [[ "$SYNC_AGENTS" == true ]]; then
+      if [[ ! -f "$agents_path" ]]; then
+        log_dim "  -> $agents_path (new file)"
+      elif ! grep -q "## Makefile Commands" "$agents_path"; then
+        log_dim "  -> $agents_path (append Makefile Commands)"
+      fi
     fi
     
     return 0
@@ -303,8 +329,15 @@ sync_project() {
     fi
   fi
   
-  # Create thoughts directories (always additive, regardless of flags)
-  create_thoughts_dirs "$path"
+   # Create thoughts directories (additive, only if --thoughts flag)
+   if [[ "$SYNC_THOUGHTS" == true ]]; then
+     create_thoughts_dirs "$path"
+   fi
+  
+  # Sync AGENTS.md (only if --agents flag - never overwrites, only appends)
+  if [[ "$SYNC_AGENTS" == true ]]; then
+    copy_agents_template "$path" "$lang"
+  fi
   
   if [[ "$synced_something" == false ]]; then
     log_dim "  $name: up to date"
