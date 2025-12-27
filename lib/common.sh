@@ -139,7 +139,7 @@ create_thoughts_dirs() {
   local thoughts_dir="$dir/thoughts"
   local created=false
   
-  for subdir in tickets plans logs research handoffs; do
+  for subdir in tickets research plans proposals specs logs reviews archive handoffs; do
     if [[ ! -d "$thoughts_dir/$subdir" ]]; then
       mkdir -p "$thoughts_dir/$subdir"
       created=true
