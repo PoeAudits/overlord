@@ -70,7 +70,7 @@ Auto-detected by file presence: `pyproject.toml`/`setup.py` → Python, `package
 - `.tmux.local` - Workspace layout
 - `Makefile` - Combined from `base.mk` + language-specific `.mk`
 - `.opencode/opencode.jsonc` - AI instructions (migrates legacy root-level file)
-- `thoughts/{tickets,plans,logs,research,handoffs}/` - Never overwritten
+- `thoughts/{tickets,research,plans,proposals,specs,logs,reviews,archive,handoffs}/` - Never overwritten
 
 ## Makefile Commands
 
@@ -131,7 +131,7 @@ overlord uninstall [--dry-run] [--force]
 
 - **Archived projects** must be moved to active/lib before opening
 - **`overlord rm`** only removes from registry, not disk
-- **`overlord sync`** supports selective file creation with `--makefile`, `--opencode`, `--tmux` flags; creates files only if missing unless `--force`; thoughts/ always created
+- **`overlord sync`** supports selective file creation with `--makefile`, `--opencode`, `--tmux` flags; creates files only if missing unless `--force`; thoughts/ always created and expanded to full 9-directory structure
 - **`overlord sync`** requires explicit project targeting (names or `--all`) or errors
 - Language filters (--py, --ts, --sol) work only with --all flag on overlord sync
 - **`thoughts/`** is always additive, never overwritten
