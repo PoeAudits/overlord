@@ -80,7 +80,7 @@ The registry uses a versioned YAML format:
 ```yaml
 version: 2
 settings:
-  base_dir: ~/Work
+  base_dir: ~/Overlord
   thoughts_dir: ~/thoughts
 projects:
   my-project:
@@ -309,7 +309,7 @@ The registry includes a global `thoughts_dir` setting (default: `~/thoughts`):
 
 ```yaml
 settings:
-  base_dir: ~/Work
+  base_dir: ~/Overlord
   thoughts_dir: ~/thoughts
 ```
 

@@ -22,7 +22,7 @@ func Example() {
 
 	// Add a project
 	reg.Projects["my-cli-tool"] = registry.Project{
-		Path:        "~/Work/my-cli-tool",
+		Path:        "~/Overlord/my-cli-tool",
 		Category:    registry.CategoryCLI,
 		Lang:        registry.LanguageGo,
 		Created:     "2024-01-15",

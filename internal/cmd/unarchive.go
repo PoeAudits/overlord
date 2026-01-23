@@ -105,8 +105,8 @@ var unarchiveCmd = &cobra.Command{
 	Short: "Restore a project from archive to an active category",
 	Long: `Restore a project from archive to an active category.
 
-The project will be moved from ~/Work/archive/{name}/ to the appropriate
-category directory (e.g., ~/Work/projects/web/{name}/), and its registry
+The project will be moved from ~/Overlord/archive/{name}/ to the appropriate
+category directory (e.g., ~/Overlord/projects/web/{name}/), and its registry
 status will be updated to 'active'.
 
 If --category is not provided, an interactive picker will be shown.

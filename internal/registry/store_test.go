@@ -26,8 +26,8 @@ func TestLoad_NonExistentFile(t *testing.T) {
 		t.Errorf("registry.Version = %d, want 2", registry.Version)
 	}
 
-	if registry.Settings.BaseDir != "~/Work" {
-		t.Errorf("registry.Settings.BaseDir = %s, want ~/Work", registry.Settings.BaseDir)
+	if registry.Settings.BaseDir != "~/Overlord" {
+		t.Errorf("registry.Settings.BaseDir = %s, want ~/Overlord", registry.Settings.BaseDir)
 	}
 
 	if registry.Settings.ThoughtsDir != "~/thoughts" {
@@ -52,11 +52,11 @@ func TestLoad_ValidFile(t *testing.T) {
 	// Create a valid registry file
 	validYAML := `version: 2
 settings:
-  base_dir: ~/Work
+  base_dir: ~/Overlord
   thoughts_dir: ~/thoughts
 projects:
   test-project:
-    path: ~/Work/test-project
+    path: ~/Overlord/test-project
     category: cli
     lang: go
     created: "2024-01-15"
@@ -105,7 +105,7 @@ func TestLoad_InvalidYAML(t *testing.T) {
 	// Create invalid YAML
 	invalidYAML := `version: 2
 settings:
-  base_dir: ~/Work
+  base_dir: ~/Overlord
   invalid yaml here [[[
 `
 
@@ -128,7 +128,7 @@ func TestLoad_InvalidRegistry(t *testing.T) {
 	// Create registry with invalid version
 	invalidRegistry := `version: 1
 settings:
-  base_dir: ~/Work
+  base_dir: ~/Overlord
   thoughts_dir: ~/thoughts
 projects: {}
 `
@@ -151,7 +151,7 @@ func TestSave_NewFile(t *testing.T) {
 
 	registry := defaultRegistry()
 	registry.Projects["test"] = Project{
-		Path:        "~/Work/test",
+		Path:        "~/Overlord/test",
 		Category:    CategoryCLI,
 		Lang:        LanguageGo,
 		Created:     "2024-01-15",
@@ -215,7 +215,7 @@ func TestSave_CreatesBackup(t *testing.T) {
 	// Create initial registry
 	registry1 := defaultRegistry()
 	registry1.Projects["project1"] = Project{
-		Path:        "~/Work/project1",
+		Path:        "~/Overlord/project1",
 		Category:    CategoryCLI,
 		Lang:        LanguageGo,
 		Created:     "2024-01-15",
@@ -230,7 +230,7 @@ func TestSave_CreatesBackup(t *testing.T) {
 	// Save again with different content
 	registry2 := defaultRegistry()
 	registry2.Projects["project2"] = Project{
-		Path:        "~/Work/project2",
+		Path:        "~/Overlord/project2",
 		Category:    CategoryWeb,
 		Lang:        LanguageTypeScript,
 		Created:     "2024-01-16",
@@ -285,7 +285,7 @@ func TestSave_InvalidRegistry(t *testing.T) {
 	registry := &Registry{
 		Version: 1,
 		Settings: Settings{
-			BaseDir:     "~/Work",
+			BaseDir:     "~/Overlord",
 			ThoughtsDir: "~/thoughts",
 		},
 		Projects: make(map[string]Project),
@@ -375,8 +375,8 @@ func TestDefaultRegistry(t *testing.T) {
 		t.Errorf("registry.Version = %d, want 2", registry.Version)
 	}
 
-	if registry.Settings.BaseDir != "~/Work" {
-		t.Errorf("registry.Settings.BaseDir = %s, want ~/Work", registry.Settings.BaseDir)
+	if registry.Settings.BaseDir != "~/Overlord" {
+		t.Errorf("registry.Settings.BaseDir = %s, want ~/Overlord", registry.Settings.BaseDir)
 	}
 
 	if registry.Settings.ThoughtsDir != "~/thoughts" {
@@ -406,7 +406,7 @@ func TestSaveLoad_RoundTrip(t *testing.T) {
 	// Create registry with multiple projects
 	original := defaultRegistry()
 	original.Projects["project1"] = Project{
-		Path:        "~/Work/project1",
+		Path:        "~/Overlord/project1",
 		Category:    CategoryCLI,
 		Lang:        LanguageGo,
 		Created:     "2024-01-15",
@@ -416,7 +416,7 @@ func TestSaveLoad_RoundTrip(t *testing.T) {
 		Status:      Status{State: StateActive},
 	}
 	original.Projects["project2"] = Project{
-		Path:        "~/Work/project2",
+		Path:        "~/Overlord/project2",
 		Category:    CategoryWeb,
 		Lang:        LanguageTypeScript,
 		Created:     "2024-01-16",

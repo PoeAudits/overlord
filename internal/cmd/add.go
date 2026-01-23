@@ -47,14 +47,14 @@ Language auto-detection checks for:
   - foundry.toml or hardhat.config.* → Solidity
   - Default: base
 
-Category auto-detection (if path is under ~/Work/):
-  - ~/Work/projects/contracts/ → contracts
-  - ~/Work/projects/web/ → web
-  - ~/Work/projects/services/ → services
+Category auto-detection (if path is under ~/Overlord/):
+  - ~/Overlord/projects/contracts/ → contracts
+  - ~/Overlord/projects/web/ → web
+  - ~/Overlord/projects/services/ → services
   - etc.
 
 Examples:
-  overlord add my-api ~/Work/projects/services/my-api
+  overlord add my-api ~/Overlord/projects/services/my-api
   overlord add my-app ./my-app --category=web --ts
   overlord add my-lib ../my-lib --py --description="Python library"
   overlord add my-contract ~/contracts/my-contract --sol --alias=mc`,

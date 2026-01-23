@@ -20,7 +20,7 @@ var (
 var archiveCmd = &cobra.Command{
 	Use:   "archive <name>",
 	Short: "Archive a project by moving it to the archive directory",
-	Long: `Archive a project by moving its directory to ~/Work/archive/<name>/ and
+	Long: `Archive a project by moving its directory to ~/Overlord/archive/<name>/ and
 updating its status to 'archived' in the registry.
 
 The name argument can be either a project name or alias.

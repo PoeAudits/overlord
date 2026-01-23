@@ -152,7 +152,7 @@ func defaultRegistry() *Registry {
 	return &Registry{
 		Version: 2,
 		Settings: Settings{
-			BaseDir:     "~/Work",
+			BaseDir:     "~/Overlord",
 			ThoughtsDir: "~/thoughts",
 		},
 		Projects: make(map[string]Project),

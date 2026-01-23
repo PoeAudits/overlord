@@ -38,7 +38,7 @@ var newCmd = &cobra.Command{
 	Long: `Create a new project with directory structure, git initialization,
 templates, thoughts integration, and registry entry.
 
-The project will be created at ~/Work/{category-path}/{name}/ with:
+The project will be created at ~/Overlord/{category-path}/{name}/ with:
   - .tmux.local (tmux session configuration)
   - Makefile (language-specific build commands)
   - README.md (project documentation)
