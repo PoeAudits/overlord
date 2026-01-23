@@ -1,0 +1,28 @@
+# {{.ProjectName}}
+
+{{.Description}}
+
+## Commands
+
+Run `make help` to see all available commands.
+
+| Command | Description |
+|---------|-------------|
+| `make install` | Install dependencies |
+| `make build` | Build contracts |
+| `make test` | Run tests |
+| `make test-v` | Run tests with verbosity |
+| `make snapshot` | Update gas snapshot |
+| `make gas` | Show gas report |
+| `make coverage` | Run coverage |
+| `make lint` | Check formatting |
+| `make fmt` | Format contracts |
+| `make clean` | Clean build artifacts |
+
+## Conventions
+
+- **Framework**: Foundry (forge, cast, anvil)
+- **Formatting**: `forge fmt` (Solidity style guide)
+- **Testing**: Foundry tests in `test/` with `.t.sol` suffix
+- **Scripts**: Deploy scripts in `script/` with `.s.sol` suffix
+- **Docs**: NatSpec comments for all public functions

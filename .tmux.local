@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Go project tmux layout
+# MODE can be "override" (default) or "merge"
+MODE=override
+set -euo pipefail
+
+S="$TMUX_SESSION"
+ROOT="$TMUX_PROJECT_DIR"
+
+# Rename the starter window (created by overlord-open)
+tmux rename-window -t "${S}:base" "editor"
+tmux send-keys -t "${S}:editor" "nvim" C-m
+
+# Shell window
+tmux new-window -t "$S:" -n shell -c "$ROOT"
+
+# Git window
+tmux new-window -t "$S:" -n git -c "$ROOT"
+tmux send-keys -t "${S}:git" "git status" C-m
+
+# --- Go-specific options ---
+# Run the application
+# tmux new-window -t "$S:" -n run -c "$ROOT"
+# tmux send-keys -t "${S}:run" "go run ." C-m
+
+# Run tests in watch mode
+# tmux new-window -t "$S:" -n test -c "$ROOT"
+# tmux send-keys -t "${S}:test" "go test -v ./..." C-m
+
+# Build the application
+# tmux new-window -t "$S:" -n build -c "$ROOT"
+# tmux send-keys -t "${S}:build" "go build" C-m
+
+# Hot reload with Air (install: go install github.com/cosmtrek/air@latest)
+# tmux new-window -t "$S:" -n air -c "$ROOT"
+# tmux send-keys -t "${S}:air" "air" C-m
+
+# Debug with Delve (install: go install github.com/go-delve/delve/cmd/dlv@latest)
+# tmux new-window -t "$S:" -n debug -c "$ROOT"
+# tmux send-keys -t "${S}:debug" "dlv debug" C-m
+
+tmux select-window -t "${S}:editor"

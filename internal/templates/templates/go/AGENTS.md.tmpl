@@ -1,0 +1,25 @@
+# {{.ProjectName}}
+
+{{.Description}}
+
+## Commands
+
+Run `make help` to see all available commands.
+
+| Command | Description |
+|---------|-------------|
+| `make install` | Install dependencies |
+| `make build` | Build the application |
+| `make run` | Run the application |
+| `make test` | Run tests |
+| `make bench` | Run benchmarks |
+| `make lint` | Run static analysis |
+| `make fmt` | Format code |
+| `make clean` | Clean build artifacts |
+
+## Conventions
+
+- **Formatting**: `go fmt` (tabs, no line limit)
+- **Linting**: `go vet` for static analysis
+- **Testing**: Table-driven tests, co-located `*_test.go` files
+- **Errors**: Return errors with context (`fmt.Errorf("...: %w", err)`)

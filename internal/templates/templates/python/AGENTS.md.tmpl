@@ -1,0 +1,26 @@
+# {{.ProjectName}}
+
+{{.Description}}
+
+## Commands
+
+Run `make help` to see all available commands.
+
+| Command | Description |
+|---------|-------------|
+| `make install` | Install dependencies |
+| `make sync` | Sync dependencies |
+| `make lock` | Update lock file |
+| `make run` | Run the project |
+| `make test` | Run tests (pytest) |
+| `make lint` | Lint code (ruff check) |
+| `make fmt` | Format code (ruff format) |
+| `make clean` | Clean build artifacts |
+
+## Conventions
+
+- **Package Manager**: uv (fast Python package manager)
+- **Formatting**: ruff format (Black-compatible)
+- **Linting**: ruff check (fast, Flake8-compatible)
+- **Testing**: pytest with fixtures in `tests/`
+- **Config**: `pyproject.toml` for all project settings
