@@ -19,7 +19,7 @@ const (
 // If the file doesn't exist, it returns a default registry.
 // The path supports ~ expansion for the home directory.
 func Load(path string) (*Registry, error) {
-	expandedPath, err := expandPath(path)
+	expandedPath, err := ExpandPath(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to expand path: %w", err)
 	}
@@ -64,7 +64,7 @@ func Save(path string, registry *Registry) error {
 		return fmt.Errorf("cannot save invalid registry: %w", err)
 	}
 
-	expandedPath, err := expandPath(path)
+	expandedPath, err := ExpandPath(path)
 	if err != nil {
 		return fmt.Errorf("failed to expand path: %w", err)
 	}
@@ -105,8 +105,8 @@ func Save(path string, registry *Registry) error {
 	return nil
 }
 
-// expandPath expands ~ to the user's home directory
-func expandPath(path string) (string, error) {
+// ExpandPath expands ~ to the user's home directory
+func ExpandPath(path string) (string, error) {
 	if len(path) == 0 {
 		return "", fmt.Errorf("path cannot be empty")
 	}

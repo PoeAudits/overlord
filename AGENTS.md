@@ -504,8 +504,10 @@ make tmux-list                      # List all windows in current session
 
 **Go Commands:**
 ```bash
-make install                        # Install dependencies (go mod download)
+make deps                           # Install dependencies (go mod download)
 make build                          # Build the application
+make install                        # Build and install to ~/.local/bin
+make deploy [VPS=hostname]          # Cross-compile and deploy to VPS (default: poe-vps)
 make run                            # Run the application (go run .)
 make test                           # Run tests (go test -v ./...)
 make bench                          # Run benchmarks

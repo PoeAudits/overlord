@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -52,6 +53,48 @@ func init() {
 
 	// Local flags
 	rootCmd.Flags().BoolP("version", "v", false, "Print version information")
+
+	// Set custom flag error handler for better help messages
+	rootCmd.SetFlagErrorFunc(flagErrorFunc)
+}
+
+// flagErrorFunc provides better error messages for flag errors
+func flagErrorFunc(cmd *cobra.Command, err error) error {
+	errStr := err.Error()
+
+	// Handle "required flag not set" errors
+	if strings.Contains(errStr, "required flag") && strings.Contains(errStr, "not set") {
+		if cmd.Name() == "new" {
+			return fmt.Errorf("%s\n\n%s", errStr, formatNewUsage())
+		}
+	}
+
+	// Handle unknown flag errors with suggestions
+	if strings.Contains(errStr, "unknown flag") {
+		if cmd.Name() == "new" {
+			// Check for common flag mistakes
+			flagSuggestions := map[string]string{
+				"--base":       "Language flags are: --py, --ts, --go, --sol (or omit for base)",
+				"--python":     "Use --py for Python",
+				"--typescript": "Use --ts for TypeScript",
+				"--golang":     "Use --go for Go",
+				"--solidity":   "Use --sol for Solidity",
+				"--lang":       "Language flags are: --py, --ts, --go, --sol",
+				"--language":   "Language flags are: --py, --ts, --go, --sol",
+				"--cat":        "Use --category=<category>",
+				"--type":       "Use --category=<category>",
+				"--template":   "Language flags are: --py, --ts, --go, --sol",
+			}
+			for flag, suggestion := range flagSuggestions {
+				if strings.Contains(errStr, flag) {
+					return fmt.Errorf("%s\n\n%s\n\n%s", errStr, suggestion, formatNewUsage())
+				}
+			}
+			return fmt.Errorf("%s\n\n%s", errStr, formatNewUsage())
+		}
+	}
+
+	return err
 }
 
 // runRoot handles the root command - routes to list or open based on args

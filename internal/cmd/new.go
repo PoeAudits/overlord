@@ -60,12 +60,40 @@ Examples:
 	RunE: runNew,
 }
 
+// formatNewUsage returns a helpful usage string for the new command
+func formatNewUsage() string {
+	validCats := make([]string, 0, len(registry.ValidCategories()))
+	for _, c := range registry.ValidCategories() {
+		validCats = append(validCats, string(c))
+	}
+
+	return fmt.Sprintf(`Usage: overlord new <name> --category=<category> [--lang-flag] [options]
+
+Categories (required):
+  %s
+
+Language flags (optional, defaults to base):
+  --py    Python
+  --ts    TypeScript
+  --go    Go
+  --sol   Solidity
+
+Options:
+  --description="..."   Project description
+  --no-git              Skip git initialization
+  --no-open             Don't open workspace after creation
+
+Examples:
+  overlord new my-api --category=services --go
+  overlord new my-app --category=web --ts --description="Web app"
+  overlord new sandbox-test --category=sandbox`, strings.Join(validCats, ", "))
+}
+
 func init() {
 	rootCmd.AddCommand(newCmd)
 
-	// Category flag
+	// Category flag - validation done in PreRunE for better error messages
 	newCmd.Flags().StringVar(&newOpts.category, "category", "", "Project category (required)")
-	newCmd.MarkFlagRequired("category")
 
 	// Description flag
 	newCmd.Flags().StringVar(&newOpts.description, "description", "", "Project description")
@@ -79,10 +107,50 @@ func init() {
 	// Behavior flags
 	newCmd.Flags().BoolVar(&newOpts.noGit, "no-git", false, "Skip git initialization")
 	newCmd.Flags().BoolVar(&newOpts.noOpen, "no-open", false, "Don't open workspace after creation")
+
+	// Add PreRunE for category validation with helpful error
+	newCmd.PreRunE = validateNewFlags
 }
 
 // nameRegex validates project names
 var nameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
+
+// validateNewFlags validates required flags and provides helpful error messages
+func validateNewFlags(cmd *cobra.Command, args []string) error {
+	if newOpts.category == "" {
+		return fmt.Errorf("--category is required\n\n%s", formatNewUsage())
+	}
+
+	// Validate category
+	category := registry.Category(newOpts.category)
+	if !category.IsValid() {
+		validCats := make([]string, 0, len(registry.ValidCategories()))
+		for _, c := range registry.ValidCategories() {
+			validCats = append(validCats, string(c))
+		}
+		return fmt.Errorf("invalid category '%s'\n\nValid categories: %s", newOpts.category, strings.Join(validCats, ", "))
+	}
+
+	// Check that only one language flag is set
+	langCount := 0
+	if newOpts.langPy {
+		langCount++
+	}
+	if newOpts.langTs {
+		langCount++
+	}
+	if newOpts.langGo {
+		langCount++
+	}
+	if newOpts.langSol {
+		langCount++
+	}
+	if langCount > 1 {
+		return fmt.Errorf("only one language flag can be set (--py, --ts, --go, or --sol)")
+	}
+
+	return nil
+}
 
 // validateName checks if the project name is valid
 func validateName(name string) error {
@@ -183,15 +251,8 @@ func runNew(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Validate category
+	// Category already validated in PreRunE
 	category := registry.Category(newOpts.category)
-	if !category.IsValid() {
-		validCats := make([]string, 0, len(registry.ValidCategories()))
-		for _, c := range registry.ValidCategories() {
-			validCats = append(validCats, string(c))
-		}
-		return fmt.Errorf("invalid category '%s'\nValid categories: %s", newOpts.category, strings.Join(validCats, ", "))
-	}
 
 	// Get language
 	lang := getLanguage()

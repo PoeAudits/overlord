@@ -342,20 +342,20 @@ func TestExpandPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result, err := expandPath(tt.path)
+			result, err := ExpandPath(tt.path)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("expandPath() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ExpandPath() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
 			if !tt.wantErr {
 				if result == "" {
-					t.Error("expandPath() returned empty string")
+					t.Error("ExpandPath() returned empty string")
 				}
 
 				// For tilde paths, verify expansion happened
 				if len(tt.path) > 0 && tt.path[0] == '~' && result == tt.path {
-					t.Errorf("expandPath() did not expand tilde: got %s", result)
+					t.Errorf("ExpandPath() did not expand tilde: got %s", result)
 				}
 			}
 		})

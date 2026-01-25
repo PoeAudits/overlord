@@ -301,7 +301,27 @@ func RunOpen(cmd *cobra.Command, args []string) error {
 		results := reg.Resolve(query)
 
 		if len(results) == 0 {
-			return fmt.Errorf("Error: no project found matching '%s'\nRun 'overlord list' to see all projects", query)
+			// Check if query looks like a command that doesn't exist
+			commonCommands := map[string]string{
+				"init":     "Use 'overlord new <name>' to create a project",
+				"create":   "Use 'overlord new <name>' to create a project",
+				"delete":   "Use 'overlord rm <name>' to remove from registry",
+				"remove":   "Use 'overlord rm <name>' to remove from registry",
+				"status":   "Use 'overlord list' to see projects or 'overlord info <name>' for details",
+				"show":     "Use 'overlord info <name>' to see project details",
+				"get":      "Use 'overlord info <name>' to see project details",
+				"start":    "Use 'overlord open <name>' to open a project workspace",
+				"run":      "Use 'overlord open <name>' to open a project workspace",
+				"enter":    "Use 'overlord open <name>' to open a project workspace",
+				"ls":       "Use 'overlord list' to see projects",
+				"projects": "Use 'overlord list' to see projects",
+				"register": "Use 'overlord add <path>' to register an existing project",
+				"restore":  "Use 'overlord unarchive <name>' to restore a project",
+			}
+			if suggestion, ok := commonCommands[strings.ToLower(query)]; ok {
+				return fmt.Errorf("'%s' is not a command.\n%s\n\nRun 'overlord help' for available commands", query, suggestion)
+			}
+			return fmt.Errorf("no project found matching '%s'\n\nRun 'overlord list' to see all projects\nRun 'overlord help' for available commands", query)
 		}
 
 		if len(results) == 1 {
