@@ -11,7 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/spf13/cobra"
 
-	"overlord-v2/internal/registry"
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 // listFlags holds the flags for the list command

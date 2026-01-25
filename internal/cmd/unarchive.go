@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"overlord-v2/internal/registry"
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 // categoryPickerModel is the Bubbletea model for category selection

@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"overlord-v2/internal/cmd"
+	"github.com/PoeAudits/overlord/internal/cmd"
 )
 
 func main() {

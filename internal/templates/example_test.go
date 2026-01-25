@@ -3,7 +3,7 @@ package templates_test
 import (
 	"fmt"
 
-	"overlord-v2/internal/templates"
+	"github.com/PoeAudits/overlord/internal/templates"
 )
 
 func Example() {

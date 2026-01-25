@@ -1,4 +1,4 @@
-module overlord-v2
+module github.com/PoeAudits/overlord
 
 go 1.25.5
 

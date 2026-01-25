@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/PoeAudits/overlord/internal/registry"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
-	"overlord-v2/internal/registry"
 )
 
 var (

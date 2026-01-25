@@ -5,7 +5,7 @@ import (
 	"log"
 	"path/filepath"
 
-	"overlord-v2/internal/registry"
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 // Example demonstrates basic usage of Load and Save functions

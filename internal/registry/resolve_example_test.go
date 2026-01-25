@@ -3,7 +3,7 @@ package registry_test
 import (
 	"fmt"
 
-	"overlord-v2/internal/registry"
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 func ExampleRegistry_Resolve_exactName() {

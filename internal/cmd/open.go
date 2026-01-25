@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"overlord-v2/internal/registry"
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 // projectItem represents a project for the picker

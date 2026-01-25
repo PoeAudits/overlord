@@ -12,8 +12,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
-	"overlord-v2/internal/registry"
-	"overlord-v2/internal/templates"
+	"github.com/PoeAudits/overlord/internal/registry"
+	"github.com/PoeAudits/overlord/internal/templates"
 )
 
 // newFlags holds the flags for the new command
