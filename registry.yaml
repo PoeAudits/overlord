@@ -460,6 +460,14 @@ projects:
         description: OpenCode Python archive
         status:
             state: archived
+    overlord-v1:
+        path: archive/overlord-v1
+        category: core-tools
+        lang: base
+        created: "2025-12-18"
+        description: Overlord v1 - shell-based project management scripts
+        status:
+            state: archived
     overlord-v2:
         path: core/tools/overlord-v2
         category: core-tools

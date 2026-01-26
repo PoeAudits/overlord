@@ -1,7 +1,11 @@
-# Worktrees directory (used for testing)
-.worktrees/
+# Machine-specific config (not shared across machines)
+machine.yaml
 
-# User-specific registry (created by setup.sh)
+# Backup and migration files
+*.bak
+*.backup
+*.pre-migration
+
+# Legacy v1 format
 registry.json
 registry.json.bak
-registry.json.pre-migration.*
