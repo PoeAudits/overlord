@@ -1,0 +1,646 @@
+version: 2
+settings:
+    base_dir: ~/Overlord
+    thoughts_dir: ~/thoughts
+projects:
+    Blog-X402:
+        path: projects/web/Blog-X402
+        category: web
+        lang: typescript
+        created: "2026-01-24"
+        description: Blog X402 web project
+        aliases:
+            - x402
+        status:
+            state: active
+    CodeSpace:
+        path: projects/services/CodeSpace
+        category: services
+        lang: go
+        created: "2026-01-24"
+        description: CodeSpace service project
+        aliases:
+            - codespace
+        status:
+            state: active
+    Database:
+        path: archive/Database
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: Database project
+        status:
+            state: archived
+    DspyWorkspace:
+        path: archive/DspyWorkspace
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: DSPy Workspace project
+        status:
+            state: archived
+    Finetune_old:
+        path: archive/Finetune_old
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: Finetune old project
+        status:
+            state: archived
+    Flashnode:
+        path: archive/Flashnode
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: Flashnode project
+        aliases:
+            - flashnode
+        status:
+            state: archived
+    NewsAgg:
+        path: archive/NewsAgg
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: News Aggregator project
+        status:
+            state: archived
+    OracleDspy:
+        path: projects/ml/OracleDspy
+        category: ml
+        lang: python
+        created: "2026-01-24"
+        description: Oracle DSPy ML project
+        aliases:
+            - oracle
+            - oracle-dspy
+        status:
+            state: active
+    PoeDspy:
+        path: archive/PoeDspy
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: Poe DSPy project
+        status:
+            state: archived
+    PriceAnalysis:
+        path: archive/PriceAnalysis
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: Price Analysis project
+        status:
+            state: archived
+    Protocols:
+        path: archive/Protocols
+        category: ml
+        lang: python
+        created: "2026-01-24"
+        description: Protocols ML project
+        aliases:
+            - protocols
+        status:
+            state: archived
+    TaxBot:
+        path: archive/TaxBot
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: Tax Bot project
+        status:
+            state: archived
+    Tinker:
+        path: archive/Tinker
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: Tinker project
+        aliases:
+            - tinker
+        status:
+            state: archived
+    Ulti:
+        path: projects/contracts/Ulti
+        category: contracts
+        lang: solidity
+        created: "2026-01-24"
+        description: Ulti smart contract project
+        aliases:
+            - ulti
+        status:
+            state: active
+    UltiFriends:
+        path: projects/contracts/UltiFriends
+        category: contracts
+        lang: solidity
+        created: "2026-01-24"
+        description: UltiFriends smart contract project
+        aliases:
+            - ultifriends
+            - friends
+        status:
+            state: active
+    UniV4:
+        path: archive/UniV4
+        category: sandbox
+        lang: solidity
+        created: "2026-01-24"
+        description: UniV4 smart contract project
+        aliases:
+            - uni
+            - univ4
+        status:
+            state: archived
+    Windfall:
+        path: archive/Windfall
+        category: sandbox
+        lang: solidity
+        created: "2026-01-24"
+        description: Windfall smart contract project
+        aliases:
+            - windfall
+        status:
+            state: archived
+    alice:
+        path: /home/thomas/.config/alice
+        category: core-agents
+        lang: base
+        created: "2026-01-24"
+        description: Alice AI agent
+        status:
+            state: active
+    anvil-agent:
+        path: archive/anvil-agent
+        category: sandbox
+        lang: solidity
+        created: "2026-01-24"
+        description: Anvil Agent project
+        status:
+            state: archived
+    bags:
+        path: archive/bags
+        category: web
+        lang: typescript
+        created: "2026-01-24"
+        description: Bags web project
+        status:
+            state: archived
+    black-pheobe:
+        path: projects/web/black-pheobe
+        category: web
+        lang: typescript
+        created: "2026-01-24"
+        description: Black Pheobe web project
+        status:
+            state: active
+    blackpheobesanity:
+        path: archive/blackpheobesanity
+        category: sandbox
+        lang: typescript
+        created: "2026-01-24"
+        description: Black Pheobe Sanity project
+        status:
+            state: archived
+    blog:
+        path: projects/web/blog
+        category: web
+        lang: typescript
+        created: "2026-01-24"
+        description: Blog web project
+        status:
+            state: active
+    cdp-agent:
+        path: archive/cdp-agent
+        category: sandbox
+        lang: typescript
+        created: "2026-01-24"
+        description: CDP Agent project
+        aliases:
+            - cdp
+        status:
+            state: archived
+    claude-council:
+        path: projects/libs/claude-council
+        category: libs
+        lang: typescript
+        created: "2026-01-24"
+        description: Claude Council library
+        status:
+            state: active
+    create-chimera-app:
+        path: archive/create-chimera-app
+        category: libs
+        lang: solidity
+        created: "2026-01-24"
+        description: Create Chimera App library
+        aliases:
+            - chimera
+        status:
+            state: archived
+    dispatch-go:
+        path: projects/cli/dispatch-go
+        category: cli
+        lang: go
+        created: "2026-01-24"
+        description: Dispatch CLI tool (Go)
+        status:
+            state: active
+    dispatch-ts:
+        path: projects/cli/dispatch-ts
+        category: cli
+        lang: typescript
+        created: "2026-01-24"
+        description: Dispatch CLI tool (TypeScript)
+        status:
+            state: active
+    dspy:
+        path: projects/libs/dspy
+        category: libs
+        lang: python
+        created: "2026-01-24"
+        description: DSPy library
+        status:
+            state: active
+    dspy-testing:
+        path: archive/dspy-testing
+        category: ml
+        lang: python
+        created: "2026-01-24"
+        description: DSPy testing project
+        status:
+            state: archived
+    dspy-utils:
+        path: projects/libs/dspy-utils
+        category: libs
+        lang: python
+        created: "2026-01-24"
+        description: DSPy utilities library
+        status:
+            state: active
+    dweb:
+        path: projects/contracts/dweb
+        category: contracts
+        lang: solidity
+        created: "2026-01-24"
+        description: Decentralized web project
+        status:
+            state: active
+    energy-coin:
+        path: archive/energy-coin
+        category: contracts
+        lang: solidity
+        created: "2026-01-24"
+        description: Energy Coin smart contract project
+        aliases:
+            - energy
+        status:
+            state: archived
+    feature-extraction-utils:
+        path: projects/libs/feature-extraction-utils
+        category: libs
+        lang: python
+        created: "2026-01-24"
+        description: Feature extraction utilities library
+        aliases:
+            - feature-extraction
+        status:
+            state: active
+    file_management:
+        path: projects/libs/file_management
+        category: libs
+        lang: python
+        created: "2026-01-24"
+        description: File management library
+        aliases:
+            - file
+            - fm
+        status:
+            state: active
+    gepa:
+        path: projects/libs/gepa
+        category: libs
+        lang: python
+        created: "2026-01-24"
+        description: GEPA library
+        status:
+            state: active
+    gopa:
+        path: core/tools/gopa
+        category: core-tools
+        lang: go
+        created: "2026-01-24"
+        description: Go path utility tool
+        status:
+            state: active
+    hermes:
+        path: core/agents/hermes
+        category: services
+        lang: typescript
+        created: "2026-01-25"
+        description: network project
+        status:
+            state: active
+        sync:
+            status: active
+    huggingface-utils:
+        path: projects/libs/huggingface-utils
+        category: libs
+        lang: python
+        created: "2026-01-24"
+        description: HuggingFace utilities library
+        aliases:
+            - huggingface
+        status:
+            state: active
+    humanlayer:
+        path: archive/humanlayer
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: Human Layer project
+        status:
+            state: archived
+    itemsort:
+        path: archive/itemsort
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: Item Sort project
+        aliases:
+            - item
+        status:
+            state: archived
+    jar:
+        path: projects/contracts/jar
+        category: contracts
+        lang: solidity
+        created: "2026-01-24"
+        description: Jar smart contract project
+        status:
+            state: active
+    judgenetwork:
+        path: archive/judgenetwork
+        category: ml
+        lang: python
+        created: "2026-01-24"
+        description: Judge Network ML project
+        status:
+            state: archived
+    khmer-wanderlust-tours:
+        path: projects/web/khmer-wanderlust-tours
+        category: web
+        lang: typescript
+        created: "2026-01-24"
+        description: Khmer Wanderlust Tours web project
+        aliases:
+            - chen
+        status:
+            state: active
+    nuck:
+        path: projects/ml/nuck
+        category: ml
+        lang: python
+        created: "2026-01-24"
+        description: Nuck ML project
+        status:
+            state: active
+    offchain-lib:
+        path: projects/libs/offchain-lib
+        category: libs
+        lang: python
+        created: "2026-01-24"
+        description: Offchain library
+        status:
+            state: active
+    opencode:
+        path: /home/thomas/.config/opencode
+        category: core-tools
+        lang: typescript
+        created: "2026-01-24"
+        description: OpenCode configuration
+        aliases:
+            - oc
+        status:
+            state: active
+    opencode-context-plugin:
+        path: archive/opencode-context-plugin
+        category: libs
+        lang: python
+        created: "2026-01-24"
+        description: OpenCode context plugin
+        aliases:
+            - context-plugin
+        status:
+            state: archived
+    opencode-dynamic-context-pruning:
+        path: archive/opencode-dynamic-context-pruning
+        category: sandbox
+        lang: typescript
+        created: "2026-01-24"
+        description: OpenCode dynamic context pruning
+        aliases:
+            - odcp
+            - prune
+        status:
+            state: archived
+    opencode-lib:
+        path: projects/libs/opencode-lib
+        category: libs
+        lang: python
+        created: "2026-01-24"
+        description: OpenCode Python library
+        status:
+            state: active
+    opencode-py-archive:
+        path: archive/opencode-py-archive
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: OpenCode Python archive
+        status:
+            state: archived
+    overlord-v2:
+        path: core/tools/overlord-v2
+        category: core-tools
+        lang: go
+        created: "2026-01-24"
+        description: Project management and orchestration tool
+        aliases:
+            - ov
+            - ol
+        status:
+            state: active
+    poe-context-plugin:
+        path: archive/poe-context-plugin
+        category: sandbox
+        lang: typescript
+        created: "2026-01-24"
+        description: Poe context plugin
+        aliases:
+            - context
+        status:
+            state: archived
+    poe-dspy-utils-fucked:
+        path: archive/poe-dspy-utils-fucked
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: Poe DSPy utils project
+        status:
+            state: archived
+    poly:
+        path: projects/web/poly
+        category: web
+        lang: typescript
+        created: "2026-01-24"
+        description: Poly web project
+        status:
+            state: active
+    pytorch-mlp-utils:
+        path: projects/libs/pytorch-mlp-utils
+        category: libs
+        lang: python
+        created: "2026-01-24"
+        description: PyTorch MLP utilities library
+        aliases:
+            - mlp
+            - mlp-utils
+        status:
+            state: active
+    recon:
+        path: archive/recon
+        category: contracts
+        lang: solidity
+        created: "2026-01-24"
+        description: Recon smart contract project
+        status:
+            state: archived
+    research:
+        path: projects/ml/research
+        category: ml
+        lang: python
+        created: "2026-01-24"
+        description: Research ML project
+        status:
+            state: active
+    sequence-classification-llm:
+        path: projects/libs/sequence-classification-llm
+        category: libs
+        lang: python
+        created: "2026-01-24"
+        description: Sequence classification LLM library
+        aliases:
+            - sequence
+            - sequence-classify
+            - sequence-llm
+        status:
+            state: active
+    signals:
+        path: projects/ml/signals
+        category: ml
+        lang: python
+        created: "2026-01-24"
+        description: Signals ML project
+        aliases:
+            - signal
+        status:
+            state: active
+    skills:
+        path: /home/thomas/.agents/skills
+        category: core-agents
+        lang: base
+        created: "2026-01-24"
+        description: Agent skills library
+        aliases:
+            - skill
+        status:
+            state: active
+    supabase-utils:
+        path: projects/libs/supabase-utils
+        category: libs
+        lang: python
+        created: "2026-01-24"
+        description: Supabase utilities library
+        aliases:
+            - supabase
+        status:
+            state: active
+    testing:
+        path: archive/testing
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: Testing project
+        status:
+            state: archived
+    testing_old:
+        path: archive/testing_old
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: Testing old project
+        status:
+            state: archived
+    todolist:
+        path: archive/todolist
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: Todo List project
+        status:
+            state: archived
+    tokenjar:
+        path: projects/contracts/tokenjar
+        category: contracts
+        lang: solidity
+        created: "2026-01-24"
+        description: TokenJar smart contract project
+        status:
+            state: active
+    toolbox:
+        path: archive/toolbox
+        category: libs
+        lang: python
+        created: "2026-01-24"
+        description: Toolbox library
+        aliases:
+            - Toolbox
+        status:
+            state: archived
+    ultitracking:
+        path: projects/contracts/ultitracking
+        category: contracts
+        lang: python
+        created: "2026-01-24"
+        description: Ulti tracking project
+        aliases:
+            - track
+        status:
+            state: active
+    v0-stylized-blog-website:
+        path: archive/v0-stylized-blog-website
+        category: sandbox
+        lang: typescript
+        created: "2026-01-24"
+        description: V0 stylized blog website
+        status:
+            state: archived
+    v0-supabase-message-judging-app:
+        path: projects/web/v0-supabase-message-judging-app
+        category: web
+        lang: typescript
+        created: "2026-01-24"
+        description: Supabase message judging app
+        aliases:
+            - judge
+        status:
+            state: active
+    whisper:
+        path: archive/whisper
+        category: sandbox
+        lang: python
+        created: "2026-01-24"
+        description: Whisper project
+        status:
+            state: archived
