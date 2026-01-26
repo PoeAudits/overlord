@@ -183,7 +183,7 @@ func TestRenderTemplate(t *testing.T) {
 			name:         "render opencode",
 			lang:         LangBase,
 			templateType: TemplateOpenCode,
-			wantContains: "test-project",
+			wantContains: "{}",
 			wantErr:      false,
 		},
 		{

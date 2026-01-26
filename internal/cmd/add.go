@@ -152,7 +152,10 @@ func getLanguageFromFlags() (registry.Language, bool) {
 	}
 }
 
-// createThoughtsStructure creates thoughts directories and symlinks
+// createThoughtsStructure creates thoughts directories and symlinks.
+// Creates all 8 subdirectories under ~/thoughts/projects/{name}/:
+// plans, logs, docs, research, sessions, handoffs, reviews, briefs
+// Symlinks to README.md and AGENTS.md are created in the docs/ subdirectory.
 func createThoughtsStructure(name, projectPath, thoughtsDir string) error {
 	// Expand project path to absolute path
 	absProjectPath, err := filepath.Abs(projectPath)
@@ -160,24 +163,23 @@ func createThoughtsStructure(name, projectPath, thoughtsDir string) error {
 		return fmt.Errorf("failed to get absolute path: %w", err)
 	}
 
-	// Create thoughts directories
-	thoughtsProjectDir := filepath.Join(thoughtsDir, "projects", name)
-	thoughtsPlansDir := filepath.Join(thoughtsDir, "plans", name)
-	thoughtsLogsDir := filepath.Join(thoughtsDir, "logs", name)
-	thoughtsSessionsDir := filepath.Join(thoughtsDir, "sessions", name)
+	// Get all 8 thoughts subdirectory paths
+	paths := GetThoughtsPaths(thoughtsDir, name)
 
-	for _, dir := range []string{thoughtsProjectDir, thoughtsPlansDir, thoughtsLogsDir, thoughtsSessionsDir} {
+	// Create all 8 subdirectories
+	for _, dir := range paths.toSlice() {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create thoughts directory %s: %w", dir, err)
 		}
 	}
 
-	// Create symlinks in projects directory
-	readmeLink := filepath.Join(thoughtsProjectDir, "README.md")
-	agentsLink := filepath.Join(thoughtsProjectDir, "AGENTS.md")
+	// Create symlinks in docs/ subdirectory (not project root)
+	docsDir := paths.Docs
+	readmeLink := filepath.Join(docsDir, "README.md")
+	agentsLink := filepath.Join(docsDir, "AGENTS.md")
 
-	// Calculate relative path from thoughts/projects/{name}/ to project directory
-	relPath, err := filepath.Rel(thoughtsProjectDir, absProjectPath)
+	// Calculate relative path from thoughts/projects/{name}/docs/ to project directory
+	relPath, err := filepath.Rel(docsDir, absProjectPath)
 	if err != nil {
 		return fmt.Errorf("failed to calculate relative path: %w", err)
 	}

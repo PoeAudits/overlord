@@ -46,10 +46,8 @@ The project will be created at ~/Overlord/{category-path}/{name}/ with:
   - .opencode/opencode.jsonc (editor configuration)
 
 Thoughts directories will be created at:
-  - ~/thoughts/projects/{name}/ (with symlinks to README.md and AGENTS.md)
-  - ~/thoughts/plans/{name}/
-  - ~/thoughts/logs/{name}/
-  - ~/thoughts/sessions/{name}/
+  - ~/thoughts/projects/{name}/{plans,logs,docs,research,sessions,handoffs,reviews,briefs}/
+  - Symlinks to README.md and AGENTS.md placed in docs/ subdirectory
 
 Examples:
   overlord new my-api --category=services --go
@@ -185,30 +183,38 @@ func getLanguage() registry.Language {
 	}
 }
 
-// expandPath expands ~ to the user's home directory
+// expandPath expands ~ to the user's home directory and resolves
+// relative paths (e.g., ".", "..", "./foo") to absolute paths.
 func expandPath(path string) (string, error) {
 	if len(path) == 0 {
 		return "", fmt.Errorf("path cannot be empty")
 	}
 
-	if path[0] != '~' {
-		return path, nil
+	if path[0] == '~' {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get home directory: %w", err)
+		}
+
+		if len(path) == 1 {
+			path = homeDir
+		} else if path[1] == '/' || path[1] == filepath.Separator {
+			path = filepath.Join(homeDir, path[2:])
+		} else {
+			return "", fmt.Errorf("~user expansion not supported, use absolute path")
+		}
 	}
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get home directory: %w", err)
+	// Resolve relative paths to absolute
+	if !filepath.IsAbs(path) {
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve absolute path: %w", err)
+		}
+		path = absPath
 	}
 
-	if len(path) == 1 {
-		return homeDir, nil
-	}
-
-	if path[1] == '/' || path[1] == filepath.Separator {
-		return filepath.Join(homeDir, path[2:]), nil
-	}
-
-	return "", fmt.Errorf("~user expansion not supported, use absolute path")
+	return path, nil
 }
 
 // cleanup removes created directories on failure
@@ -354,32 +360,33 @@ func runNew(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Println(" done")
 
-	// 3. Create thoughts directories
+	// 3. Create thoughts directories (all 8 subdirectories under ~/thoughts/projects/{name}/)
 	fmt.Printf("  Creating thoughts structure...")
 
-	thoughtsProjectDir := filepath.Join(thoughtsDir, "projects", name)
-	thoughtsPlansDir := filepath.Join(thoughtsDir, "plans", name)
-	thoughtsLogsDir := filepath.Join(thoughtsDir, "logs", name)
-	thoughtsSessionsDir := filepath.Join(thoughtsDir, "sessions", name)
+	// Get paths for all 8 thoughts subdirectories using the helper function
+	thoughtsPaths := GetThoughtsPaths(thoughtsDir, name)
+	thoughtsProjectBase := filepath.Join(thoughtsDir, "projects", name)
 
-	// Create all thoughts directories
-	for _, dir := range []string{thoughtsProjectDir, thoughtsPlansDir, thoughtsLogsDir, thoughtsSessionsDir} {
+	// Create all 8 thoughts subdirectories
+	for _, dir := range thoughtsPaths.toSlice() {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create thoughts directory %s: %w", dir, err)
 		}
 		c.add(dir)
 	}
+	// Also track the project base directory for cleanup
+	c.add(thoughtsProjectBase)
 
-	// Create relative symlinks in projects directory
-	// Calculate relative path from thoughts/projects/{name}/ to project directory
+	// Create relative symlinks in docs/ subdirectory
+	// Calculate relative path from thoughts/projects/{name}/docs/ to project directory
 	readmeSrc := filepath.Join(projectPath, "README.md")
 	agentsSrc := filepath.Join(projectPath, "AGENTS.md")
 
-	readmeLink := filepath.Join(thoughtsProjectDir, "README.md")
-	agentsLink := filepath.Join(thoughtsProjectDir, "AGENTS.md")
+	readmeLink := filepath.Join(thoughtsPaths.Docs, "README.md")
+	agentsLink := filepath.Join(thoughtsPaths.Docs, "AGENTS.md")
 
-	// Calculate relative path
-	relPath, err := filepath.Rel(thoughtsProjectDir, projectPath)
+	// Calculate relative path from docs/ subdirectory to project
+	relPath, err := filepath.Rel(thoughtsPaths.Docs, projectPath)
 	if err != nil {
 		return fmt.Errorf("failed to calculate relative path: %w", err)
 	}
@@ -482,7 +489,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%s\n", successStyle.Render("Project created successfully!"))
 	fmt.Println()
 	fmt.Printf("%s %s\n", labelStyle.Render("Project path:"), pathStyle.Render(projectPath))
-	fmt.Printf("%s %s\n", labelStyle.Render("Thoughts:"), pathStyle.Render(thoughtsProjectDir))
+	fmt.Printf("%s %s\n", labelStyle.Render("Thoughts:"), pathStyle.Render(thoughtsProjectBase))
 	fmt.Println()
 
 	// 6. Open workspace (unless --no-open)

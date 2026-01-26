@@ -120,6 +120,21 @@ func (s State) IsValid() bool {
 	return s == StateActive || s == StateArchived
 }
 
+// SyncStatus represents the project sync status
+type SyncStatus string
+
+// SyncStatus constants
+const (
+	SyncActive   SyncStatus = "active"
+	SyncInactive SyncStatus = "inactive"
+)
+
+// IsValid checks if the sync status is valid
+// Empty string is valid for backward compatibility (treated as inactive)
+func (s SyncStatus) IsValid() bool {
+	return s == SyncActive || s == SyncInactive || s == ""
+}
+
 // Status represents the project status
 type Status struct {
 	State State `yaml:"state"`
@@ -133,16 +148,31 @@ func (s *Status) Validate() error {
 	return nil
 }
 
+// ProjectSync represents per-project sync configuration
+type ProjectSync struct {
+	Status  SyncStatus `yaml:"status,omitempty"`
+	Exclude []string   `yaml:"exclude,omitempty"`
+}
+
+// Validate validates the project sync configuration
+func (ps *ProjectSync) Validate() error {
+	if !ps.Status.IsValid() {
+		return fmt.Errorf("invalid sync status: %s (must be 'active', 'inactive', or empty)", ps.Status)
+	}
+	return nil
+}
+
 // Project represents a project entry in the registry
 type Project struct {
-	Path        string   `yaml:"path"`
-	Category    Category `yaml:"category"`
-	Lang        Language `yaml:"lang"`
-	Created     string   `yaml:"created"`
-	Description string   `yaml:"description"`
-	Aliases     []string `yaml:"aliases,omitempty"`
-	Tags        []string `yaml:"tags,omitempty"`
-	Status      Status   `yaml:"status"`
+	Path        string      `yaml:"path"`
+	Category    Category    `yaml:"category"`
+	Lang        Language    `yaml:"lang"`
+	Created     string      `yaml:"created"`
+	Description string      `yaml:"description"`
+	Aliases     []string    `yaml:"aliases,omitempty"`
+	Tags        []string    `yaml:"tags,omitempty"`
+	Status      Status      `yaml:"status"`
+	Sync        ProjectSync `yaml:"sync,omitempty"`
 }
 
 // Validate validates the project fields
@@ -180,6 +210,11 @@ func (p *Project) Validate() error {
 		errs = append(errs, err.Error())
 	}
 
+	// Validate sync if present
+	if err := p.Sync.Validate(); err != nil {
+		errs = append(errs, err.Error())
+	}
+
 	if len(errs) > 0 {
 		return fmt.Errorf("project validation failed: %s", strings.Join(errs, "; "))
 	}
@@ -187,10 +222,23 @@ func (p *Project) Validate() error {
 	return nil
 }
 
+// SyncSettings represents sync configuration
+type SyncSettings struct {
+	DefaultExclude []string `yaml:"default_exclude,omitempty"`
+}
+
+// Validate validates the sync settings
+func (s *SyncSettings) Validate() error {
+	// Permissive validation - empty exclude list is valid
+	// Could add validation for pattern syntax in the future
+	return nil
+}
+
 // Settings represents the registry settings
 type Settings struct {
-	BaseDir     string `yaml:"base_dir"`
-	ThoughtsDir string `yaml:"thoughts_dir"`
+	BaseDir     string       `yaml:"base_dir"`
+	ThoughtsDir string       `yaml:"thoughts_dir"`
+	Sync        SyncSettings `yaml:"sync,omitempty"`
 }
 
 // Validate validates the settings
@@ -203,6 +251,11 @@ func (s *Settings) Validate() error {
 
 	if s.ThoughtsDir == "" {
 		errs = append(errs, "thoughts_dir is required")
+	}
+
+	// Validate sync settings if present
+	if err := s.Sync.Validate(); err != nil {
+		errs = append(errs, err.Error())
 	}
 
 	if len(errs) > 0 {

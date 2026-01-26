@@ -7,6 +7,16 @@ import (
 	"path/filepath"
 )
 
+// resolveProjectPath resolves a project path to an absolute path.
+// If the project path is already absolute, it returns it directly.
+// Otherwise, it joins it with the base directory.
+func resolveProjectPath(projectPath, baseDir string) string {
+	if filepath.IsAbs(projectPath) {
+		return projectPath
+	}
+	return filepath.Join(baseDir, projectPath)
+}
+
 // copyDirectory recursively copies a directory from src to dst
 func copyDirectory(src, dst string) error {
 	// Get source directory info

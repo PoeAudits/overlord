@@ -206,63 +206,6 @@ func TestSave_CreatesParentDirectories(t *testing.T) {
 	}
 }
 
-func TestSave_CreatesBackup(t *testing.T) {
-	t.Parallel()
-
-	tempDir := t.TempDir()
-	registryPath := filepath.Join(tempDir, "registry.yaml")
-
-	// Create initial registry
-	registry1 := defaultRegistry()
-	registry1.Projects["project1"] = Project{
-		Path:        "~/Overlord/project1",
-		Category:    CategoryCLI,
-		Lang:        LanguageGo,
-		Created:     "2024-01-15",
-		Description: "First version",
-		Status:      Status{State: StateActive},
-	}
-
-	if err := Save(registryPath, registry1); err != nil {
-		t.Fatalf("Save() first save error = %v, want nil", err)
-	}
-
-	// Save again with different content
-	registry2 := defaultRegistry()
-	registry2.Projects["project2"] = Project{
-		Path:        "~/Overlord/project2",
-		Category:    CategoryWeb,
-		Lang:        LanguageTypeScript,
-		Created:     "2024-01-16",
-		Description: "Second version",
-		Status:      Status{State: StateActive},
-	}
-
-	if err := Save(registryPath, registry2); err != nil {
-		t.Fatalf("Save() second save error = %v, want nil", err)
-	}
-
-	// Verify backup exists
-	backupPath := registryPath + BackupSuffix
-	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
-		t.Fatal("backup file was not created")
-	}
-
-	// Load backup and verify it contains first version
-	backup, err := Load(backupPath)
-	if err != nil {
-		t.Fatalf("Load() backup error = %v, want nil", err)
-	}
-
-	if _, ok := backup.Projects["project1"]; !ok {
-		t.Error("backup does not contain project1")
-	}
-
-	if _, ok := backup.Projects["project2"]; ok {
-		t.Error("backup should not contain project2")
-	}
-}
-
 func TestSave_NilRegistry(t *testing.T) {
 	t.Parallel()
 

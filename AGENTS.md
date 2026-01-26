@@ -11,6 +11,8 @@ Overlord v2 is a layered CLI application built with Cobra, featuring fuzzy match
 │      CLI Commands (Cobra)                               │  ← User interface
 │      - Root (routing), List, Info, New, Add, Rm         │
 │      - Open (with TUI picker), Archive, Unarchive       │
+│      - Init (scaffolding), Setup, Config                 │
+│      - Activate, Sync, Deactivate (multi-machine sync)  │
 ├─────────────────────────────────────────────────────────┤
 │      Registry Operations                                │  ← Business logic
 │      - Resolve (fuzzy matching)                         │
@@ -36,6 +38,7 @@ Overlord v2 is a layered CLI application built with Cobra, featuring fuzzy match
 - Fuzzy matching for flexible project resolution
 - Interactive TUI when ambiguous or no args provided
 - Embedded templates for portability
+- Automatic thoughts directory management during archive/unarchive
 
 ## Directory Structure
 
@@ -52,11 +55,21 @@ overlord-v2/
 │   │   ├── add.go             # Register existing project
 │   │   ├── rm.go              # Remove from registry
 │   │   ├── open.go            # Open workspace (with TUI picker)
-│   │   ├── archive.go         # Archive project
-│   │   ├── unarchive.go       # Restore archived project
-│   │   ├── fileutil.go        # File operations (expandPath, copyFile)
+│   │   ├── archive.go         # Archive project + thoughts
+│   │   ├── unarchive.go       # Restore project + thoughts
+│   │   ├── thoughts.go        # Thoughts directory management helpers
+│   │   ├── init.go            # Initialize directory with templates
+│   │   ├── setup.go           # Set up overlord directories/config
+│   │   ├── config.go          # Open registry in editor
+│   │   ├── activate.go        # Activate sync for project
+│   │   ├── sync.go            # Sync files between machines
+│   │   ├── deactivate.go      # Deactivate sync and optionally remove
+│   │   ├── fileutil.go        # File operations (resolveProjectPath, copyFile)
 │   │   ├── *_test.go          # Command tests
-│   │   └── open_test.go       # TUI picker tests
+│   │   ├── open_test.go       # TUI picker tests
+│   │   ├── thoughts_test.go   # Thoughts helpers tests
+│   │   ├── archive_test.go    # Archive command tests
+│   │   └── unarchive_test.go  # Unarchive command tests
 │   ├── registry/              # Registry types and operations
 │   │   ├── types.go           # Registry, Project, Category, Language types
 │   │   ├── types_test.go      # Type validation tests
@@ -65,6 +78,21 @@ overlord-v2/
 │   │   ├── resolve.go         # Fuzzy matching and resolution
 │   │   ├── resolve_test.go    # Resolution tests
 │   │   └── example_test.go    # Usage examples
+│   ├── machine/               # Machine configuration for sync
+│   │   ├── config.go          # MachineConfig, Role types, Load function
+│   │   ├── config_test.go     # Machine config tests
+│   │   └── example_test.go    # Usage examples
+│   ├── sync/                  # Sync infrastructure
+│   │   ├── rsync.go           # Rsync wrapper for file sync
+│   │   ├── rsync_test.go      # Rsync tests
+│   │   ├── conflict.go        # Conflict detection
+│   │   ├── conflict_test.go   # Conflict detection tests
+│   │   ├── example_test.go    # Rsync usage examples
+│   │   └── example_conflict_test.go  # Conflict detection examples
+│   ├── gitops/                # Git operations for registry sync
+│   │   ├── git.go             # GitOps struct with Add, Commit, Push, Pull
+│   │   ├── git_test.go        # Git operations tests
+│   │   └── example_test.go    # Git operations examples
 │   └── templates/             # Embedded templates
 │       ├── templates.go       # Template loading and rendering
 │       ├── templates_test.go  # Template tests
@@ -89,6 +117,9 @@ overlord-v2/
 - `cmd/` contains only the main entry point
 - `internal/cmd/` contains Cobra command definitions
 - `internal/registry/` contains all registry-related logic
+- `internal/machine/` contains machine-specific configuration for sync
+- `internal/sync/` contains rsync wrapper and conflict detection
+- `internal/gitops/` contains git operations for registry sync
 - `internal/templates/` contains template system
 - Tests are co-located with source files (`*_test.go`)
 - Example tests demonstrate usage patterns
@@ -281,6 +312,382 @@ func GetTemplate(lang Language, templateType TemplateType) (string, error) {
 - Non-`.tmpl` files returned as-is
 - Variable substitution: `{{.ProjectName}}`, `{{.Description}}`, etc.
 
+### Machine Config Pattern
+
+Machine configuration defines the role and sync behavior for each machine.
+
+**Structure:**
+```go
+type MachineConfig struct {
+    Name        string `yaml:"name"`
+    Role        Role   `yaml:"role"`
+    StorageHost string `yaml:"storage_host,omitempty"`
+}
+```
+
+**Location:** `internal/machine/config.go`
+
+**Roles:**
+- `storage` - Machine that holds the full project set (no storage_host)
+- `working-set` - Machine that syncs a subset from storage (requires storage_host)
+
+**Rules:**
+- Config file: `~/.config/overlord/machine.yaml`
+- If file doesn't exist, defaults to storage role with hostname
+- `storage_host` required for working-set, forbidden for storage
+- All configs validated before use
+- Path expansion supports `~` for home directory
+
+### Rsync Wrapper Pattern
+
+The rsync wrapper provides a Go interface to rsync for bidirectional file sync.
+
+**Structure:**
+```go
+type Rsync struct {
+    executor CommandExecutor
+    lookPath LookPathFunc
+}
+
+type RsyncOptions struct {
+    Source   string   // Source path
+    Dest     string   // Destination path
+    Excludes []string // Exclusion patterns
+    DryRun   bool     // Trial run with no changes
+    Delete   bool     // Delete extraneous files from dest
+}
+```
+
+**Location:** `internal/sync/rsync.go`
+
+**Key Methods:**
+- `Push(opts) (*RsyncResult, error)` - Sync local → remote
+- `Pull(opts) (*RsyncResult, error)` - Sync remote → local
+- `DryRun(opts) (string, error)` - Preview changes without syncing
+
+**Rules:**
+- Source paths automatically get trailing `/` for rsync
+- Remote paths formatted as `host:path` or `user@host:path`
+- Uses `-avz --progress` flags by default
+- Validates options before execution
+- Returns exit code and output in RsyncResult
+- Supports custom CommandExecutor for testing
+
+**Helper Functions:**
+- `FormatRemotePath(host, path)` - Format as `host:path`
+- `FormatRemotePathWithUser(user, host, path)` - Format as `user@host:path`
+- `ParseRemotePath(remotePath)` - Parse into user, host, path components
+- `IsRemotePath(path)` - Check if path is remote format
+
+### Git Operations Pattern
+
+GitOps provides git operations for registry sync with automatic commit prefixing.
+
+**Structure:**
+```go
+type GitOps struct {
+    RepoPath string
+}
+```
+
+**Location:** `internal/gitops/git.go`
+
+**Key Methods:**
+- `HasChanges() (bool, error)` - Check for uncommitted changes
+- `Add(files...)` - Stage files (defaults to all if none specified)
+- `Commit(message)` - Commit with "overlord: " prefix
+- `Push()` - Push to remote (no-op if no remote)
+- `Pull()` - Pull with rebase (no-op if no remote)
+
+**Rules:**
+- All commits automatically prefixed with "overlord: "
+- Push/Pull gracefully handle repos without remotes
+- Uses `git -C <path>` for operations in specific directory
+- Pull uses `--rebase` to avoid merge commits
+- Errors include git output for debugging
+
+**Usage Pattern:**
+```go
+git := gitops.New("~/.config/overlord")
+if hasChanges, _ := git.HasChanges(); hasChanges {
+    git.Add()
+    git.Commit("sync completed")
+    git.Push()
+}
+```
+
+### Conflict Detection Pattern
+
+Conflict detection uses bidirectional rsync dry-runs to identify file conflicts.
+
+**Algorithm:**
+1. Run rsync dry-run local→remote (what would be pushed)
+2. Run rsync dry-run remote→local (what would be pulled)
+3. Parse outputs to extract file lists
+4. Compare lists to categorize conflicts:
+   - Files in both lists = `ConflictBothModified`
+   - Files only in push list = `ConflictLocalOnly`
+   - Files only in pull list = `ConflictRemoteOnly`
+
+**Structure:**
+```go
+type Conflict struct {
+    Path string        // Relative path of conflicting file
+    Type ConflictType  // Type of conflict
+}
+
+type ConflictType string
+const (
+    ConflictLocalOnly      ConflictType = "local-only"
+    ConflictRemoteOnly     ConflictType = "remote-only"
+    ConflictBothModified   ConflictType = "both-modified"
+)
+```
+
+**Location:** `internal/sync/conflict.go`
+
+**Key Functions:**
+- `DetectConflicts(localPath, remoteHost, remotePath, excludes)` - Detect conflicts
+- `parseRsyncOutput(output)` - Extract file list from rsync output
+- `detectConflictsFromFileLists(pushFiles, pullFiles)` - Categorize conflicts
+
+**Rules:**
+- Uses rsync dry-run to avoid actual file transfers
+- Parses rsync verbose output to extract file paths
+- Skips directories (only tracks files)
+- Returns all conflicts, not just first one found
+- Supports custom Rsync instance for testing
+
+### Sync Command Patterns
+
+The sync commands (activate, sync, deactivate) manage multi-machine project synchronization.
+
+#### Activate Command Pattern
+
+**Purpose:** Mark a project for sync by setting `sync.status = active`
+
+**Location:** `internal/cmd/activate.go`
+
+**Flow:**
+1. Load registry
+2. Resolve project (fuzzy matching)
+3. Check if project is archived (error if true)
+4. Check if already active (info message if true)
+5. Update `project.Sync.Status = registry.SyncActive`
+6. Save registry
+7. Git add, commit, push registry changes
+
+**Key Features:**
+- Uses fuzzy matching for project resolution
+- Validates project state (no archived projects)
+- Auto-commits with message: "overlord: activate <project>"
+- Warns but doesn't fail if git push fails
+
+**Example:**
+```go
+// Activate sync for a project
+overlord activate my-project
+```
+
+#### Sync Command Pattern
+
+**Purpose:** Bidirectionally sync files between working-set and storage machines
+
+**Location:** `internal/cmd/sync.go`
+
+**Flow:**
+1. Load machine config
+2. Check role (storage machines show info message and exit)
+3. Pull registry from git
+4. Load registry
+5. Determine projects to sync (all active or specific project)
+6. For each project:
+   - Detect conflicts (bidirectional rsync dry-run)
+   - Prompt user if conflicts found (unless --force)
+   - Pull from storage (remote → local)
+   - Push to storage (local → remote)
+7. Print summary
+
+**Flags:**
+- `--dry-run` - Preview changes without syncing
+- `--force` - Skip conflict confirmation
+
+**Key Features:**
+- Respects global + per-project exclusion patterns
+- Conflict detection before sync
+- Interactive confirmation for conflicts
+- Detailed progress output with styled messages
+- Summary report (synced, partial, failed, skipped)
+
+**Sync Order:**
+- Always pull first, then push (prevents overwriting remote changes)
+
+**Example:**
+```go
+// Sync all active projects
+overlord sync
+
+// Sync specific project
+overlord sync my-project
+
+// Preview what would sync
+overlord sync --dry-run
+```
+
+#### Deactivate Command Pattern
+
+**Purpose:** Deactivate sync and optionally remove local directory
+
+**Location:** `internal/cmd/deactivate.go`
+
+**Flow:**
+1. Load machine config
+2. Load registry
+3. Resolve project (fuzzy matching)
+4. Check if project is archived (error if true)
+5. Check if already inactive (info message if true)
+6. **On working-set machines:**
+   - Sync final changes to storage (push only)
+   - If sync fails and not --force-remove, abort
+7. Update `project.Sync.Status = registry.SyncInactive`
+8. Save registry
+9. Git add, commit, push registry changes
+10. **On working-set machines (if not --keep-local):**
+    - Prompt for directory removal (unless --force)
+    - Remove directory if confirmed
+
+**Flags:**
+- `--force` - Skip confirmation prompts
+- `--keep-local` - Don't remove local directory
+- `--force-remove` - Remove directory even if sync failed
+
+**Key Features:**
+- Syncs to storage before deactivating (data safety)
+- Only removes directories on working-set machines
+- Requires confirmation before removal (unless --force)
+- Aborts if sync fails (unless --force-remove)
+- Auto-commits with message: "overlord: deactivate <project>"
+
+**Example:**
+```go
+// Deactivate and prompt for removal
+overlord deactivate my-project
+
+// Deactivate but keep local files
+overlord deactivate my-project --keep-local
+
+// Deactivate and remove without prompt
+overlord deactivate my-project --force
+```
+
+**Safety Rules:**
+- Always sync to storage before deactivating (on working-set)
+- Never remove directories on storage machines
+- Abort if sync fails (unless --force-remove)
+- Require confirmation for directory removal (unless --force)
+
+### Thoughts Management Pattern
+
+**Purpose:** Automatically manage thoughts directories when archiving/unarchiving projects
+
+**Location:** `internal/cmd/thoughts.go`
+
+**Thoughts Directory Structure:**
+
+Main location (active projects) - **Project-centric structure**:
+```
+~/thoughts/projects/{project-name}/
+├── plans/
+├── logs/
+├── docs/          # Symlinks to project files
+├── research/
+├── sessions/
+├── handoffs/
+├── reviews/
+└── briefs/
+```
+
+Archive location (archived projects):
+```
+~/thoughts/archive/{project-name}/
+├── plans/
+├── logs/
+├── docs/          # Symlinks to archived project files
+├── research/
+├── sessions/
+├── handoffs/
+├── reviews/
+└── briefs/
+```
+
+**Key Types:**
+```go
+type ThoughtsPaths struct {
+    Plans    string
+    Logs     string
+    Docs     string
+    Research string
+    Sessions string
+    Handoffs string
+    Reviews  string
+    Briefs   string
+}
+```
+
+**Key Functions:**
+- `GetThoughtsPaths(thoughtsDir, projectName)` - Get paths for main location (8 subdirectories)
+- `GetArchiveThoughtsPaths(thoughtsDir, projectName)` - Get paths for archive location (8 subdirectories)
+- `ThoughtsExist(paths)` - Check which directories exist
+- `MoveThoughtsToArchive(thoughtsDir, projectName)` - Move thoughts to archive
+- `MoveThoughtsFromArchive(thoughtsDir, projectName)` - Restore thoughts from archive
+- `UpdateProjectSymlinks(thoughtsDocsDir, actualProjectPath)` - Update symlinks in docs/ to project files
+
+**Archive Behavior:**
+
+When archiving a project:
+1. Move project directory to `~/Overlord/archive/{name}/`
+2. Move thoughts from `~/thoughts/projects/{name}/` to `~/thoughts/archive/{name}/`
+3. Update symlinks in archived thoughts to point to archived project location
+4. Warn if thoughts directories don't exist (non-fatal)
+
+**Unarchive Behavior:**
+
+When unarchiving a project:
+1. Move project directory from archive to category directory
+2. Restore thoughts from `~/thoughts/archive/{name}/` to `~/thoughts/projects/{name}/`
+3. Update symlinks to point to restored project location
+4. Handle legacy archives (projects archived before this feature) gracefully
+
+**Rules:**
+- Thoughts operations are secondary (warn on failure, don't fail archive/unarchive)
+- Always update symlinks after moving thoughts
+- Use `moveDirectory` for cross-filesystem compatibility
+- Clean up empty archive directories after restoration
+- Skip creating broken symlinks (only symlink if target exists)
+
+**Example:**
+```go
+// Archive thoughts
+warnings, err := MoveThoughtsToArchive("~/thoughts", "my-project")
+if err != nil {
+    // Warn but continue - project archive succeeded
+    fmt.Printf("Warning: Failed to move thoughts: %v\n", err)
+}
+
+// Restore thoughts
+warnings, err := MoveThoughtsFromArchive("~/thoughts", "my-project")
+if err != nil {
+    // Warn but continue - project unarchive succeeded
+    fmt.Printf("Warning: Failed to restore thoughts: %v\n", err)
+}
+
+// Update symlinks
+thoughtsPaths := GetThoughtsPaths("~/thoughts", "my-project")
+if err := UpdateProjectSymlinks(thoughtsPaths.Docs, "/path/to/project"); err != nil {
+    fmt.Printf("Warning: Failed to update symlinks: %v\n", err)
+}
+```
+
 ## Coding Conventions
 
 ### Naming Conventions
@@ -361,6 +768,130 @@ func GetTemplate(lang Language, templateType TemplateType) (string, error) {
 **Methods:**
 - `IsValid() bool` - Validates language
 
+### SyncSettings
+
+**Purpose:** Global sync configuration with default exclusion patterns  
+**Location:** `internal/registry/types.go`  
+**Fields:**
+- `DefaultExclude` - Default patterns to exclude from sync (e.g., node_modules, .venv)
+
+**Usage:**
+```yaml
+settings:
+  sync:
+    default_exclude:
+      - node_modules
+      - .venv
+      - __pycache__
+```
+
+### ProjectSync
+
+**Purpose:** Per-project sync configuration  
+**Location:** `internal/registry/types.go`  
+**Fields:**
+- `Status` - Sync status (active/inactive, empty = inactive for backward compat)
+- `Exclude` - Project-specific exclusion patterns (in addition to defaults)
+
+**Usage:**
+```yaml
+projects:
+  my-project:
+    sync:
+      status: active
+      exclude:
+        - .cache
+        - dist/
+```
+
+### MachineConfig
+
+**Purpose:** Machine-specific configuration for multi-machine sync  
+**Location:** `internal/machine/config.go`  
+**Fields:**
+- `Name` - Machine identifier (defaults to hostname)
+- `Role` - Machine role (storage or working-set)
+- `StorageHost` - Hostname of storage machine (required for working-set)
+
+**Key Methods:**
+- `Validate() error` - Validates configuration
+- `Load(path) (*MachineConfig, error)` - Loads config from file or returns default
+
+**Usage:**
+```yaml
+# Storage machine
+name: desktop-machine
+role: storage
+
+# Working-set machine
+name: laptop
+role: working-set
+storage_host: desktop-machine
+```
+
+### Rsync
+
+**Purpose:** Wrapper for rsync operations with Go interface  
+**Location:** `internal/sync/rsync.go`  
+**Key Types:**
+- `Rsync` - Main wrapper struct with executor and lookPath
+- `RsyncOptions` - Configuration for sync operations
+- `RsyncResult` - Result containing output and exit code
+- `Direction` - Enum for push/pull direction
+
+**Key Methods:**
+- `NewRsync()` - Create instance with default executor
+- `NewRsyncWithExecutor(executor)` - Create instance with custom executor (for testing)
+- `Push(opts)` - Sync local to remote
+- `Pull(opts)` - Sync remote to local
+- `DryRun(opts)` - Preview changes without syncing
+
+### Conflict
+
+**Purpose:** Represents a file conflict between local and remote  
+**Location:** `internal/sync/conflict.go`  
+**Fields:**
+- `Path` - Relative path of conflicting file
+- `Type` - Type of conflict (local-only, remote-only, both-modified)
+
+**Key Types:**
+- `ConflictType` - Enum for conflict types
+- `Conflict` - Struct representing a single conflict
+
+**Key Functions:**
+- `DetectConflicts(localPath, remoteHost, remotePath, excludes)` - Detect all conflicts
+- `DetectConflictsWithRsync(rsync, ...)` - Detect conflicts with custom Rsync instance
+
+**Conflict Types:**
+- `ConflictLocalOnly` - File exists only locally (would be pushed)
+- `ConflictRemoteOnly` - File exists only remotely (would be pulled)
+- `ConflictBothModified` - File modified on both sides (true conflict)
+
+### GitOps
+
+**Purpose:** Git operations for registry sync  
+**Location:** `internal/gitops/git.go`  
+**Fields:**
+- `RepoPath` - Path to git repository
+
+**Key Methods:**
+- `New(repoPath)` - Create new GitOps instance
+- `HasChanges()` - Check for uncommitted changes
+- `Add(files...)` - Stage files (all if none specified)
+- `Commit(message)` - Commit with automatic "overlord: " prefix
+- `Push()` - Push to remote (gracefully handles no remote)
+- `Pull()` - Pull with rebase (gracefully handles no remote)
+
+**Usage:**
+```go
+git := gitops.New("~/.config/overlord")
+if hasChanges, _ := git.HasChanges(); hasChanges {
+    git.Add()
+    git.Commit("activate my-project")
+    git.Push()
+}
+```
+
 ## Dependencies
 
 ### External Dependencies
@@ -404,6 +935,35 @@ internal/registry/resolve.go
 internal/templates/templates.go
     └── embed (go:embed)
     └── text/template
+
+internal/machine/config.go
+    └── gopkg.in/yaml.v3
+    └── os (path expansion, hostname)
+
+internal/sync/rsync.go
+    └── os/exec (command execution)
+    └── bytes (output buffering)
+
+internal/sync/conflict.go
+    └── internal/sync/rsync.go (Rsync, RsyncOptions)
+    └── strings (output parsing)
+
+internal/gitops/git.go
+    └── os/exec (git commands)
+    └── strings (output parsing)
+
+internal/cmd/thoughts.go
+    └── os (file operations, stat, mkdir, rename, remove)
+    └── path/filepath (path manipulation)
+    └── strings (error checking)
+
+internal/cmd/archive.go
+    └── internal/cmd/thoughts.go (MoveThoughtsToArchive, UpdateProjectSymlinks)
+    └── internal/registry (Load, Save)
+
+internal/cmd/unarchive.go
+    └── internal/cmd/thoughts.go (MoveThoughtsFromArchive, UpdateProjectSymlinks)
+    └── internal/registry (Load, Save)
 ```
 
 ## Common Tasks
@@ -444,6 +1004,37 @@ internal/templates/templates.go
 3. Add command to root in `init()`: `rootCmd.AddCommand(listCmd)`
 4. Implement command logic
 5. Update Makefile if command needs a shortcut
+
+### Configuring Sync Exclusion Patterns
+
+**Global defaults (applies to all projects):**
+1. Edit `~/.config/overlord/registry.yaml`
+2. Add patterns to `settings.sync.default_exclude`:
+   ```yaml
+   settings:
+     sync:
+       default_exclude:
+         - node_modules
+         - .venv
+         - __pycache__
+         - .git
+   ```
+
+**Per-project exclusions (in addition to defaults):**
+1. Edit project entry in registry
+2. Add patterns to `sync.exclude`:
+   ```yaml
+   projects:
+     my-project:
+       sync:
+         status: active
+         exclude:
+           - .cache
+           - dist/
+           - build/
+   ```
+
+**Note:** Project-specific exclusions are additive to global defaults
 
 ## Do NOT
 
@@ -515,3 +1106,20 @@ make fmt                            # Format code (go fmt ./...)
 make vet                            # Vet code (go vet ./...)
 make clean                          # Clean build artifacts
 ```
+
+**Overlord Commands:**
+```bash
+make setup                          # Set up overlord directories and config
+make config                         # Open registry in editor
+make init [PATH=<path>] [LANG=go|py|ts|sol]  # Initialize directory with templates
+```
+
+**Sync Commands:**
+```bash
+make activate NAME=<name>           # Activate sync for a project
+make sync [NAME=<name>]             # Sync all or specific project
+make sync DRY_RUN=1                 # Preview sync changes
+make sync FORCE=1                   # Force sync (skip conflict confirmation)
+make deactivate NAME=<name>         # Deactivate sync for a project
+```
+

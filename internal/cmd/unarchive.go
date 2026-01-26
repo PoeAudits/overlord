@@ -223,6 +223,43 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Restore thoughts directories from archive (secondary operation - warn on failure, don't fail unarchive)
+	thoughtsDir := reg.Settings.ThoughtsDir
+	var thoughtsWarnings []string
+	var thoughtsRestored bool
+
+	thoughtsWarnings, err = MoveThoughtsFromArchive(thoughtsDir, resolvedName)
+	if err != nil {
+		// Thoughts restore failed - warn but continue (project unarchive succeeded)
+		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
+		fmt.Printf("%s Failed to restore thoughts directories: %v\n", warnStyle.Render("Warning:"), err)
+	} else {
+		// Check if any thoughts were actually restored (not just warnings about missing archive)
+		// If archive didn't exist, we still need to update symlinks if thoughts exist in main location
+		thoughtsRestored = true
+		for _, w := range thoughtsWarnings {
+			if strings.Contains(w, "no archived thoughts found") {
+				thoughtsRestored = false
+				break
+			}
+		}
+	}
+
+	// Update symlinks in the restored thoughts projects directory
+	expandedThoughtsDir, expandErr := expandPath(thoughtsDir)
+	if expandErr == nil {
+		thoughtsPaths := GetThoughtsPaths(expandedThoughtsDir, resolvedName)
+		// Check if thoughts projects directory exists (either restored or pre-existing)
+		if _, statErr := os.Stat(thoughtsPaths.Docs); statErr == nil {
+			if symlinkErr := UpdateProjectSymlinks(thoughtsPaths.Docs, targetPath); symlinkErr != nil {
+				// Symlink update failed - warn but continue
+				thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to update symlinks: %v", symlinkErr))
+			}
+		}
+	} else {
+		thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to expand thoughts directory: %v", expandErr))
+	}
+
 	// Update registry
 	project.Path = filepath.Join(targetCategory.Path(), resolvedName)
 	project.Category = targetCategory
@@ -234,13 +271,7 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to save registry: %w", err)
 	}
 
-	// Update thoughts symlinks
-	if err := updateThoughtsSymlinks(resolvedName, targetPath, reg.Settings); err != nil {
-		// Non-fatal - warn but continue
-		fmt.Fprintf(os.Stderr, "Warning: failed to update thoughts symlinks: %v\n", err)
-	}
-
-	// Print success message
+	// Define styles for output
 	cyan := lipgloss.Color("86")
 	green := lipgloss.Color("82")
 	gray := lipgloss.Color("245")
@@ -249,12 +280,28 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 	successStyle := lipgloss.NewStyle().Foreground(green).Bold(true)
 	pathStyle := lipgloss.NewStyle().Foreground(gray)
 
+	// Print success message
 	fmt.Printf("%s '%s' to category '%s'\n",
 		successStyle.Render("Unarchived"),
 		resolvedName,
 		targetCategory)
 	fmt.Printf("  %s %s\n", labelStyle.Render("From:"), pathStyle.Render(formatPathWithTilde(sourcePath)))
 	fmt.Printf("  %s %s\n", labelStyle.Render("To:"), pathStyle.Render(formatPathWithTilde(targetPath)))
+
+	// Print thoughts status
+	if thoughtsRestored {
+		fmt.Printf("  %s restored from %s/archive/%s/\n", labelStyle.Render("Thoughts:"), thoughtsDir, resolvedName)
+	}
+	fmt.Println()
+
+	// Print any warnings from thoughts restore
+	if len(thoughtsWarnings) > 0 {
+		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+		for _, warning := range thoughtsWarnings {
+			fmt.Printf("%s %s\n", warnStyle.Render("Warning:"), warning)
+		}
+		fmt.Println()
+	}
 
 	return nil
 }
@@ -281,67 +328,4 @@ func showCategoryPicker() (*registry.Category, error) {
 	}
 
 	return result.selected, nil
-}
-
-// updateThoughtsSymlinks updates symlinks in thoughts directory
-func updateThoughtsSymlinks(projectName, projectPath string, settings registry.Settings) error {
-	thoughtsDir, err := expandPath(settings.ThoughtsDir)
-	if err != nil {
-		return fmt.Errorf("failed to expand thoughts directory: %w", err)
-	}
-
-	projectThoughtsDir := filepath.Join(thoughtsDir, "projects", projectName)
-
-	// Check if thoughts directory exists
-	if _, err := os.Stat(projectThoughtsDir); os.IsNotExist(err) {
-		// No thoughts directory - nothing to update
-		return nil
-	}
-
-	// Remove old symlinks
-	entries, err := os.ReadDir(projectThoughtsDir)
-	if err != nil {
-		return fmt.Errorf("failed to read thoughts directory: %w", err)
-	}
-
-	for _, entry := range entries {
-		entryPath := filepath.Join(projectThoughtsDir, entry.Name())
-		info, err := os.Lstat(entryPath)
-		if err != nil {
-			continue
-		}
-
-		// Remove if it's a symlink
-		if info.Mode()&os.ModeSymlink != 0 {
-			if err := os.Remove(entryPath); err != nil {
-				return fmt.Errorf("failed to remove old symlink %s: %w", entryPath, err)
-			}
-		}
-	}
-
-	// Create new symlinks
-	// Calculate relative path from thoughts project dir to project dir
-	relPath, err := filepath.Rel(projectThoughtsDir, projectPath)
-	if err != nil {
-		return fmt.Errorf("failed to calculate relative path: %w", err)
-	}
-
-	// Common symlink targets
-	symlinkTargets := []string{"README.md", "AGENTS.md", "docs", ".git"}
-
-	for _, target := range symlinkTargets {
-		targetPath := filepath.Join(projectPath, target)
-		if _, err := os.Stat(targetPath); err == nil {
-			// Target exists - create symlink
-			linkPath := filepath.Join(projectThoughtsDir, target)
-			linkTarget := filepath.Join(relPath, target)
-
-			if err := os.Symlink(linkTarget, linkPath); err != nil {
-				// Non-fatal - continue with other symlinks
-				fmt.Fprintf(os.Stderr, "Warning: failed to create symlink %s: %v\n", linkPath, err)
-			}
-		}
-	}
-
-	return nil
 }

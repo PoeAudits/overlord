@@ -25,10 +25,11 @@ updating its status to 'archived' in the registry.
 
 The name argument can be either a project name or alias.
 
-Thoughts directories remain linked (they may become broken, that's ok):
-  ~/thoughts/plans/<project>/
-  ~/thoughts/logs/<project>/
-  ~/thoughts/sessions/<project>/
+Thoughts directories are also moved to archive:
+  From: ~/thoughts/projects/<project>/{plans,logs,docs,research,sessions,handoffs,reviews,briefs}/
+  To:   ~/thoughts/archive/<project>/{plans,logs,docs,research,sessions,handoffs,reviews,briefs}/
+
+Symlinks in the docs directory are updated to point to the new archive location.
 
 Examples:
   overlord archive myproject              # Archive with confirmation
@@ -120,6 +121,32 @@ func runArchive(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Move thoughts directories to archive (secondary operation - warn on failure, don't fail archive)
+	thoughtsDir := reg.Settings.ThoughtsDir
+	var thoughtsWarnings []string
+	var thoughtsMoved bool
+
+	thoughtsWarnings, err = MoveThoughtsToArchive(thoughtsDir, projectName)
+	if err != nil {
+		// Thoughts move failed - warn but continue (project archive succeeded)
+		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
+		fmt.Printf("%s Failed to move thoughts directories: %v\n", warnStyle.Render("Warning:"), err)
+	} else {
+		thoughtsMoved = true
+
+		// Update symlinks in the archived thoughts docs directory
+		expandedThoughtsDir, expandErr := expandPath(thoughtsDir)
+		if expandErr == nil {
+			archiveThoughtsPaths := GetArchiveThoughtsPaths(expandedThoughtsDir, projectName)
+			if symlinkErr := UpdateProjectSymlinks(archiveThoughtsPaths.Docs, destPath); symlinkErr != nil {
+				// Symlink update failed - warn but continue
+				thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to update symlinks: %v", symlinkErr))
+			}
+		} else {
+			thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to expand thoughts directory: %v", expandErr))
+		}
+	}
+
 	// Update registry
 	project.Path = archivePath
 	project.Status.State = registry.StateArchived
@@ -143,12 +170,21 @@ func runArchive(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%s '%s'\n", successStyle.Render("Archived"), projectName)
 	fmt.Printf("  %s %s\n", labelStyle.Render("From:"), pathStyle.Render(formatPathWithTilde(sourcePath)))
 	fmt.Printf("  %s %s\n", labelStyle.Render("To:"), pathStyle.Render(formatPathWithTilde(destPath)))
+
+	// Print thoughts status
+	if thoughtsMoved {
+		fmt.Printf("  %s %s/archive/%s/\n", labelStyle.Render("Thoughts:"), thoughtsDir, projectName)
+	}
 	fmt.Println()
 
-	// Print thoughts note
-	thoughtsDir := reg.Settings.ThoughtsDir
-	fmt.Printf("%s Thoughts at %s/{plans,logs,sessions}/%s/ remain linked\n",
-		labelStyle.Render("Note:"), thoughtsDir, projectName)
+	// Print any warnings from thoughts move
+	if len(thoughtsWarnings) > 0 {
+		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+		for _, warning := range thoughtsWarnings {
+			fmt.Printf("%s %s\n", warnStyle.Render("Warning:"), warning)
+		}
+		fmt.Println()
+	}
 
 	return nil
 }

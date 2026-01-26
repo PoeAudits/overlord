@@ -303,7 +303,6 @@ func RunOpen(cmd *cobra.Command, args []string) error {
 		if len(results) == 0 {
 			// Check if query looks like a command that doesn't exist
 			commonCommands := map[string]string{
-				"init":     "Use 'overlord new <name>' to create a project",
 				"create":   "Use 'overlord new <name>' to create a project",
 				"delete":   "Use 'overlord rm <name>' to remove from registry",
 				"remove":   "Use 'overlord rm <name>' to remove from registry",
@@ -468,8 +467,8 @@ func openProject(name string, project registry.Project, settings registry.Settin
 		return fmt.Errorf("failed to expand base directory: %w", err)
 	}
 
-	// Build full project path
-	projectPath := filepath.Join(baseDir, project.Path)
+	// Build full project path (handles both relative and absolute paths)
+	projectPath := resolveProjectPath(project.Path, baseDir)
 
 	// Check if directory exists
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
@@ -502,8 +501,8 @@ func openProject(name string, project registry.Project, settings registry.Settin
 		fmt.Printf("%s %s\n", labelStyle.Render("Creating session:"), name)
 		fmt.Printf("%s %s\n", labelStyle.Render("Path:"), pathStyle.Render(projectPath))
 
-		// Create new session (detached)
-		createSession := exec.Command("tmux", "new-session", "-d", "-s", name, "-c", projectPath)
+		// Create new session (detached) with window named "base" for .tmux.local compatibility
+		createSession := exec.Command("tmux", "new-session", "-d", "-s", name, "-n", "base", "-c", projectPath)
 		if output, err := createSession.CombinedOutput(); err != nil {
 			return fmt.Errorf("failed to create tmux session: %s", strings.TrimSpace(string(output)))
 		}

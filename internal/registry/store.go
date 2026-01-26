@@ -11,8 +11,6 @@ import (
 const (
 	// DefaultRegistryPath is the default location for the registry file
 	DefaultRegistryPath = "~/.config/overlord/registry.yaml"
-	// BackupSuffix is appended to create backup files
-	BackupSuffix = ".bak"
 )
 
 // Load reads the registry from the specified path.
@@ -75,14 +73,6 @@ func Save(path string, registry *Registry) error {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
-	// Backup existing file
-	if _, err := os.Stat(expandedPath); err == nil {
-		backupPath := expandedPath + BackupSuffix
-		if err := copyFile(expandedPath, backupPath); err != nil {
-			return fmt.Errorf("failed to backup registry: %w", err)
-		}
-	}
-
 	// Marshal to YAML
 	data, err := yaml.Marshal(registry)
 	if err != nil {
@@ -105,46 +95,39 @@ func Save(path string, registry *Registry) error {
 	return nil
 }
 
-// ExpandPath expands ~ to the user's home directory
+// ExpandPath expands ~ to the user's home directory and resolves
+// relative paths (e.g., ".", "..", "./foo") to absolute paths.
 func ExpandPath(path string) (string, error) {
 	if len(path) == 0 {
 		return "", fmt.Errorf("path cannot be empty")
 	}
 
-	if path[0] != '~' {
-		return path, nil
+	if path[0] == '~' {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get home directory: %w", err)
+		}
+
+		if len(path) == 1 {
+			path = homeDir
+		} else if path[1] == '/' || path[1] == filepath.Separator {
+			path = filepath.Join(homeDir, path[2:])
+		} else {
+			// ~user/path not supported
+			return "", fmt.Errorf("~user expansion not supported, use absolute path")
+		}
 	}
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get home directory: %w", err)
+	// Resolve relative paths to absolute
+	if !filepath.IsAbs(path) {
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve absolute path: %w", err)
+		}
+		path = absPath
 	}
 
-	if len(path) == 1 {
-		return homeDir, nil
-	}
-
-	// Handle ~/path
-	if path[1] == '/' || path[1] == filepath.Separator {
-		return filepath.Join(homeDir, path[2:]), nil
-	}
-
-	// ~user/path not supported
-	return "", fmt.Errorf("~user expansion not supported, use absolute path")
-}
-
-// copyFile copies a file from src to dst
-func copyFile(src, dst string) error {
-	data, err := os.ReadFile(src)
-	if err != nil {
-		return fmt.Errorf("failed to read source file: %w", err)
-	}
-
-	if err := os.WriteFile(dst, data, 0644); err != nil {
-		return fmt.Errorf("failed to write destination file: %w", err)
-	}
-
-	return nil
+	return path, nil
 }
 
 // defaultRegistry returns a new registry with default values

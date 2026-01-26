@@ -17,6 +17,7 @@ Overlord v2 is a complete rewrite from Bash to Go, providing a modern CLI for ma
 - **Global Thoughts Directory** - Centralized thoughts directory for cross-project notes
 - **Archive Management** - Archive and restore projects without losing metadata
 - **Atomic Operations** - Safe registry updates with automatic backups and validation
+- **Multi-Machine Sync** - Bidirectional sync between working-set and storage machines with conflict detection
 
 ## Quick Start
 
@@ -72,6 +73,7 @@ Overlord stores its configuration and registry at `~/.config/overlord/`:
 
 - `config.yaml` - Application configuration (managed by Viper)
 - `registry.yaml` - Project registry with metadata
+- `machine.yaml` - Machine-specific configuration for multi-machine sync (optional)
 
 ### Registry Structure
 
@@ -82,6 +84,11 @@ version: 2
 settings:
   base_dir: ~/Overlord
   thoughts_dir: ~/thoughts
+  sync:
+    default_exclude:
+      - node_modules
+      - .venv
+      - __pycache__
 projects:
   my-project:
     path: projects/web/my-project
@@ -93,6 +100,11 @@ projects:
     tags: ["react", "nextjs"]
     status:
       state: active
+    sync:
+      status: active
+      exclude:
+        - .cache
+        - dist/
 ```
 
 ### Categories
@@ -114,6 +126,25 @@ projects:
 - `go` - Go projects
 - `solidity` - Solidity smart contracts
 - `base` - Language-agnostic or multi-language projects
+
+### Machine Configuration
+
+For multi-machine sync, create `~/.config/overlord/machine.yaml`:
+
+**Storage Machine (holds full project set):**
+```yaml
+name: desktop-machine
+role: storage
+```
+
+**Working-Set Machine (syncs subset from storage):**
+```yaml
+name: laptop
+role: working-set
+storage_host: desktop-machine
+```
+
+If no machine config exists, defaults to storage role with the system hostname.
 
 ## Usage
 
@@ -253,6 +284,82 @@ Archived projects:
 - Cannot be opened until restored
 - Useful for inactive projects you want to track
 
+#### Sync Commands
+
+Overlord supports multi-machine sync for working across different machines (e.g., desktop and laptop).
+
+**Activate Sync:**
+```bash
+# Mark a project for sync
+overlord activate my-project
+
+# Works with fuzzy matching and aliases
+overlord activate mp
+```
+
+The `activate` command:
+- Sets the project's sync status to "active"
+- Automatically commits and pushes the registry change
+- Does not sync files (use `overlord sync` for that)
+
+**Sync Files:**
+```bash
+# Sync all active projects
+overlord sync
+
+# Sync a specific project
+overlord sync my-project
+
+# Preview what would be synced (dry-run)
+overlord sync --dry-run
+
+# Force sync even if conflicts detected
+overlord sync --force
+```
+
+The `sync` command (on working-set machines):
+- Pulls the latest registry from git
+- Detects conflicts between local and remote files
+- Pulls changes from storage machine
+- Pushes local changes to storage machine
+- Respects exclusion patterns (global + per-project)
+
+**Deactivate Sync:**
+```bash
+# Deactivate and prompt to remove local directory
+overlord deactivate my-project
+
+# Deactivate but keep local files
+overlord deactivate my-project --keep-local
+
+# Deactivate and remove without confirmation
+overlord deactivate my-project --force
+
+# Remove directory even if sync failed
+overlord deactivate my-project --force-remove
+```
+
+The `deactivate` command (on working-set machines):
+- Syncs final changes to storage before deactivating
+- Sets sync status to "inactive"
+- Optionally removes the local project directory
+- Automatically commits and pushes the registry change
+
+**Sync Workflow Example:**
+```bash
+# On working-set machine (laptop):
+overlord activate my-web-app    # Mark for sync
+overlord sync                   # Pull from storage + push local changes
+
+# Work on the project...
+# Make changes, commit, etc.
+
+overlord sync my-web-app        # Sync specific project
+
+# When done working on this machine:
+overlord deactivate my-web-app  # Sync to storage and remove local copy
+```
+
 ### Project Resolution
 
 Overlord uses smart resolution to find projects:
@@ -334,6 +441,16 @@ make bench                          # Run benchmarks
 make fmt                            # Format code
 make vet                            # Vet code
 make clean                          # Clean build artifacts
+```
+
+### Sync Commands
+
+```bash
+make activate NAME=<name>           # Activate sync for a project
+make sync [NAME=<name>]             # Sync all or specific project
+make sync DRY_RUN=1                 # Preview sync changes
+make sync FORCE=1                   # Force sync (skip conflict confirmation)
+make deactivate NAME=<name>         # Deactivate sync for a project
 ```
 
 ### Worktree Management

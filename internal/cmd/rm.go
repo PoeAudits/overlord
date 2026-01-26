@@ -150,8 +150,8 @@ func expandProjectPath(projectPath, baseDir string) (string, error) {
 		return "", fmt.Errorf("failed to expand base dir: %w", err)
 	}
 
-	// Join with project path
-	fullPath := filepath.Join(expandedBaseDir, projectPath)
+	// Resolve project path (handles both relative and absolute paths)
+	fullPath := resolveProjectPath(projectPath, expandedBaseDir)
 
 	// Clean the path
 	return filepath.Clean(fullPath), nil
