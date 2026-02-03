@@ -61,11 +61,27 @@ func commitAndPushRegistry(action string) error {
 // and returns true if the user responds with "y" or "yes".
 // Returns (false, nil) if not in a terminal.
 func confirmAction(prompt string) (bool, error) {
+	return confirm(prompt, "[y/N]: ", func(r string) bool {
+		return r == "y" || r == "yes"
+	})
+}
+
+// confirmStrict prompts the user and requires typing "yes" (not just "y").
+// Use for destructive operations that cannot be undone.
+// Returns (false, nil) if not in a terminal.
+func confirmStrict(prompt string) (bool, error) {
+	return confirm(prompt, "Type 'yes' to confirm: ", func(r string) bool {
+		return r == "yes"
+	})
+}
+
+// confirm is the shared implementation for confirmation prompts.
+func confirm(prompt, suffix string, accept func(string) bool) (bool, error) {
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		return false, nil
 	}
 
-	fmt.Printf("%s [y/N]: ", prompt)
+	fmt.Printf("%s %s", prompt, suffix)
 
 	reader := bufio.NewReader(os.Stdin)
 	response, err := reader.ReadString('\n')
@@ -74,7 +90,7 @@ func confirmAction(prompt string) (bool, error) {
 	}
 
 	response = strings.TrimSpace(strings.ToLower(response))
-	return response == "y" || response == "yes", nil
+	return accept(response), nil
 }
 
 // expandBaseDir expands the base directory path from registry settings.
@@ -95,4 +111,45 @@ func countTrue(flags ...bool) int {
 		}
 	}
 	return count
+}
+
+// mergeExcludes combines global and per-project exclusion patterns.
+func mergeExcludes(global, project []string) []string {
+	excludes := make([]string, 0, len(global)+len(project))
+	excludes = append(excludes, global...)
+	excludes = append(excludes, project...)
+	return excludes
+}
+
+// languageFromFlags determines the language from boolean flags.
+// Returns the language and whether any flag was explicitly set.
+func languageFromFlags(py, ts, gol, sol, base bool) (registry.Language, bool) {
+	switch {
+	case py:
+		return registry.LanguagePython, true
+	case ts:
+		return registry.LanguageTypeScript, true
+	case gol:
+		return registry.LanguageGo, true
+	case sol:
+		return registry.LanguageSolidity, true
+	case base:
+		return registry.LanguageBase, true
+	default:
+		return "", false
+	}
+}
+
+// validateCategory validates a category string and returns the typed Category.
+// Returns an error with a helpful message listing valid categories if invalid.
+func validateCategory(name string) (registry.Category, error) {
+	category := registry.Category(name)
+	if !category.IsValid() {
+		validCats := make([]string, 0, len(registry.ValidCategories()))
+		for _, c := range registry.ValidCategories() {
+			validCats = append(validCats, string(c))
+		}
+		return "", fmt.Errorf("invalid category '%s'\nValid categories: %s", name, strings.Join(validCats, ", "))
+	}
+	return category, nil
 }

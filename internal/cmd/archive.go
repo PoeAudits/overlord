@@ -1,11 +1,9 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/PoeAudits/overlord/internal/registry"
 	"github.com/spf13/cobra"
@@ -253,14 +251,5 @@ func confirmArchiveMultiple(projects []resolvedProject) (bool, error) {
 			fmt.Printf("    To:   %s\n", formatPathWithTilde(p.destPath))
 		}
 	}
-	fmt.Print("Continue? [y/N]: ")
-
-	reader := bufio.NewReader(os.Stdin)
-	response, err := reader.ReadString('\n')
-	if err != nil {
-		return false, err
-	}
-
-	response = strings.TrimSpace(strings.ToLower(response))
-	return response == "y" || response == "yes", nil
+	return confirmAction("Continue?")
 }

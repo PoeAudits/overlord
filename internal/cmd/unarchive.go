@@ -150,15 +150,10 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 	// Get or prompt for category
 	var targetCategory registry.Category
 	if unarchiveCategoryFlag != "" {
-		targetCategory = registry.Category(unarchiveCategoryFlag)
-		if !targetCategory.IsValid() {
-			validCats := registry.ValidCategories()
-			catNames := make([]string, len(validCats))
-			for i, c := range validCats {
-				catNames[i] = string(c)
-			}
-			return fmt.Errorf("invalid category '%s'\nValid categories: %s",
-				unarchiveCategoryFlag, strings.Join(catNames, ", "))
+		var err error
+		targetCategory, err = validateCategory(unarchiveCategoryFlag)
+		if err != nil {
+			return err
 		}
 	} else {
 		// Show interactive picker

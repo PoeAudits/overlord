@@ -2,20 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
-// configErr stores any error from initConfig for later reporting
-var configErr error
-
-var (
-	cfgFile string
-	version = "0.1.0" // Will be set by build flags later
-)
+var version = "0.1.0" // Will be set by build flags later
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -39,10 +31,7 @@ Configuration is stored at ~/.config/overlord/`,
 	SilenceUsage:       true,
 	DisableFlagParsing: false,
 	Args:               cobra.ArbitraryArgs,
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		return configErr
-	},
-	RunE: runRoot,
+	RunE:               runRoot,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -52,11 +41,6 @@ func Execute() error {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
-
-	// Global flags
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/overlord/config.yaml)")
-
 	// Local flags
 	rootCmd.Flags().BoolP("version", "v", false, "Print version information")
 
@@ -122,35 +106,4 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 	// Has args - treat as project name and run open
 	return RunOpen(cmd, args)
-}
-
-// initConfig reads in config file and ENV variables if set.
-// Any fatal errors are stored in configErr and surfaced via PersistentPreRunE.
-func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory
-		home, err := os.UserHomeDir()
-		if err != nil {
-			configErr = fmt.Errorf("failed to determine home directory: %w", err)
-			return
-		}
-
-		// Search config in ~/.config/overlord directory with name "config" (without extension)
-		configDir := home + "/.config/overlord"
-		viper.AddConfigPath(configDir)
-		viper.SetConfigType("yaml")
-		viper.SetConfigName("config")
-	}
-
-	// Read in environment variables that match
-	viper.SetEnvPrefix("OVERLORD")
-	viper.AutomaticEnv()
-
-	// If a config file is found, read it in
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
-	}
 }

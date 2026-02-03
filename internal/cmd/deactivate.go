@@ -134,9 +134,7 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 			remotePath := sync.FormatRemotePath(machineConfig.StorageHost, resolveProjectPath(project.Path, remoteBaseDir))
 
 			// Merge exclusion patterns
-			excludes := make([]string, 0, len(reg.Settings.Sync.DefaultExclude)+len(project.Sync.Exclude))
-			excludes = append(excludes, reg.Settings.Sync.DefaultExclude...)
-			excludes = append(excludes, project.Sync.Exclude...)
+			excludes := mergeExcludes(reg.Settings.Sync.DefaultExclude, project.Sync.Exclude)
 
 			// Push to storage
 			rsync := sync.NewRsync()

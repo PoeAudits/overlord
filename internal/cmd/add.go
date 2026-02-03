@@ -207,20 +207,7 @@ func detectCategory(projectPath, baseDir string) (registry.Category, error) {
 
 // getLanguageFromFlags determines the language from flags
 func getLanguageFromFlags() (registry.Language, bool) {
-	switch {
-	case addOpts.langPy:
-		return registry.LanguagePython, true
-	case addOpts.langTs:
-		return registry.LanguageTypeScript, true
-	case addOpts.langGo:
-		return registry.LanguageGo, true
-	case addOpts.langSol:
-		return registry.LanguageSolidity, true
-	case addOpts.langBase:
-		return registry.LanguageBase, true
-	default:
-		return "", false
-	}
+	return languageFromFlags(addOpts.langPy, addOpts.langTs, addOpts.langGo, addOpts.langSol, addOpts.langBase)
 }
 
 // createThoughtsStructure creates thoughts directories and symlinks.
@@ -383,13 +370,10 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	// Determine category (flag takes precedence over auto-detection)
 	var category registry.Category
 	if addOpts.category != "" {
-		category = registry.Category(addOpts.category)
-		if !category.IsValid() {
-			validCats := make([]string, 0, len(registry.ValidCategories()))
-			for _, c := range registry.ValidCategories() {
-				validCats = append(validCats, string(c))
-			}
-			return fmt.Errorf("invalid category '%s'\nValid categories: %s", addOpts.category, strings.Join(validCats, ", "))
+		var err error
+		category, err = validateCategory(addOpts.category)
+		if err != nil {
+			return err
 		}
 	} else {
 		detectedCat, catErr := detectCategory(expandedPath, baseDir)

@@ -286,10 +286,7 @@ type syncContext struct {
 
 // buildExcludes merges global and per-project exclusion patterns.
 func (ctx *syncContext) buildExcludes() []string {
-	excludes := make([]string, 0, len(ctx.globalExcludes)+len(ctx.project.Sync.Exclude))
-	excludes = append(excludes, ctx.globalExcludes...)
-	excludes = append(excludes, ctx.project.Sync.Exclude...)
-	return excludes
+	return mergeExcludes(ctx.globalExcludes, ctx.project.Sync.Exclude)
 }
 
 // ensureLocalDir creates the local project directory if it doesn't exist.
@@ -993,10 +990,7 @@ type hostSyncContext struct {
 
 // buildExcludes merges global and per-project exclusion patterns.
 func (ctx *hostSyncContext) buildExcludes() []string {
-	excludes := make([]string, 0, len(ctx.globalExcludes)+len(ctx.project.Sync.Exclude))
-	excludes = append(excludes, ctx.globalExcludes...)
-	excludes = append(excludes, ctx.project.Sync.Exclude...)
-	return excludes
+	return mergeExcludes(ctx.globalExcludes, ctx.project.Sync.Exclude)
 }
 
 // ensureRemoteDir creates the remote project directory via SSH.

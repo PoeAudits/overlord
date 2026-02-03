@@ -126,13 +126,8 @@ func validateNewFlags(cmd *cobra.Command, args []string) error {
 	}
 
 	// Validate category
-	category := registry.Category(newOpts.category)
-	if !category.IsValid() {
-		validCats := make([]string, 0, len(registry.ValidCategories()))
-		for _, c := range registry.ValidCategories() {
-			validCats = append(validCats, string(c))
-		}
-		return fmt.Errorf("invalid category '%s'\n\nValid categories: %s", newOpts.category, strings.Join(validCats, ", "))
+	if _, err := validateCategory(newOpts.category); err != nil {
+		return err
 	}
 
 	// Check that only one language flag is set
@@ -162,18 +157,11 @@ func validateName(name string) error {
 
 // getLanguage determines the language from flags
 func getLanguage() registry.Language {
-	switch {
-	case newOpts.langPy:
-		return registry.LanguagePython
-	case newOpts.langTs:
-		return registry.LanguageTypeScript
-	case newOpts.langGo:
-		return registry.LanguageGo
-	case newOpts.langSol:
-		return registry.LanguageSolidity
-	default:
+	lang, set := languageFromFlags(newOpts.langPy, newOpts.langTs, newOpts.langGo, newOpts.langSol, false)
+	if !set {
 		return registry.LanguageBase
 	}
+	return lang
 }
 
 // cleanup removes created directories on failure

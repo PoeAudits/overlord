@@ -1,11 +1,9 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/PoeAudits/overlord/internal/registry"
 	"github.com/charmbracelet/lipgloss"
@@ -250,14 +248,5 @@ func confirmClear(targets []clearTarget) (bool, error) {
 	}
 
 	fmt.Printf("%s This cannot be undone.\n", warnStyle.Render("CAUTION:"))
-	fmt.Print("Type 'yes' to confirm: ")
-
-	reader := bufio.NewReader(os.Stdin)
-	response, err := reader.ReadString('\n')
-	if err != nil {
-		return false, err
-	}
-
-	response = strings.TrimSpace(strings.ToLower(response))
-	return response == "yes", nil
+	return confirmStrict("")
 }
