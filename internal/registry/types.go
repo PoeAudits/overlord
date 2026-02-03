@@ -2,6 +2,7 @@ package registry
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -20,7 +21,22 @@ const (
 	CategoryCoreAgents Category = "core-agents"
 	CategoryCoreTools  Category = "core-tools"
 	CategorySandbox    Category = "sandbox"
+	CategoryConfig     Category = "config"
 )
+
+// categoryPaths maps each category to its filesystem path.
+var categoryPaths = map[Category]string{
+	CategoryContracts:  "projects/contracts/",
+	CategoryWeb:        "projects/web/",
+	CategoryServices:   "projects/services/",
+	CategoryML:         "projects/ml/",
+	CategoryLibs:       "projects/libs/",
+	CategoryCLI:        "projects/cli/",
+	CategoryCoreAgents: "core/agents/",
+	CategoryCoreTools:  "core/tools/",
+	CategorySandbox:    "sandbox/",
+	CategoryConfig:     "config/",
+}
 
 // ValidCategories returns all valid category values
 func ValidCategories() []Category {
@@ -34,44 +50,23 @@ func ValidCategories() []Category {
 		CategoryCoreAgents,
 		CategoryCoreTools,
 		CategorySandbox,
+		CategoryConfig,
 	}
 }
 
 // IsValid checks if the category is valid
 func (c Category) IsValid() bool {
-	switch c {
-	case CategoryContracts, CategoryWeb, CategoryServices, CategoryML,
-		CategoryLibs, CategoryCLI, CategoryCoreAgents, CategoryCoreTools,
-		CategorySandbox:
-		return true
+	for _, valid := range ValidCategories() {
+		if c == valid {
+			return true
+		}
 	}
 	return false
 }
 
 // Path returns the filesystem path for the category
 func (c Category) Path() string {
-	switch c {
-	case CategoryContracts:
-		return "projects/contracts/"
-	case CategoryWeb:
-		return "projects/web/"
-	case CategoryServices:
-		return "projects/services/"
-	case CategoryML:
-		return "projects/ml/"
-	case CategoryLibs:
-		return "projects/libs/"
-	case CategoryCLI:
-		return "projects/cli/"
-	case CategoryCoreAgents:
-		return "core/agents/"
-	case CategoryCoreTools:
-		return "core/tools/"
-	case CategorySandbox:
-		return "sandbox/"
-	default:
-		return ""
-	}
+	return categoryPaths[c]
 }
 
 // Language represents the programming language type
@@ -99,9 +94,10 @@ func ValidLanguages() []Language {
 
 // IsValid checks if the language is valid
 func (l Language) IsValid() bool {
-	switch l {
-	case LanguagePython, LanguageTypeScript, LanguageGo, LanguageSolidity, LanguageBase:
-		return true
+	for _, valid := range ValidLanguages() {
+		if l == valid {
+			return true
+		}
 	}
 	return false
 }
@@ -173,6 +169,7 @@ type Project struct {
 	Tags        []string    `yaml:"tags,omitempty"`
 	Status      Status      `yaml:"status"`
 	Sync        ProjectSync `yaml:"sync,omitempty"`
+	LastOpened  string      `yaml:"last_opened,omitempty"`
 }
 
 // Validate validates the project fields
@@ -213,6 +210,13 @@ func (p *Project) Validate() error {
 	// Validate sync if present
 	if err := p.Sync.Validate(); err != nil {
 		errs = append(errs, err.Error())
+	}
+
+	// Validate last_opened if present (must be RFC3339)
+	if p.LastOpened != "" {
+		if _, err := time.Parse(time.RFC3339, p.LastOpened); err != nil {
+			errs = append(errs, fmt.Sprintf("invalid last_opened format: %s (expected RFC3339)", p.LastOpened))
+		}
 	}
 
 	if len(errs) > 0 {
@@ -318,42 +322,6 @@ func (r *Registry) GetProjectByAlias(alias string) (string, Project, bool) {
 	return "", Project{}, false
 }
 
-// GetProjectsByCategory retrieves all projects in a category
-func (r *Registry) GetProjectsByCategory(category Category) map[string]Project {
-	result := make(map[string]Project)
-	for name, project := range r.Projects {
-		if project.Category == category {
-			result[name] = project
-		}
-	}
-	return result
-}
-
-// GetProjectsByTag retrieves all projects with a specific tag
-func (r *Registry) GetProjectsByTag(tag string) map[string]Project {
-	result := make(map[string]Project)
-	for name, project := range r.Projects {
-		for _, t := range project.Tags {
-			if t == tag {
-				result[name] = project
-				break
-			}
-		}
-	}
-	return result
-}
-
-// GetProjectsByLanguage retrieves all projects using a specific language
-func (r *Registry) GetProjectsByLanguage(lang Language) map[string]Project {
-	result := make(map[string]Project)
-	for name, project := range r.Projects {
-		if project.Lang == lang {
-			result[name] = project
-		}
-	}
-	return result
-}
-
 // GetActiveProjects retrieves all active projects
 func (r *Registry) GetActiveProjects() map[string]Project {
 	result := make(map[string]Project)
@@ -374,4 +342,37 @@ func (r *Registry) GetArchivedProjects() map[string]Project {
 		}
 	}
 	return result
+}
+
+// FindProjectByPath finds a project whose resolved root contains the given absolute path.
+// baseDir should be the expanded (absolute) base directory from settings.
+// Returns the project name, the project, and whether a match was found.
+// If multiple projects match (nested directories), the most specific match (longest path) wins.
+func (r *Registry) FindProjectByPath(absPath, baseDir string) (string, Project, bool) {
+	absPath = filepath.Clean(absPath)
+	baseDir = filepath.Clean(baseDir)
+
+	var bestName string
+	var bestProject Project
+	bestLen := 0
+
+	for name, project := range r.Projects {
+		var projectRoot string
+		if filepath.IsAbs(project.Path) {
+			projectRoot = filepath.Clean(project.Path)
+		} else {
+			projectRoot = filepath.Clean(filepath.Join(baseDir, project.Path))
+		}
+
+		// Check if absPath is within or equal to projectRoot
+		if absPath == projectRoot || strings.HasPrefix(absPath, projectRoot+string(filepath.Separator)) {
+			if len(projectRoot) > bestLen {
+				bestLen = len(projectRoot)
+				bestName = name
+				bestProject = project
+			}
+		}
+	}
+
+	return bestName, bestProject, bestLen > 0
 }

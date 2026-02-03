@@ -29,7 +29,7 @@ func init() {
 
 func runConfig(cmd *cobra.Command, args []string) error {
 	// Expand registry path
-	registryPath, err := expandPath(registry.DefaultRegistryPath)
+	registryPath, err := registry.ExpandPath(registry.DefaultRegistryPath)
 	if err != nil {
 		return fmt.Errorf("failed to expand registry path: %w", err)
 	}

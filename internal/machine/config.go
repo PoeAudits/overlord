@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/PoeAudits/overlord/internal/registry"
 	"gopkg.in/yaml.v3"
 )
 
@@ -33,9 +34,10 @@ func (r Role) IsValid() bool {
 
 // MachineConfig represents the machine-specific configuration
 type MachineConfig struct {
-	Name        string `yaml:"name"`
-	Role        Role   `yaml:"role"`
-	StorageHost string `yaml:"storage_host,omitempty"`
+	Name            string            `yaml:"name"`
+	Role            Role              `yaml:"role"`
+	StorageHost     string            `yaml:"storage_host,omitempty"`
+	WorkingSetHosts map[string]string `yaml:"working_set_hosts,omitempty"`
 }
 
 // Validate checks if the machine config is valid
@@ -58,6 +60,20 @@ func (m *MachineConfig) Validate() error {
 		return fmt.Errorf("storage_host should not be set for storage role")
 	}
 
+	// WorkingSetHosts must NOT be set for working-set machines
+	if m.Role == RoleWorkingSet && len(m.WorkingSetHosts) > 0 {
+		return fmt.Errorf("working_set_hosts should not be set for working-set role")
+	}
+
+	// If WorkingSetHosts is set on storage, each value must be non-empty
+	if m.Role == RoleStorage && len(m.WorkingSetHosts) > 0 {
+		for name, host := range m.WorkingSetHosts {
+			if host == "" {
+				return fmt.Errorf("working_set_hosts value for %q cannot be empty", name)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -75,7 +91,7 @@ func Save(path string, config *MachineConfig) error {
 		return fmt.Errorf("cannot save invalid machine config: %w", err)
 	}
 
-	expandedPath, err := expandPath(path)
+	expandedPath, err := registry.ExpandPath(path)
 	if err != nil {
 		return fmt.Errorf("failed to expand path: %w", err)
 	}
@@ -111,7 +127,7 @@ func Save(path string, config *MachineConfig) error {
 // If the file doesn't exist, it returns a default config.
 // The path supports ~ expansion for the home directory.
 func Load(path string) (*MachineConfig, error) {
-	expandedPath, err := expandPath(path)
+	expandedPath, err := registry.ExpandPath(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to expand path: %w", err)
 	}
@@ -153,39 +169,4 @@ func defaultConfig() (*MachineConfig, error) {
 		Name: hostname,
 		Role: RoleStorage,
 	}, nil
-}
-
-// expandPath expands ~ to the user's home directory and resolves
-// relative paths (e.g., ".", "..", "./foo") to absolute paths.
-func expandPath(path string) (string, error) {
-	if len(path) == 0 {
-		return "", fmt.Errorf("path cannot be empty")
-	}
-
-	if path[0] == '~' {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("failed to get home directory: %w", err)
-		}
-
-		if len(path) == 1 {
-			path = homeDir
-		} else if path[1] == '/' || path[1] == filepath.Separator {
-			path = filepath.Join(homeDir, path[2:])
-		} else {
-			// ~user/path not supported
-			return "", fmt.Errorf("~user expansion not supported, use absolute path")
-		}
-	}
-
-	// Resolve relative paths to absolute
-	if !filepath.IsAbs(path) {
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			return "", fmt.Errorf("failed to resolve absolute path: %w", err)
-		}
-		path = absPath
-	}
-
-	return path, nil
 }

@@ -4,32 +4,7 @@ A Go-based CLI tool for managing Git worktrees, tmux sessions, and project regis
 
 ## Architecture Overview
 
-Overlord v2 is a layered CLI application built with Cobra, featuring fuzzy matching, interactive TUI, and embedded templates:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│      CLI Commands (Cobra)                               │  ← User interface
-│      - Root (routing), List, Info, New, Add, Rm         │
-│      - Open (with TUI picker), Archive, Unarchive       │
-│      - Init (scaffolding), Setup, Config                 │
-│      - Activate, Sync, Deactivate (multi-machine sync)  │
-├─────────────────────────────────────────────────────────┤
-│      Registry Operations                                │  ← Business logic
-│      - Resolve (fuzzy matching)                         │
-│      - Filter (category, tags, status)                  │
-│      - Validate (all types)                             │
-├─────────────────────────────────────────────────────────┤
-│      Templates (Embedded)                               │  ← Project initialization
-│      - Language-specific templates                      │
-│      - Variable substitution                            │
-├─────────────────────────────────────────────────────────┤
-│      YAML Store (Load/Save)                             │  ← Data persistence
-│      - Atomic writes (temp + rename)                    │
-│      - Automatic backups                                │
-├─────────────────────────────────────────────────────────┤
-│      Filesystem (~/.config/overlord)                    │  ← Storage
-└─────────────────────────────────────────────────────────┘
-```
+Layered CLI application: Cobra commands → Registry operations (fuzzy matching, filtering, validation) → Templates (embedded, language-specific) → YAML Store (atomic writes, backups) → Filesystem (`~/.config/overlord`).
 
 **Core Principles:**
 - Registry is the single source of truth for project metadata
@@ -40,1086 +15,416 @@ Overlord v2 is a layered CLI application built with Cobra, featuring fuzzy match
 - Embedded templates for portability
 - Automatic thoughts directory management during archive/unarchive
 
+**Two Repositories:**
+
+| Repository | Purpose | Location |
+|------------|---------|----------|
+| `PoeAudits/overlord` | Source code (this Go project) | `~/Overlord/core/tools/overlord-v2` |
+| `PoeAudits/overlord-config` | Registry + config (synced between machines) | `~/.config/overlord/` |
+
+The config repo contains `registry.yaml` (tracked, shared), `.gitignore`, and `machine.yaml` (gitignored, machine-specific). The `overlord setup` command initializes it.
+
 ## Directory Structure
 
 ```
 overlord-v2/
-├── cmd/overlord/              # Application entry point
-│   └── main.go                # Calls cmd.Execute()
-├── internal/                  # Private application code
-│   ├── cmd/                   # Cobra command definitions
-│   │   ├── root.go            # Root command + routing logic
-│   │   ├── list.go            # List projects with filtering
-│   │   ├── info.go            # Show project details
-│   │   ├── new.go             # Create new project
-│   │   ├── add.go             # Register existing project
-│   │   ├── rm.go              # Remove from registry
-│   │   ├── open.go            # Open workspace (with TUI picker)
-│   │   ├── archive.go         # Archive project + thoughts
-│   │   ├── unarchive.go       # Restore project + thoughts
-│   │   ├── thoughts.go        # Thoughts directory management helpers
-│   │   ├── init.go            # Initialize directory with templates
-│   │   ├── setup.go           # Set up overlord directories/config
-│   │   ├── config.go          # Open registry in editor
-│   │   ├── activate.go        # Activate sync for project
-│   │   ├── sync.go            # Sync files between machines
-│   │   ├── deactivate.go      # Deactivate sync and optionally remove
-│   │   ├── fileutil.go        # File operations (resolveProjectPath, copyFile)
-│   │   ├── *_test.go          # Command tests
-│   │   ├── open_test.go       # TUI picker tests
-│   │   ├── thoughts_test.go   # Thoughts helpers tests
-│   │   ├── archive_test.go    # Archive command tests
-│   │   └── unarchive_test.go  # Unarchive command tests
-│   ├── registry/              # Registry types and operations
-│   │   ├── types.go           # Registry, Project, Category, Language types
-│   │   ├── types_test.go      # Type validation tests
-│   │   ├── store.go           # Load/Save with atomic writes
-│   │   ├── store_test.go      # Store operation tests
-│   │   ├── resolve.go         # Fuzzy matching and resolution
-│   │   ├── resolve_test.go    # Resolution tests
-│   │   └── example_test.go    # Usage examples
-│   ├── machine/               # Machine configuration for sync
-│   │   ├── config.go          # MachineConfig, Role types, Load function
-│   │   ├── config_test.go     # Machine config tests
-│   │   └── example_test.go    # Usage examples
-│   ├── sync/                  # Sync infrastructure
-│   │   ├── rsync.go           # Rsync wrapper for file sync
-│   │   ├── rsync_test.go      # Rsync tests
-│   │   ├── conflict.go        # Conflict detection
-│   │   ├── conflict_test.go   # Conflict detection tests
-│   │   ├── example_test.go    # Rsync usage examples
-│   │   └── example_conflict_test.go  # Conflict detection examples
-│   ├── gitops/                # Git operations for registry sync
-│   │   ├── git.go             # GitOps struct with Add, Commit, Push, Pull
-│   │   ├── git_test.go        # Git operations tests
-│   │   └── example_test.go    # Git operations examples
-│   └── templates/             # Embedded templates
-│       ├── templates.go       # Template loading and rendering
-│       ├── templates_test.go  # Template tests
-│       ├── example_test.go    # Template usage examples
-│       └── templates/         # Template files (embedded via go:embed)
-│           ├── base/          # Base templates (all languages)
-│           │   ├── Makefile
-│           │   ├── README.md.tmpl
-│           │   └── AGENTS.md.tmpl
-│           ├── go/            # Go-specific templates
-│           ├── python/        # Python-specific templates
-│           ├── typescript/    # TypeScript-specific templates
-│           ├── solidity/      # Solidity-specific templates
-│           └── shared/        # Shared files
-│               └── .tmux.local
-├── Makefile                   # Build and worktree commands
-├── go.mod                     # Go module definition
-└── AGENTS.md                  # This file
+├── cmd/overlord/main.go           # Entry point (only calls cmd.Execute())
+├── internal/
+│   ├── cmd/                       # Cobra command definitions
+│   │   ├── root.go                # Root command + routing logic
+│   │   ├── constants.go           # Named constants (max lengths, picker sizes)
+│   │   ├── styles.go              # Shared terminal styles (NewStyles())
+│   │   ├── helpers.go             # Shared helpers (loadRegistry, saveRegistry, countTrue, etc.)
+│   │   ├── fileutil.go            # File operations helpers
+│   │   ├── tmux.go                # Tmux session management (tmuxSession struct)
+│   │   ├── list.go                # List projects with filtering
+│   │   ├── info.go, new.go, add.go, rm.go
+│   │   ├── open.go                # Open workspace (with TUI picker)
+│   │   ├── worktree.go            # Git worktree + tmux management
+│   │   ├── archive.go, unarchive.go, clear.go, thoughts.go
+│   │   ├── init.go, setup.go, config.go
+│   │   ├── activate.go, sync.go, deactivate.go
+│   │   └── env.go, detect.go
+│   ├── registry/                  # Registry types and operations
+│   │   ├── types.go               # Registry, Project, Category, Language types
+│   │   ├── store.go               # Load/Save with atomic writes
+│   │   └── resolve.go             # Fuzzy matching and resolution
+│   ├── machine/config.go          # MachineConfig, Role types, Load function
+│   ├── sync/
+│   │   ├── rsync.go               # Rsync wrapper for file sync
+│   │   └── conflict.go            # Conflict detection
+│   ├── gitops/git.go              # Git operations for registry sync
+│   └── templates/
+│       ├── templates.go           # Template loading and rendering
+│       └── templates/             # Embedded template files (go:embed)
+│           ├── base/              # Base templates (all languages)
+│           ├── go/, python/, typescript/, solidity/
+│           └── shared/.tmux.local
+├── Makefile
+└── go.mod
 ```
 
-### Key Conventions
-- `cmd/` contains only the main entry point
-- `internal/cmd/` contains Cobra command definitions
-- `internal/registry/` contains all registry-related logic
-- `internal/machine/` contains machine-specific configuration for sync
-- `internal/sync/` contains rsync wrapper and conflict detection
-- `internal/gitops/` contains git operations for registry sync
-- `internal/templates/` contains template system
-- Tests are co-located with source files (`*_test.go`)
-- Example tests demonstrate usage patterns
-- Templates are embedded at compile time (go:embed)
+Tests are co-located (`*_test.go`). Example tests in `example_test.go` files.
 
 ## Key Patterns
 
-### Registry Pattern
+### Shared Utilities (internal/cmd/)
 
-The registry is a versioned YAML structure with validation at every level.
+Command files use shared utilities to reduce duplication:
 
-**Structure:**
+**Constants** (`constants.go`): Named constants for magic numbers used across commands:
+- `maxProjectNameLen` (64) — maximum project name length
+- `maxDescDisplayLen` (40) — max description length in tables/pickers
+- `maxPickerVisibleItems` (15) — default visible items in TUI picker
+- `minPickerVisibleItems` (5) — minimum visible items in TUI picker
+- `pickerHeaderFooterLines` (5) — lines reserved for picker header/footer
+- `defaultWorktreeBaseDir` — base directory for worktrees (`~/Overlord/worktrees`)
+- `worktreeAdjectives`, `worktreeNouns` — word lists for auto-generated branch names
+
+**Styles** (`styles.go`): Centralized terminal styling via `NewStyles()`. Returns a `Styles` struct with pre-configured lipgloss styles for success, error, warning, info, dim, bold, and color constants. All command files call `NewStyles()` instead of defining inline styles.
+
+**Helpers** (`helpers.go`): Common operations used across commands:
+- `loadRegistry()` — loads registry with error handling
+- `saveRegistry()` — saves registry with validation
+- `commitAndPushRegistry()` — git add + commit + push for registry changes
+- `confirmAction()` — interactive yes/no confirmation prompt
+- `expandBaseDir()` — expands base_dir from registry settings
+- `countTrue()` — variadic helper to count true boolean flags (used for validation)
+
+**File Utilities** (`fileutil.go`): File system operations:
+- `formatPathWithTilde()` — replaces home dir with `~` for display
+- `moveDirectory()` — cross-device safe directory move (copy + remove)
+- `expandProjectPath()` — resolves project path from registry
+- `copyFileWithMode()` — copies file with mode preservation, cleans up partial files on failure
+
+**Tmux Session Management** (`tmux.go`): Encapsulates tmux session operations via `tmuxSession` struct:
+- `exists()` — checks if session exists
+- `create()` — creates new detached session with "base" window
+- `sourceLocal()` — sources `.tmux.local` file with environment variables
+- `attachOrSwitch()` — attaches to session or switches if already in tmux
+
+**Pattern:** Command files import these utilities and call them instead of duplicating logic. Path expansion uses `registry.ExpandPath()` (canonical implementation). Commands that manage tmux sessions (new.go, open.go) use the `tmuxSession` struct instead of inline exec.Command calls.
+
+### Registry & Store
+
+The registry (`internal/registry/types.go`) is a versioned YAML structure (version: 2) with cascading validation: `Registry → Settings + Projects → Project fields`. All types implement `Validate() error`. Enums (Category, Language, State) have `IsValid()` methods.
+
+Registry saves (`internal/registry/store.go`) use atomic writes: validate → backup existing (`.bak`) → write temp (`.tmp`) → atomic rename → clean up on failure. Never write invalid data.
+
+### Root Command Routing
+
+`overlord` with no args → list active projects. `overlord <name>` → open project (shorthand for `overlord open <name>`). Subcommands exported as `RunXxx` for reuse. Location: `internal/cmd/root.go`.
+
+**Error propagation:** Config initialization errors are stored in `configErr` and returned via `PersistentPreRunE`. This prevents `os.Exit()` calls outside main and allows proper error handling through Cobra's error chain.
+
+### Fuzzy Matching
+
+Three-tier matching in `internal/registry/resolve.go`: exact name (score: 1000) → exact alias (score: 900) → fuzzy match on names/aliases (min score: 50). Ambiguous matches trigger interactive TUI picker.
+
+### Interactive TUI
+
+Bubbletea picker in `internal/cmd/open.go`. Shown when: no args, multiple matches, or ambiguous. Real-time fuzzy filtering, arrow key navigation, Enter to select, Esc to cancel. Falls back to error if not TTY.
+
+### Templates
+
+Embedded via `go:embed all:templates` in `internal/templates/templates.go`. Fallback order: `templates/{lang}/` → `templates/base/` → `templates/shared/`. `.tmpl` files processed with `text/template`, others returned as-is. Variables: `{{.ProjectName}}`, `{{.Description}}`, etc.
+
+### Enums
+
+Categories and Languages are typed string constants with `IsValid()`, `ValidCategories()`/`ValidLanguages()` list methods. 
+
+**Category.Path():** Uses package-level `categoryPaths` map for filesystem mapping (not a switch statement). This makes adding new categories simpler — just update the map and `ValidCategories()`.
+
+**IsValid() methods:** Iterate over `ValidCategories()`/`ValidLanguages()` instead of duplicating the list in a switch. Single source of truth for valid values.
+
+Values:
+- **Categories:** contracts, web, services, ml, libs, cli, core-agents, core-tools, sandbox, config
+- **Languages:** python, typescript, go, solidity, base
+
+### Context Threading Pattern
+
+All long-running operations accept `context.Context` as the first parameter. This enables future timeout/cancellation support without breaking signatures.
+
+**Packages with context support:**
+- `internal/gitops/git.go` — `Add(ctx)`, `Commit(ctx)`, `Push(ctx)`, `Pull(ctx)`
+- `internal/sync/rsync.go` — `Push(ctx)`, `Pull(ctx)`, `DryRun(ctx)`
+- `internal/sync/conflict.go` — `DetectConflictsWithSSH(ctx)`, `DetectConflictsWithRsyncSSH(ctx)`
+- `internal/ssh/mux.go` — `Connect(ctx)`, `Close(ctx)`
+
+**Current usage:** Commands pass `context.Background()` to these methods. Future enhancements can use `context.WithTimeout()` for long operations (e.g., large file syncs, slow git operations).
+
+**CommandExecutor interface:** Updated to accept context. Test mocks and real implementations both support context-aware execution.
+
+### Context Structs for Complex Operations
+
+When a function requires many parameters (>5), use a context struct to bundle related parameters. This improves readability and makes it easier to add new parameters without breaking signatures.
+
+**Example:** `syncContext` in `sync.go` bundles 16 parameters into logical groups:
 ```go
-type Registry struct {
-    Version  int                `yaml:"version"`
-    Settings Settings           `yaml:"settings"`
-    Projects map[string]Project `yaml:"projects"`
+type syncContext struct {
+    // Project info
+    name    string
+    project registry.Project
+    
+    // Path info
+    baseDir       string
+    remoteBaseDir string
+    storageHost   string
+    
+    // Sync config
+    globalExcludes []string
+    rsyncClient    *sync.Rsync
+    sshCommand     string
+    sshEnv         string
+    
+    // Options
+    dryRun bool
+    force  bool
+    
+    // Styles
+    styles Styles
 }
 ```
 
-**Location:** `internal/registry/types.go`
-
-**Rules:**
-- Version must be 2 (for future compatibility)
-- All types implement `Validate() error`
-- Validation cascades: Registry → Settings + Projects → Project fields
-- Enums (Category, Language, State) have `IsValid()` methods
-
-### Atomic Write Pattern
-
-Registry saves use atomic writes to prevent corruption.
-
-**Flow:**
-1. Validate registry before writing
-2. Create parent directories if needed
-3. Backup existing file (`.bak` suffix)
-4. Write to temporary file (`.tmp` suffix)
-5. Atomic rename temp → final
-6. Clean up temp file on failure
-
-**Location:** `internal/registry/store.go` (`Save` function)
-
-**Rules:**
-- Never write invalid data
-- Always backup before overwriting
-- Use temp file + rename for atomicity
-- Clean up temp files on error
-
-### Enum Validation Pattern
-
-Categories and Languages are type-safe enums with validation.
-
-**Structure:**
-```go
-type Category string
-
-const (
-    CategoryWeb Category = "web"
-    // ... other categories
-)
-
-func (c Category) IsValid() bool {
-    switch c {
-    case CategoryWeb, CategoryServices, ...:
-        return true
-    }
-    return false
-}
-```
-
-**Location:** `internal/registry/types.go`
-
-**Rules:**
-- Define as typed string constants
-- Provide `IsValid()` method
-- Provide `ValidCategories()` / `ValidLanguages()` for listing
-- Categories have `Path()` method for filesystem mapping
-
-### Cobra Command Pattern
-
-Commands are defined using Cobra with Viper for configuration.
-
-**Structure:**
-```go
-var rootCmd = &cobra.Command{
-    Use:   "overlord",
-    Short: "Brief description",
-    Long:  `Detailed description`,
-}
-
-func init() {
-    cobra.OnInitialize(initConfig)
-    rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
-}
-```
-
-**Location:** `internal/cmd/root.go`
-
-**Rules:**
-- Root command in `internal/cmd/root.go`
-- Subcommands in separate files (list.go, info.go, etc.)
-- Use Viper for config management
-- Config location: `~/.config/overlord/config.yaml`
-
-### Root Command Routing Pattern
-
-The root command routes to different subcommands based on arguments.
-
-**Flow:**
-```go
-func runRoot(cmd *cobra.Command, args []string) error {
-    if len(args) == 0 {
-        // No args - run list command
-        return RunList(cmd, args)
-    }
-    // Has args - treat as project name and run open
-    return RunOpen(cmd, args)
-}
-```
-
-**Location:** `internal/cmd/root.go`
-
-**Rules:**
-- `overlord` with no args → list active projects
-- `overlord <name>` → open project (shorthand for `overlord open <name>`)
-- Subcommands exported as `RunXxx` for reuse
-
-### Fuzzy Matching Pattern
-
-Project resolution uses a three-tier matching strategy.
-
-**Flow:**
-1. Check for exact name match (score: 1000)
-2. Check for exact alias match (score: 900)
-3. Fuzzy match on names and aliases (score: variable)
-
-**Location:** `internal/registry/resolve.go`
-
-**Rules:**
-- Exact matches return immediately (no fuzzy search)
-- Fuzzy matches require minimum score (50)
-- Results sorted by score (highest first)
-- Ambiguous matches (equal scores) trigger interactive picker
-
-### Interactive TUI Pattern
-
-The open command uses Bubbletea for interactive project selection.
-
-**Structure:**
-```go
-type pickerModel struct {
-    textInput  textinput.Model
-    projects   []projectItem
-    filtered   []projectItem
-    cursor     int
-    selected   *projectItem
-    cancelled  bool
-}
-```
-
-**Location:** `internal/cmd/open.go`
-
-**Rules:**
-- Picker shown when: no args, multiple matches, or ambiguous
-- Real-time fuzzy filtering on user input
-- Arrow keys for navigation
-- Enter to select, Esc to cancel
-- Terminal detection (fallback to error if not TTY)
-
-### Template Embedding Pattern
-
-Templates are embedded at compile time using go:embed.
-
-**Structure:**
-```go
-//go:embed all:templates
-var templateFS embed.FS
-
-func GetTemplate(lang Language, templateType TemplateType) (string, error) {
-    // Fallback logic: language-specific -> base -> shared
-}
-```
-
-**Location:** `internal/templates/templates.go`
-
-**Rules:**
-- Templates embedded via `go:embed all:templates`
-- Fallback order: `templates/{lang}/` → `templates/base/` → `templates/shared/`
-- `.tmpl` files processed with text/template
-- Non-`.tmpl` files returned as-is
-- Variable substitution: `{{.ProjectName}}`, `{{.Description}}`, etc.
-
-### Machine Config Pattern
-
-Machine configuration defines the role and sync behavior for each machine.
-
-**Structure:**
-```go
-type MachineConfig struct {
-    Name        string `yaml:"name"`
-    Role        Role   `yaml:"role"`
-    StorageHost string `yaml:"storage_host,omitempty"`
-}
-```
-
-**Location:** `internal/machine/config.go`
-
-**Roles:**
-- `storage` - Machine that holds the full project set (no storage_host)
-- `working-set` - Machine that syncs a subset from storage (requires storage_host)
-
-**Rules:**
-- Config file: `~/.config/overlord/machine.yaml`
-- If file doesn't exist, defaults to storage role with hostname
-- `storage_host` required for working-set, forbidden for storage
-- All configs validated before use
-- Path expansion supports `~` for home directory
-
-### Rsync Wrapper Pattern
-
-The rsync wrapper provides a Go interface to rsync for bidirectional file sync.
-
-**Structure:**
-```go
-type Rsync struct {
-    executor CommandExecutor
-    lookPath LookPathFunc
-}
-
-type RsyncOptions struct {
-    Source   string   // Source path
-    Dest     string   // Destination path
-    Excludes []string // Exclusion patterns
-    DryRun   bool     // Trial run with no changes
-    Delete   bool     // Delete extraneous files from dest
-}
-```
-
-**Location:** `internal/sync/rsync.go`
-
-**Key Methods:**
-- `Push(opts) (*RsyncResult, error)` - Sync local → remote
-- `Pull(opts) (*RsyncResult, error)` - Sync remote → local
-- `DryRun(opts) (string, error)` - Preview changes without syncing
-
-**Rules:**
-- Source paths automatically get trailing `/` for rsync
-- Remote paths formatted as `host:path` or `user@host:path`
-- Uses `-avz --progress` flags by default
-- Validates options before execution
-- Returns exit code and output in RsyncResult
-- Supports custom CommandExecutor for testing
-
-**Helper Functions:**
-- `FormatRemotePath(host, path)` - Format as `host:path`
-- `FormatRemotePathWithUser(user, host, path)` - Format as `user@host:path`
-- `ParseRemotePath(remotePath)` - Parse into user, host, path components
-- `IsRemotePath(path)` - Check if path is remote format
-
-### Git Operations Pattern
-
-GitOps provides git operations for registry sync with automatic commit prefixing.
-
-**Structure:**
-```go
-type GitOps struct {
-    RepoPath string
-}
-```
-
-**Location:** `internal/gitops/git.go`
-
-**Key Methods:**
-- `HasChanges() (bool, error)` - Check for uncommitted changes
-- `Add(files...)` - Stage files (defaults to all if none specified)
-- `Commit(message)` - Commit with "overlord: " prefix
-- `Push()` - Push to remote (no-op if no remote)
-- `Pull()` - Pull with rebase (no-op if no remote)
-
-**Rules:**
-- All commits automatically prefixed with "overlord: "
-- Push/Pull gracefully handle repos without remotes
-- Uses `git -C <path>` for operations in specific directory
-- Pull uses `--rebase` to avoid merge commits
-- Errors include git output for debugging
-
-**Usage Pattern:**
-```go
-git := gitops.New("~/.config/overlord")
-if hasChanges, _ := git.HasChanges(); hasChanges {
-    git.Add()
-    git.Commit("sync completed")
-    git.Push()
-}
-```
-
-### Conflict Detection Pattern
-
-Conflict detection uses bidirectional rsync dry-runs to identify file conflicts.
-
-**Algorithm:**
-1. Run rsync dry-run local→remote (what would be pushed)
-2. Run rsync dry-run remote→local (what would be pulled)
-3. Parse outputs to extract file lists
-4. Compare lists to categorize conflicts:
-   - Files in both lists = `ConflictBothModified`
-   - Files only in push list = `ConflictLocalOnly`
-   - Files only in pull list = `ConflictRemoteOnly`
-
-**Structure:**
-```go
-type Conflict struct {
-    Path string        // Relative path of conflicting file
-    Type ConflictType  // Type of conflict
-}
-
-type ConflictType string
-const (
-    ConflictLocalOnly      ConflictType = "local-only"
-    ConflictRemoteOnly     ConflictType = "remote-only"
-    ConflictBothModified   ConflictType = "both-modified"
-)
-```
-
-**Location:** `internal/sync/conflict.go`
+**Methods on context structs** extract common operations:
+- `buildExcludes()` — merges global and per-project exclusion patterns
+- `ensureLocalDir()` — creates local directory if needed, returns firstSync flag
+- `detectAndHandleConflicts()` — checks for conflicts and prompts user
+
+**When to use:** Functions with >5 parameters, especially when parameters fall into logical groups (config, options, paths, etc.). Also used for storage-side sync with `hostSyncContext`.
+
+## Multi-Machine Sync
+
+### Machine Config
+
+`internal/machine/config.go` — stored at `~/.config/overlord/machine.yaml` (gitignored).
+
+Two roles:
+- **storage** — holds full project set. Optional `working_set_hosts` map (name → `[user@]host`). No `storage_host`.
+- **working-set** — syncs subset from storage. Requires `storage_host`. No `working_set_hosts`.
+
+If file doesn't exist, defaults to storage role with hostname.
+
+### Sync Infrastructure
+
+**Rsync wrapper** (`internal/sync/rsync.go`): Go interface to rsync with `Push()`, `Pull()`, `DryRun()`. Uses `-avz --progress`, auto-adds trailing `/` to source. Supports custom `CommandExecutor` for testing.
+
+**Conflict detection** (`internal/sync/conflict.go`): Bidirectional rsync dry-runs → parse outputs → categorize as `local-only`, `remote-only`, or `both-modified`. Returns all conflicts.
+
+**GitOps** (`internal/gitops/git.go`): `Add()`, `Commit()` (auto-prefixes "overlord: "), `Push()`, `Pull()` (with rebase). Push/Pull gracefully handle repos without remotes.
+
+### Sync Commands
+
+**`overlord activate <project>`** (`internal/cmd/activate.go`):
+Set `sync.status = active`. Validates not archived. Auto-commits and pushes registry changes.
+
+**`overlord sync [project]`** (`internal/cmd/sync.go`):
+- **Working-set:** Pull registry → for each active project: detect conflicts → pull from storage → push to storage. First sync creates local dir, skips conflict detection, pull-only.
+- **Storage:** Determine target host (flag / auto-select / TUI picker) → for each active project: create remote dir via SSH → push local → remote.
+- Flags: `--dry-run`, `--force` (skip conflict confirmation), `--host <name>` (storage only)
+- Sync order (working-set): always pull first, then push
+
+**`overlord deactivate <project>`** (`internal/cmd/deactivate.go`):
+- On working-set: sync final changes to storage first (abort if fails unless `--force-remove`)
+- Set `sync.status = inactive`, commit+push registry
+- On working-set: prompt for directory removal (unless `--keep-local` or `--force`)
+- Never removes directories on storage machines
+
+### Sync Exclusion Patterns
+
+Global defaults in `settings.sync.default_exclude`. Per-project in `project.sync.exclude` (additive to globals).
+
+### Machine-Aware List
+
+Storage machines: `overlord list` shows all active projects. Working-set machines: shows only synced projects (`sync.status == active` AND `status.state == active`). Override with `--all` or `--archived`.
+
+## Thoughts Management
+
+`internal/cmd/thoughts.go` — automatic thoughts directory management during archive/unarchive.
+
+**Structure:** `~/thoughts/projects/{project-name}/` with subdirs: plans, logs, docs (symlinks to project), research, sessions, handoffs, reviews, briefs. Archive location: `~/thoughts/archive/{project-name}/`.
+
+**Archive flow:** Move project dir → move thoughts to archive → update symlinks to archived location.
+**Unarchive flow:** Move project from archive → restore thoughts → update symlinks. Handles legacy archives.
+
+**Rules:** Thoughts operations are secondary (warn on failure, don't fail archive/unarchive). Always update symlinks after moving. Clean up empty archive dirs.
+
+## Worktree Management
+
+`internal/cmd/worktree.go` — git worktree management with tmux session integration.
+
+**Commands:**
+- **`overlord worktree new [branch]`** — Create worktree + tmux session. Auto-generates adjective-noun branch names if not provided.
+- **`overlord worktree list`** — List worktrees for current project with session status.
+- **`overlord worktree attach [branch]`** — Attach to worktree's tmux session. Uses current branch if in worktree.
+- **`overlord worktree remove [branch]`** — Remove worktree, branch, and session. Supports self-removal with confirmation.
+- **Alias:** `overlord wt` is shorthand for `overlord worktree`.
+
+**Directory Structure:**
+- Worktrees created at: `~/Overlord/worktrees/{project}/{branch}/`
+- Session name format: `{project}--{branch}` (slashes in branch replaced with dashes)
+
+**Auto-generated Names:** Uses adjective-noun pairs (e.g., `swift-fix`, `bright-task`) from word lists in `constants.go`. Appends counter on collision (`swift-fix-2`).
+
+**Context Detection:** Works from any git repository. Detects project name from directory. If in a worktree, resolves to main repo for operations.
+
+**Session Setup:** Creates tmux session with single "base" window running `opencode`.
 
 **Key Functions:**
-- `DetectConflicts(localPath, remoteHost, remotePath, excludes)` - Detect conflicts
-- `parseRsyncOutput(output)` - Extract file list from rsync output
-- `detectConflictsFromFileLists(pushFiles, pullFiles)` - Categorize conflicts
-
-**Rules:**
-- Uses rsync dry-run to avoid actual file transfers
-- Parses rsync verbose output to extract file paths
-- Skips directories (only tracks files)
-- Returns all conflicts, not just first one found
-- Supports custom Rsync instance for testing
-
-### Sync Command Patterns
-
-The sync commands (activate, sync, deactivate) manage multi-machine project synchronization.
-
-#### Activate Command Pattern
-
-**Purpose:** Mark a project for sync by setting `sync.status = active`
-
-**Location:** `internal/cmd/activate.go`
-
-**Flow:**
-1. Load registry
-2. Resolve project (fuzzy matching)
-3. Check if project is archived (error if true)
-4. Check if already active (info message if true)
-5. Update `project.Sync.Status = registry.SyncActive`
-6. Save registry
-7. Git add, commit, push registry changes
-
-**Key Features:**
-- Uses fuzzy matching for project resolution
-- Validates project state (no archived projects)
-- Auto-commits with message: "overlord: activate <project>"
-- Warns but doesn't fail if git push fails
-
-**Example:**
-```go
-// Activate sync for a project
-overlord activate my-project
-```
-
-#### Sync Command Pattern
-
-**Purpose:** Bidirectionally sync files between working-set and storage machines
-
-**Location:** `internal/cmd/sync.go`
-
-**Flow:**
-1. Load machine config
-2. Check role (storage machines show info message and exit)
-3. Pull registry from git
-4. Load registry
-5. Determine projects to sync (all active or specific project)
-6. For each project:
-   - Detect conflicts (bidirectional rsync dry-run)
-   - Prompt user if conflicts found (unless --force)
-   - Pull from storage (remote → local)
-   - Push to storage (local → remote)
-7. Print summary
-
-**Flags:**
-- `--dry-run` - Preview changes without syncing
-- `--force` - Skip conflict confirmation
-
-**Key Features:**
-- Respects global + per-project exclusion patterns
-- Conflict detection before sync
-- Interactive confirmation for conflicts
-- Detailed progress output with styled messages
-- Summary report (synced, partial, failed, skipped)
-
-**Sync Order:**
-- Always pull first, then push (prevents overwriting remote changes)
-
-**Example:**
-```go
-// Sync all active projects
-overlord sync
-
-// Sync specific project
-overlord sync my-project
-
-// Preview what would sync
-overlord sync --dry-run
-```
-
-#### Deactivate Command Pattern
-
-**Purpose:** Deactivate sync and optionally remove local directory
-
-**Location:** `internal/cmd/deactivate.go`
-
-**Flow:**
-1. Load machine config
-2. Load registry
-3. Resolve project (fuzzy matching)
-4. Check if project is archived (error if true)
-5. Check if already inactive (info message if true)
-6. **On working-set machines:**
-   - Sync final changes to storage (push only)
-   - If sync fails and not --force-remove, abort
-7. Update `project.Sync.Status = registry.SyncInactive`
-8. Save registry
-9. Git add, commit, push registry changes
-10. **On working-set machines (if not --keep-local):**
-    - Prompt for directory removal (unless --force)
-    - Remove directory if confirmed
-
-**Flags:**
-- `--force` - Skip confirmation prompts
-- `--keep-local` - Don't remove local directory
-- `--force-remove` - Remove directory even if sync failed
-
-**Key Features:**
-- Syncs to storage before deactivating (data safety)
-- Only removes directories on working-set machines
-- Requires confirmation before removal (unless --force)
-- Aborts if sync fails (unless --force-remove)
-- Auto-commits with message: "overlord: deactivate <project>"
-
-**Example:**
-```go
-// Deactivate and prompt for removal
-overlord deactivate my-project
-
-// Deactivate but keep local files
-overlord deactivate my-project --keep-local
-
-// Deactivate and remove without prompt
-overlord deactivate my-project --force
-```
-
-**Safety Rules:**
-- Always sync to storage before deactivating (on working-set)
-- Never remove directories on storage machines
-- Abort if sync fails (unless --force-remove)
-- Require confirmation for directory removal (unless --force)
-
-### Thoughts Management Pattern
-
-**Purpose:** Automatically manage thoughts directories when archiving/unarchiving projects
-
-**Location:** `internal/cmd/thoughts.go`
-
-**Thoughts Directory Structure:**
-
-Main location (active projects) - **Project-centric structure**:
-```
-~/thoughts/projects/{project-name}/
-├── plans/
-├── logs/
-├── docs/          # Symlinks to project files
-├── research/
-├── sessions/
-├── handoffs/
-├── reviews/
-└── briefs/
-```
-
-Archive location (archived projects):
-```
-~/thoughts/archive/{project-name}/
-├── plans/
-├── logs/
-├── docs/          # Symlinks to archived project files
-├── research/
-├── sessions/
-├── handoffs/
-├── reviews/
-└── briefs/
-```
-
-**Key Types:**
-```go
-type ThoughtsPaths struct {
-    Plans    string
-    Logs     string
-    Docs     string
-    Research string
-    Sessions string
-    Handoffs string
-    Reviews  string
-    Briefs   string
-}
-```
-
-**Key Functions:**
-- `GetThoughtsPaths(thoughtsDir, projectName)` - Get paths for main location (8 subdirectories)
-- `GetArchiveThoughtsPaths(thoughtsDir, projectName)` - Get paths for archive location (8 subdirectories)
-- `ThoughtsExist(paths)` - Check which directories exist
-- `MoveThoughtsToArchive(thoughtsDir, projectName)` - Move thoughts to archive
-- `MoveThoughtsFromArchive(thoughtsDir, projectName)` - Restore thoughts from archive
-- `UpdateProjectSymlinks(thoughtsDocsDir, actualProjectPath)` - Update symlinks in docs/ to project files
-
-**Archive Behavior:**
-
-When archiving a project:
-1. Move project directory to `~/Overlord/archive/{name}/`
-2. Move thoughts from `~/thoughts/projects/{name}/` to `~/thoughts/archive/{name}/`
-3. Update symlinks in archived thoughts to point to archived project location
-4. Warn if thoughts directories don't exist (non-fatal)
-
-**Unarchive Behavior:**
-
-When unarchiving a project:
-1. Move project directory from archive to category directory
-2. Restore thoughts from `~/thoughts/archive/{name}/` to `~/thoughts/projects/{name}/`
-3. Update symlinks to point to restored project location
-4. Handle legacy archives (projects archived before this feature) gracefully
-
-**Rules:**
-- Thoughts operations are secondary (warn on failure, don't fail archive/unarchive)
-- Always update symlinks after moving thoughts
-- Use `moveDirectory` for cross-filesystem compatibility
-- Clean up empty archive directories after restoration
-- Skip creating broken symlinks (only symlink if target exists)
-
-**Example:**
-```go
-// Archive thoughts
-warnings, err := MoveThoughtsToArchive("~/thoughts", "my-project")
-if err != nil {
-    // Warn but continue - project archive succeeded
-    fmt.Printf("Warning: Failed to move thoughts: %v\n", err)
-}
-
-// Restore thoughts
-warnings, err := MoveThoughtsFromArchive("~/thoughts", "my-project")
-if err != nil {
-    // Warn but continue - project unarchive succeeded
-    fmt.Printf("Warning: Failed to restore thoughts: %v\n", err)
-}
-
-// Update symlinks
-thoughtsPaths := GetThoughtsPaths("~/thoughts", "my-project")
-if err := UpdateProjectSymlinks(thoughtsPaths.Docs, "/path/to/project"); err != nil {
-    fmt.Printf("Warning: Failed to update symlinks: %v\n", err)
-}
-```
+- `detectProject()` — Detects project from cwd, handles worktree resolution
+- `parseWorktreeList()` — Parses `git worktree list --porcelain` output
+- `generateBranchName()` — Generates random adjective-noun names
+- `worktreeSessionName()` — Formats `{project}--{branch}` session name
+- `ensureUniqueBranch()` — Appends counter to avoid collisions
 
 ## Coding Conventions
 
-### Naming Conventions
+### Naming
 
 | Thing | Convention | Example |
 |-------|------------|---------|
 | Files | snake_case | `types.go`, `store.go` |
-| Test files | `*_test.go` | `types_test.go` |
 | Types | PascalCase | `Registry`, `Project` |
-| Functions | PascalCase (exported) | `Load`, `Save` |
-| Functions | camelCase (private) | `expandPath`, `copyFile` |
+| Exported functions | PascalCase | `Load`, `Save` |
+| Private functions | camelCase | `expandPath`, `copyFile` |
 | Constants | PascalCase with prefix | `CategoryWeb`, `StateActive` |
 | YAML tags | snake_case | `yaml:"base_dir"` |
-
-### File Organization
-
-- One primary type per file (e.g., `types.go` has all registry types)
-- Related functions in same file (e.g., `store.go` has Load/Save)
-- Tests co-located: `types.go` → `types_test.go`
-- Example tests in `example_test.go`
 
 ### Error Handling
 
 - Return errors, don't panic
-- Wrap errors with context: `fmt.Errorf("failed to X: %w", err)`
+- Wrap with context: `fmt.Errorf("failed to X: %w", err)`
 - Validate before operations (fail fast)
-- Use descriptive error messages
 
 ### Testing
 
 - Table-driven tests for validation
 - Test both valid and invalid cases
 - Use `t.Run()` for subtests
-- Example tests demonstrate usage
-
-## Key Abstractions
-
-### Registry
-
-**Purpose:** Central data structure for project metadata  
-**Location:** `internal/registry/types.go`  
-**Key Methods:**
-- `Validate() error` - Validates entire registry
-- `GetProject(name) (Project, bool)` - Retrieve by name
-- `GetProjectByAlias(alias) (string, Project, bool)` - Retrieve by alias
-- `GetProjectsByCategory(Category) map[string]Project` - Filter by category
-- `GetProjectsByTag(tag) map[string]Project` - Filter by tag
-- `GetActiveProjects() map[string]Project` - Filter by state
-
-### Project
-
-**Purpose:** Represents a single project entry  
-**Location:** `internal/registry/types.go`  
-**Fields:**
-- `Path` - Relative path from base_dir
-- `Category` - Project category (enum)
-- `Lang` - Programming language (enum)
-- `Created` - Creation date (YYYY-MM-DD)
-- `Description` - Human-readable description
-- `Aliases` - Alternative names for lookup
-- `Tags` - Freeform tags for filtering
-- `Status` - Current state (active/archived)
-
-### Category
-
-**Purpose:** Type-safe project categorization  
-**Location:** `internal/registry/types.go`  
-**Values:** contracts, web, services, ml, libs, cli, core-agents, core-tools, sandbox  
-**Methods:**
-- `IsValid() bool` - Validates category
-- `Path() string` - Returns filesystem path for category
-
-### Language
-
-**Purpose:** Type-safe language identification  
-**Location:** `internal/registry/types.go`  
-**Values:** python, typescript, go, solidity, base  
-**Methods:**
-- `IsValid() bool` - Validates language
-
-### SyncSettings
-
-**Purpose:** Global sync configuration with default exclusion patterns  
-**Location:** `internal/registry/types.go`  
-**Fields:**
-- `DefaultExclude` - Default patterns to exclude from sync (e.g., node_modules, .venv)
-
-**Usage:**
-```yaml
-settings:
-  sync:
-    default_exclude:
-      - node_modules
-      - .venv
-      - __pycache__
-```
-
-### ProjectSync
-
-**Purpose:** Per-project sync configuration  
-**Location:** `internal/registry/types.go`  
-**Fields:**
-- `Status` - Sync status (active/inactive, empty = inactive for backward compat)
-- `Exclude` - Project-specific exclusion patterns (in addition to defaults)
-
-**Usage:**
-```yaml
-projects:
-  my-project:
-    sync:
-      status: active
-      exclude:
-        - .cache
-        - dist/
-```
-
-### MachineConfig
-
-**Purpose:** Machine-specific configuration for multi-machine sync  
-**Location:** `internal/machine/config.go`  
-**Fields:**
-- `Name` - Machine identifier (defaults to hostname)
-- `Role` - Machine role (storage or working-set)
-- `StorageHost` - Hostname of storage machine (required for working-set)
-
-**Key Methods:**
-- `Validate() error` - Validates configuration
-- `Load(path) (*MachineConfig, error)` - Loads config from file or returns default
-
-**Usage:**
-```yaml
-# Storage machine
-name: desktop-machine
-role: storage
-
-# Working-set machine
-name: laptop
-role: working-set
-storage_host: desktop-machine
-```
-
-### Rsync
-
-**Purpose:** Wrapper for rsync operations with Go interface  
-**Location:** `internal/sync/rsync.go`  
-**Key Types:**
-- `Rsync` - Main wrapper struct with executor and lookPath
-- `RsyncOptions` - Configuration for sync operations
-- `RsyncResult` - Result containing output and exit code
-- `Direction` - Enum for push/pull direction
-
-**Key Methods:**
-- `NewRsync()` - Create instance with default executor
-- `NewRsyncWithExecutor(executor)` - Create instance with custom executor (for testing)
-- `Push(opts)` - Sync local to remote
-- `Pull(opts)` - Sync remote to local
-- `DryRun(opts)` - Preview changes without syncing
-
-### Conflict
-
-**Purpose:** Represents a file conflict between local and remote  
-**Location:** `internal/sync/conflict.go`  
-**Fields:**
-- `Path` - Relative path of conflicting file
-- `Type` - Type of conflict (local-only, remote-only, both-modified)
-
-**Key Types:**
-- `ConflictType` - Enum for conflict types
-- `Conflict` - Struct representing a single conflict
-
-**Key Functions:**
-- `DetectConflicts(localPath, remoteHost, remotePath, excludes)` - Detect all conflicts
-- `DetectConflictsWithRsync(rsync, ...)` - Detect conflicts with custom Rsync instance
-
-**Conflict Types:**
-- `ConflictLocalOnly` - File exists only locally (would be pushed)
-- `ConflictRemoteOnly` - File exists only remotely (would be pulled)
-- `ConflictBothModified` - File modified on both sides (true conflict)
-
-### GitOps
-
-**Purpose:** Git operations for registry sync  
-**Location:** `internal/gitops/git.go`  
-**Fields:**
-- `RepoPath` - Path to git repository
-
-**Key Methods:**
-- `New(repoPath)` - Create new GitOps instance
-- `HasChanges()` - Check for uncommitted changes
-- `Add(files...)` - Stage files (all if none specified)
-- `Commit(message)` - Commit with automatic "overlord: " prefix
-- `Push()` - Push to remote (gracefully handles no remote)
-- `Pull()` - Pull with rebase (gracefully handles no remote)
-
-**Usage:**
-```go
-git := gitops.New("~/.config/overlord")
-if hasChanges, _ := git.HasChanges(); hasChanges {
-    git.Add()
-    git.Commit("activate my-project")
-    git.Push()
-}
-```
-
-## Dependencies
-
-### External Dependencies
-
-| Package | Purpose | Usage |
-|---------|---------|-------|
-| `github.com/spf13/cobra` | CLI framework | Command definitions |
-| `github.com/spf13/viper` | Configuration | Config file loading |
-| `gopkg.in/yaml.v3` | YAML parsing | Registry serialization |
-| `github.com/sahilm/fuzzy` | Fuzzy matching | Project resolution |
-| `github.com/charmbracelet/bubbletea` | TUI framework | Interactive picker |
-| `github.com/charmbracelet/bubbles` | TUI components | Text input widget |
-| `github.com/charmbracelet/lipgloss` | Terminal styling | Colors and tables |
-| `golang.org/x/term` | Terminal detection | TTY checking |
-
-### Internal Dependencies
-
-```
-cmd/overlord/main.go
-    └── internal/cmd (Execute)
-            └── github.com/spf13/cobra
-            └── github.com/spf13/viper
-
-internal/cmd/open.go
-    └── internal/registry (Load, Resolve)
-    └── github.com/charmbracelet/bubbletea
-    └── github.com/sahilm/fuzzy
-
-internal/cmd/new.go
-    └── internal/registry (Load, Save)
-    └── internal/templates (RenderTemplate)
-
-internal/registry/store.go
-    └── internal/registry/types.go (Registry, Project)
-    └── gopkg.in/yaml.v3
-
-internal/registry/resolve.go
-    └── internal/registry/types.go (Registry, Project)
-    └── github.com/sahilm/fuzzy
-
-internal/templates/templates.go
-    └── embed (go:embed)
-    └── text/template
-
-internal/machine/config.go
-    └── gopkg.in/yaml.v3
-    └── os (path expansion, hostname)
-
-internal/sync/rsync.go
-    └── os/exec (command execution)
-    └── bytes (output buffering)
-
-internal/sync/conflict.go
-    └── internal/sync/rsync.go (Rsync, RsyncOptions)
-    └── strings (output parsing)
-
-internal/gitops/git.go
-    └── os/exec (git commands)
-    └── strings (output parsing)
-
-internal/cmd/thoughts.go
-    └── os (file operations, stat, mkdir, rename, remove)
-    └── path/filepath (path manipulation)
-    └── strings (error checking)
-
-internal/cmd/archive.go
-    └── internal/cmd/thoughts.go (MoveThoughtsToArchive, UpdateProjectSymlinks)
-    └── internal/registry (Load, Save)
-
-internal/cmd/unarchive.go
-    └── internal/cmd/thoughts.go (MoveThoughtsFromArchive, UpdateProjectSymlinks)
-    └── internal/registry (Load, Save)
-```
-
-## Common Tasks
-
-### Adding a New Category
-
-1. Add constant to `internal/registry/types.go`:
-   ```go
-   const CategoryNewType Category = "new-type"
-   ```
-2. Update `ValidCategories()` function
-3. Update `IsValid()` switch statement
-4. Add path mapping in `Path()` method
-5. Update tests in `types_test.go`
-
-### Adding a New Language
-
-1. Add constant to `internal/registry/types.go`:
-   ```go
-   const LanguageNewLang Language = "new-lang"
-   ```
-2. Update `ValidLanguages()` function
-3. Update `IsValid()` switch statement
-4. Update tests in `types_test.go`
-
-### Adding a New Registry Field
-
-1. Add field to struct in `internal/registry/types.go`
-2. Add YAML tag: `` `yaml:"field_name"` ``
-3. Update `Validate()` method if validation needed
-4. Update tests in `types_test.go`
-5. Update example in `example_test.go`
-
-### Adding a New Cobra Command
-
-1. Create new file in `internal/cmd/` (e.g., `list.go`)
-2. Define command with `cobra.Command`
-3. Add command to root in `init()`: `rootCmd.AddCommand(listCmd)`
-4. Implement command logic
-5. Update Makefile if command needs a shortcut
-
-### Configuring Sync Exclusion Patterns
-
-**Global defaults (applies to all projects):**
-1. Edit `~/.config/overlord/registry.yaml`
-2. Add patterns to `settings.sync.default_exclude`:
-   ```yaml
-   settings:
-     sync:
-       default_exclude:
-         - node_modules
-         - .venv
-         - __pycache__
-         - .git
-   ```
-
-**Per-project exclusions (in addition to defaults):**
-1. Edit project entry in registry
-2. Add patterns to `sync.exclude`:
-   ```yaml
-   projects:
-     my-project:
-       sync:
-         status: active
-         exclude:
-           - .cache
-           - dist/
-           - build/
-   ```
-
-**Note:** Project-specific exclusions are additive to global defaults
+- Example tests in `example_test.go` for public APIs
 
 ## Do NOT
 
-### Architecture
 - Do NOT put business logic in `cmd/overlord/main.go` (only call Execute)
 - Do NOT skip validation before saving registry
 - Do NOT modify registry without going through Load/Save
 - Do NOT use global variables for registry state
-
-### Code Style
-- Do NOT use `panic()` for expected errors (return errors)
+- Do NOT use `panic()` for expected errors
 - Do NOT ignore errors (always check and handle)
-- Do NOT use `interface{}` without good reason (use concrete types)
+- Do NOT use `interface{}` without good reason
 - Do NOT mutate function parameters (return new values)
-
-### Registry Operations
-- Do NOT write registry without validation
 - Do NOT skip atomic write pattern (temp file + rename)
 - Do NOT skip backup before overwriting
-- Do NOT hardcode paths (use `expandPath` for ~ expansion)
-
-### Testing
+- Do NOT hardcode paths (use `registry.ExpandPath()` for ~ expansion)
 - Do NOT skip table-driven tests for validation
 - Do NOT test only happy paths (test error cases)
-- Do NOT use `t.Error` when `t.Fatal` is appropriate
-- Do NOT skip example tests for public APIs
+- Do NOT define inline styles in command files (use `NewStyles()`)
+- Do NOT duplicate registry load/save logic (use `loadRegistry()`, `saveRegistry()`)
+- Do NOT duplicate git commit logic (use `commitAndPushRegistry()`)
+- Do NOT use magic numbers (define named constants in `constants.go`)
+- Do NOT use `os.Exit()` outside main (propagate errors via return values)
+- Do NOT leave resource leaks (clean up partial files on failure)
+
+## Common Tasks
+
+### Adding a New Category
+1. Add constant to `internal/registry/types.go`
+2. Update `ValidCategories()` list
+3. Add path mapping to `categoryPaths` map
+4. Update tests in `types_test.go`
+
+### Adding a New Language
+1. Add constant to `internal/registry/types.go`
+2. Update `ValidLanguages()` list
+3. Update tests in `types_test.go`
+
+### Adding a New Registry Field
+1. Add field to struct in `internal/registry/types.go` with YAML tag
+2. Update `Validate()` if needed
+3. Update tests and examples
+
+### Adding a New Cobra Command
+1. Create file in `internal/cmd/`
+2. Define `cobra.Command`, add to root in `init()`
+3. Implement logic
+4. Update Makefile if needed
+
+## Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| `context` | Context threading for cancellation/timeout support |
+| `github.com/spf13/cobra` | CLI framework |
+| `github.com/spf13/viper` | Configuration |
+| `gopkg.in/yaml.v3` | YAML parsing |
+| `github.com/sahilm/fuzzy` | Fuzzy matching |
+| `github.com/charmbracelet/bubbletea` | TUI framework |
+| `github.com/charmbracelet/bubbles` | TUI components |
+| `github.com/charmbracelet/lipgloss` | Terminal styling |
+| `golang.org/x/term` | Terminal detection |
+
+## Environment Variables Management
+
+`internal/cmd/env.go` — manages environment variables via pass (password-store) integration.
+
+**`.env.pass` template format:**
+```
+# Secrets from pass
+API_KEY=pass:anthropic-api-key
+DB_URL=pass:project/db-url
+
+# Literal config
+NODE_ENV=development
+PORT=3000
+```
+
+**Commands:**
+- **`overlord env [project]`** — reads `.env.pass`, resolves `pass:` references, writes `.env` (0600 perms). Auto-detects project from cwd if no arg.
+- **`overlord env generate [project]`** — scans pass store, generates `.env.pass` with all entries. Converts `kebab-case` to `UPPER_SNAKE_CASE`. Refuses to overwrite without `--force`. Auto-run during `overlord new`.
+
+**Implementation notes:**
+- `listPassEntries()` walks `$PASSWORD_STORE_DIR` (or `~/.password-store`), returns sorted `.gpg` files
+- `passEntryToEnvVar()` converts pass entry names to env var names: `anthropic-api-key` → `ANTHROPIC_API_KEY`
+- `parseEnvPassFile()` parses template, `resolveEnvEntries()` fetches from pass, `atomicWriteEnvFile()` writes with 0600
+- Integrated into `overlord new` (step 2b) — generates `.env.pass` if pass store exists (best-effort)
 
 ## Makefile Commands
 
-**Worktree Management:**
 ```bash
-make worktree-new [BRANCH=name]     # Create worktree + tmux session
-make worktree-list                  # List worktrees
-make worktree-attach BRANCH=name    # Attach to session
-make worktree-remove BRANCH=name    # Remove worktree + kill session
-make worktree-archive BRANCH=name   # Archive logs from worktree
-make worktree-archive-remove BRANCH=name  # Archive logs then remove worktree
-make worktree-setup                 # Run .worktree-setup.sh in current directory
-```
-
-**Tmux Session Management:**
-```bash
-make worktree-sessions               # List tmux sessions for all worktrees
-```
-
-**Cross-Session Communication:**
-```bash
-make worktree-send BRANCH=x WINDOW=y CMD="z"   # Send command to worktree session window
-make worktree-read BRANCH=x WINDOW=y           # Read visible pane content from worktree
-```
-
-**Current Session Utilities (run from within tmux):**
-```bash
-make tmux-send WINDOW=x CMD="y"     # Send command to current session window
-make tmux-read WINDOW=x             # Read visible pane content from window
-make tmux-list                      # List all windows in current session
-```
-
-**Go Commands:**
-```bash
-make deps                           # Install dependencies (go mod download)
+# Build & Dev
 make build                          # Build the application
 make install                        # Build and install to ~/.local/bin
-make deploy [VPS=hostname]          # Cross-compile and deploy to VPS (default: poe-vps)
-make run                            # Run the application (go run .)
+make deploy [VPS=hostname]          # Cross-compile and deploy to VPS
 make test                           # Run tests (go test -v ./...)
-make bench                          # Run benchmarks
-make fmt                            # Format code (go fmt ./...)
-make vet                            # Vet code (go vet ./...)
-make clean                          # Clean build artifacts
-```
+make fmt                            # Format code
+make vet                            # Vet code
 
-**Overlord Commands:**
-```bash
+# Overlord
 make setup                          # Set up overlord directories and config
 make config                         # Open registry in editor
-make init [PATH=<path>] [LANG=go|py|ts|sol]  # Initialize directory with templates
-```
+make init [PATH=<path>] [LANG=go|py|ts|sol]  # Initialize with templates
 
-**Sync Commands:**
-```bash
+# Sync
 make activate NAME=<name>           # Activate sync for a project
 make sync [NAME=<name>]             # Sync all or specific project
 make sync DRY_RUN=1                 # Preview sync changes
 make sync FORCE=1                   # Force sync (skip conflict confirmation)
+make sync HOST=<name>               # Push to specific host (storage only)
 make deactivate NAME=<name>         # Deactivate sync for a project
-```
 
+# Environment Variables
+make env-pull [NAME=<name>]         # Pull .env from .env.pass template
+make env-generate [NAME=<name>]     # Generate .env.pass from pass store
+make env-generate FORCE=1           # Overwrite existing .env.pass
+
+# Worktree Management (via overlord commands)
+make wt-new [BRANCH=name]           # Create worktree + tmux session
+make wt-list                        # List worktrees
+make wt-attach BRANCH=name          # Attach to session
+make wt-remove BRANCH=name          # Remove worktree + kill session
+
+# Tmux (current session utilities)
+make tmux-send WINDOW=x CMD="y"     # Send to current session window
+make tmux-read WINDOW=x             # Read current session pane
+make tmux-list                      # List windows in current session
+```

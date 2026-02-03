@@ -1,6 +1,7 @@
 package gitops
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -56,93 +57,6 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestHasChanges(t *testing.T) {
-	tests := []struct {
-		name     string
-		setup    func(t *testing.T, dir string)
-		expected bool
-	}{
-		{
-			name: "no changes",
-			setup: func(t *testing.T, dir string) {
-				// Empty repo, no changes
-			},
-			expected: false,
-		},
-		{
-			name: "untracked file",
-			setup: func(t *testing.T, dir string) {
-				createTestFile(t, dir, "test.txt", "content")
-			},
-			expected: true,
-		},
-		{
-			name: "modified file",
-			setup: func(t *testing.T, dir string) {
-				// Create and commit a file
-				createTestFile(t, dir, "test.txt", "original")
-				cmd := exec.Command("git", "add", "test.txt")
-				cmd.Dir = dir
-				if err := cmd.Run(); err != nil {
-					t.Fatal(err)
-				}
-				commit := exec.Command("git", "commit", "-m", "initial")
-				commit.Dir = dir
-				if err := commit.Run(); err != nil {
-					t.Fatal(err)
-				}
-
-				// Modify the file
-				createTestFile(t, dir, "test.txt", "modified")
-			},
-			expected: true,
-		},
-		{
-			name: "staged changes",
-			setup: func(t *testing.T, dir string) {
-				createTestFile(t, dir, "test.txt", "content")
-				cmd := exec.Command("git", "add", "test.txt")
-				cmd.Dir = dir
-				if err := cmd.Run(); err != nil {
-					t.Fatal(err)
-				}
-			},
-			expected: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dir := setupTestRepo(t)
-			tt.setup(t, dir)
-
-			gitOps := New(dir)
-			hasChanges, err := gitOps.HasChanges()
-
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if hasChanges != tt.expected {
-				t.Errorf("expected hasChanges=%v, got %v", tt.expected, hasChanges)
-			}
-		})
-	}
-}
-
-func TestHasChanges_InvalidRepo(t *testing.T) {
-	gitOps := New("/nonexistent/path")
-	_, err := gitOps.HasChanges()
-
-	if err == nil {
-		t.Fatal("expected error for invalid repo, got nil")
-	}
-
-	if !strings.Contains(err.Error(), "failed to check git status") {
-		t.Errorf("expected error message about git status, got: %v", err)
-	}
-}
-
 func TestAdd(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -181,19 +95,20 @@ func TestAdd(t *testing.T) {
 			tt.setup(t, dir)
 
 			gitOps := New(dir)
-			err := gitOps.Add(tt.files...)
+			err := gitOps.Add(context.Background(), tt.files...)
 
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			// Verify files were staged
-			hasChanges, err := gitOps.HasChanges()
+			// Verify files were staged using git status --porcelain
+			cmd := exec.Command("git", "-C", dir, "status", "--porcelain")
+			output, err := cmd.CombinedOutput()
 			if err != nil {
 				t.Fatalf("failed to check changes: %v", err)
 			}
 
-			if !hasChanges {
+			if len(strings.TrimSpace(string(output))) == 0 {
 				t.Error("expected staged changes after add")
 			}
 		})
@@ -205,7 +120,7 @@ func TestAdd_InvalidFile(t *testing.T) {
 	gitOps := New(dir)
 
 	// Try to add a file that doesn't exist with pathspec
-	err := gitOps.Add("nonexistent.txt")
+	err := gitOps.Add(context.Background(), "nonexistent.txt")
 
 	// Git add with pathspec for nonexistent file should fail
 	if err == nil {
@@ -220,13 +135,13 @@ func TestCommit(t *testing.T) {
 	gitOps := New(dir)
 
 	// Stage the file
-	if err := gitOps.Add(); err != nil {
+	if err := gitOps.Add(context.Background()); err != nil {
 		t.Fatalf("failed to add file: %v", err)
 	}
 
 	// Commit
 	message := "test commit"
-	err := gitOps.Commit(message)
+	err := gitOps.Commit(context.Background(), message)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -253,7 +168,7 @@ func TestCommit_NothingToCommit(t *testing.T) {
 	gitOps := New(dir)
 
 	// Try to commit with no staged changes
-	err := gitOps.Commit("test")
+	err := gitOps.Commit(context.Background(), "test")
 
 	if err == nil {
 		t.Fatal("expected error for commit with no changes, got nil")
@@ -269,7 +184,7 @@ func TestPush_NoRemote(t *testing.T) {
 	gitOps := New(dir)
 
 	// Push should succeed (no-op) when there's no remote
-	err := gitOps.Push()
+	err := gitOps.Push(context.Background())
 
 	if err != nil {
 		t.Errorf("expected no error for push without remote, got: %v", err)
@@ -281,7 +196,7 @@ func TestPull_NoRemote(t *testing.T) {
 	gitOps := New(dir)
 
 	// Pull should succeed (no-op) when there's no remote
-	err := gitOps.Pull()
+	err := gitOps.Pull(context.Background())
 
 	if err != nil {
 		t.Errorf("expected no error for pull without remote, got: %v", err)
@@ -311,10 +226,10 @@ func TestPush_WithRemote(t *testing.T) {
 	gitOps := New(dir)
 
 	// Create a commit
-	if err := gitOps.Add(); err != nil {
+	if err := gitOps.Add(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := gitOps.Commit("test"); err != nil {
+	if err := gitOps.Commit(context.Background(), "test"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -337,14 +252,14 @@ func TestPush_WithRemote(t *testing.T) {
 
 	// Now test our Push method
 	createTestFile(t, dir, "test2.txt", "content2")
-	if err := gitOps.Add(); err != nil {
+	if err := gitOps.Add(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := gitOps.Commit("second commit"); err != nil {
+	if err := gitOps.Commit(context.Background(), "second commit"); err != nil {
 		t.Fatal(err)
 	}
 
-	err := gitOps.Push()
+	err := gitOps.Push(context.Background())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -370,10 +285,10 @@ func TestPull_WithRemote(t *testing.T) {
 	}
 
 	gitOps1 := New(dir1)
-	if err := gitOps1.Add(); err != nil {
+	if err := gitOps1.Add(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := gitOps1.Commit("initial"); err != nil {
+	if err := gitOps1.Commit(context.Background(), "initial"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -416,19 +331,19 @@ func TestPull_WithRemote(t *testing.T) {
 
 	// Make a change in first repo and push
 	createTestFile(t, dir1, "test2.txt", "content2")
-	if err := gitOps1.Add(); err != nil {
+	if err := gitOps1.Add(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := gitOps1.Commit("second"); err != nil {
+	if err := gitOps1.Commit(context.Background(), "second"); err != nil {
 		t.Fatal(err)
 	}
-	if err := gitOps1.Push(); err != nil {
+	if err := gitOps1.Push(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
 	// Pull in second repo
 	gitOps2 := New(dir2)
-	err := gitOps2.Pull()
+	err := gitOps2.Pull(context.Background())
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -442,7 +357,7 @@ func TestPull_WithRemote(t *testing.T) {
 
 func TestPush_InvalidRepo(t *testing.T) {
 	gitOps := New("/nonexistent/path")
-	err := gitOps.Push()
+	err := gitOps.Push(context.Background())
 
 	if err == nil {
 		t.Fatal("expected error for invalid repo, got nil")
@@ -455,7 +370,7 @@ func TestPush_InvalidRepo(t *testing.T) {
 
 func TestPull_InvalidRepo(t *testing.T) {
 	gitOps := New("/nonexistent/path")
-	err := gitOps.Pull()
+	err := gitOps.Pull(context.Background())
 
 	if err == nil {
 		t.Fatal("expected error for invalid repo, got nil")
@@ -463,5 +378,146 @@ func TestPull_InvalidRepo(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "failed to check git remote") {
 		t.Errorf("expected error message about git remote, got: %v", err)
+	}
+}
+
+func TestNew_WithEnv(t *testing.T) {
+	gitOps := New("/test/repo")
+	gitOps.Env = []string{"GIT_SSH_COMMAND=ssh -o ControlMaster=auto"}
+
+	if gitOps.RepoPath != "/test/repo" {
+		t.Errorf("expected RepoPath %q, got %q", "/test/repo", gitOps.RepoPath)
+	}
+
+	if len(gitOps.Env) != 1 {
+		t.Fatalf("expected 1 env var, got %d", len(gitOps.Env))
+	}
+
+	if gitOps.Env[0] != "GIT_SSH_COMMAND=ssh -o ControlMaster=auto" {
+		t.Errorf("expected GIT_SSH_COMMAND env, got %q", gitOps.Env[0])
+	}
+}
+
+func TestEnv_DefaultNil(t *testing.T) {
+	gitOps := New("/test/repo")
+
+	if gitOps.Env != nil {
+		t.Errorf("expected nil Env by default, got %v", gitOps.Env)
+	}
+}
+
+func TestPush_WithEnv_NoRemote(t *testing.T) {
+	// Push with Env set should still work when there's no remote (no-op)
+	dir := setupTestRepo(t)
+	gitOps := New(dir)
+	gitOps.Env = []string{"GIT_SSH_COMMAND=ssh -o ControlMaster=auto"}
+
+	err := gitOps.Push(context.Background())
+	if err != nil {
+		t.Errorf("expected no error for push without remote with Env, got: %v", err)
+	}
+}
+
+func TestPull_WithEnv_NoRemote(t *testing.T) {
+	// Pull with Env set should still work when there's no remote (no-op)
+	dir := setupTestRepo(t)
+	gitOps := New(dir)
+	gitOps.Env = []string{"GIT_SSH_COMMAND=ssh -o ControlMaster=auto"}
+
+	err := gitOps.Pull(context.Background())
+	if err != nil {
+		t.Errorf("expected no error for pull without remote with Env, got: %v", err)
+	}
+}
+
+func TestHasUsableRemote(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(t *testing.T) string
+		expected bool
+	}{
+		{
+			name: "not a git repo",
+			setup: func(t *testing.T) string {
+				return t.TempDir()
+			},
+			expected: false,
+		},
+		{
+			name: "nonexistent path",
+			setup: func(t *testing.T) string {
+				return "/nonexistent/path/that/does/not/exist"
+			},
+			expected: false,
+		},
+		{
+			name: "git repo without remote",
+			setup: func(t *testing.T) string {
+				return setupTestRepo(t)
+			},
+			expected: false,
+		},
+		{
+			name: "git repo with remote URL",
+			setup: func(t *testing.T) string {
+				dir := setupTestRepo(t)
+				addRemote := exec.Command("git", "remote", "add", "origin", "git@github.com:user/repo.git")
+				addRemote.Dir = dir
+				if err := addRemote.Run(); err != nil {
+					t.Fatalf("failed to add remote: %v", err)
+				}
+				return dir
+			},
+			expected: true,
+		},
+		{
+			name: "git repo with local bare remote",
+			setup: func(t *testing.T) string {
+				// Create a bare repo as remote
+				remoteDir := t.TempDir()
+				initBare := exec.Command("git", "init", "--bare")
+				initBare.Dir = remoteDir
+				if err := initBare.Run(); err != nil {
+					t.Fatalf("failed to create bare repo: %v", err)
+				}
+
+				dir := setupTestRepo(t)
+				addRemote := exec.Command("git", "remote", "add", "origin", remoteDir)
+				addRemote.Dir = dir
+				if err := addRemote.Run(); err != nil {
+					t.Fatalf("failed to add remote: %v", err)
+				}
+				return dir
+			},
+			expected: true,
+		},
+		{
+			name: "git repo with multiple remotes",
+			setup: func(t *testing.T) string {
+				dir := setupTestRepo(t)
+				addOrigin := exec.Command("git", "remote", "add", "origin", "git@github.com:user/repo.git")
+				addOrigin.Dir = dir
+				if err := addOrigin.Run(); err != nil {
+					t.Fatalf("failed to add origin: %v", err)
+				}
+				addUpstream := exec.Command("git", "remote", "add", "upstream", "git@github.com:upstream/repo.git")
+				addUpstream.Dir = dir
+				if err := addUpstream.Run(); err != nil {
+					t.Fatalf("failed to add upstream: %v", err)
+				}
+				return dir
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := tt.setup(t)
+			got := HasUsableRemote(path)
+			if got != tt.expected {
+				t.Errorf("HasUsableRemote(%q) = %v, want %v", path, got, tt.expected)
+			}
+		})
 	}
 }

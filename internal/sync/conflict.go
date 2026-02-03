@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
@@ -62,17 +63,9 @@ func (c *Conflict) Validate() error {
 	return nil
 }
 
-// DetectConflicts detects file conflicts between local and remote paths
-// It uses rsync dry-run in both directions to identify differences
-//
-// Algorithm:
-// 1. Run rsync dry-run local→remote (what local would push)
-// 2. Run rsync dry-run remote→local (what remote would pull)
-// 3. Parse outputs to get list of files that would change each direction
-// 4. Files in both lists = potential conflict (both modified)
-// 5. Files only in push list = local-only changes
-// 6. Files only in pull list = remote-only changes
-func DetectConflicts(localPath, remoteHost, remotePath string, excludes []string) ([]Conflict, error) {
+// DetectConflictsWithSSH detects file conflicts with an optional custom SSH command.
+// sshCommand is passed to rsync via -e for SSH multiplexing (empty string uses default SSH).
+func DetectConflictsWithSSH(ctx context.Context, localPath, remoteHost, remotePath string, excludes []string, sshCommand string) ([]Conflict, error) {
 	if localPath == "" {
 		return nil, fmt.Errorf("local path is required")
 	}
@@ -89,22 +82,24 @@ func DetectConflicts(localPath, remoteHost, remotePath string, excludes []string
 	remote := FormatRemotePath(remoteHost, remotePath)
 
 	// Run dry-run local→remote (push)
-	pushOutput, err := rsync.DryRun(RsyncOptions{
-		Source:   localPath,
-		Dest:     remote,
-		Excludes: excludes,
-		DryRun:   true,
+	pushOutput, err := rsync.DryRun(ctx, RsyncOptions{
+		Source:     localPath,
+		Dest:       remote,
+		Excludes:   excludes,
+		DryRun:     true,
+		SSHCommand: sshCommand,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to run push dry-run: %w", err)
 	}
 
 	// Run dry-run remote→local (pull)
-	pullOutput, err := rsync.DryRun(RsyncOptions{
-		Source:   remote,
-		Dest:     localPath,
-		Excludes: excludes,
-		DryRun:   true,
+	pullOutput, err := rsync.DryRun(ctx, RsyncOptions{
+		Source:     remote,
+		Dest:       localPath,
+		Excludes:   excludes,
+		DryRun:     true,
+		SSHCommand: sshCommand,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to run pull dry-run: %w", err)
@@ -226,9 +221,9 @@ func detectConflictsFromFileLists(pushFiles, pullFiles []string) []Conflict {
 	return conflicts
 }
 
-// DetectConflictsWithRsync detects conflicts using a custom Rsync instance
-// This is useful for testing with mocked rsync
-func DetectConflictsWithRsync(rsync *Rsync, localPath, remoteHost, remotePath string, excludes []string) ([]Conflict, error) {
+// DetectConflictsWithRsyncSSH detects conflicts using a custom Rsync instance and optional SSH command.
+// sshCommand is passed to rsync via -e for SSH multiplexing (empty string uses default SSH).
+func DetectConflictsWithRsyncSSH(ctx context.Context, rsync *Rsync, localPath, remoteHost, remotePath string, excludes []string, sshCommand string) ([]Conflict, error) {
 	if localPath == "" {
 		return nil, fmt.Errorf("local path is required")
 	}
@@ -243,22 +238,24 @@ func DetectConflictsWithRsync(rsync *Rsync, localPath, remoteHost, remotePath st
 	remote := FormatRemotePath(remoteHost, remotePath)
 
 	// Run dry-run local→remote (push)
-	pushOutput, err := rsync.DryRun(RsyncOptions{
-		Source:   localPath,
-		Dest:     remote,
-		Excludes: excludes,
-		DryRun:   true,
+	pushOutput, err := rsync.DryRun(ctx, RsyncOptions{
+		Source:     localPath,
+		Dest:       remote,
+		Excludes:   excludes,
+		DryRun:     true,
+		SSHCommand: sshCommand,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to run push dry-run: %w", err)
 	}
 
 	// Run dry-run remote→local (pull)
-	pullOutput, err := rsync.DryRun(RsyncOptions{
-		Source:   remote,
-		Dest:     localPath,
-		Excludes: excludes,
-		DryRun:   true,
+	pullOutput, err := rsync.DryRun(ctx, RsyncOptions{
+		Source:     remote,
+		Dest:       localPath,
+		Excludes:   excludes,
+		DryRun:     true,
+		SSHCommand: sshCommand,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to run pull dry-run: %w", err)

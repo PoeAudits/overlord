@@ -15,6 +15,9 @@ import (
 	"github.com/PoeAudits/overlord/internal/registry"
 )
 
+// DefaultConfigRepoURL is the default git remote for the registry config repository.
+const DefaultConfigRepoURL = "git@github.com:PoeAudits/overlord-config.git"
+
 var setupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Set up overlord directories and configuration",
@@ -64,9 +67,9 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	}
 
 	// Step 4: Load or create registry
-	reg, err := registry.Load(registry.DefaultRegistryPath)
+	reg, err := loadRegistry()
 	if err != nil {
-		return fmt.Errorf("failed to load registry: %w", err)
+		return err
 	}
 
 	// Expand paths from settings
@@ -99,8 +102,8 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	}
 
 	// Save registry (creates it if it doesn't exist)
-	if err := registry.Save(registry.DefaultRegistryPath, reg); err != nil {
-		return fmt.Errorf("failed to save registry: %w", err)
+	if err := saveRegistry(reg); err != nil {
+		return err
 	}
 	fmt.Printf("  Registry: %s\n", registry.DefaultRegistryPath)
 
@@ -145,13 +148,21 @@ func setupGitRepo(configDir string) error {
 		return nil
 	}
 
-	// Ask for remote URL
-	fmt.Printf("  Git remote URL (leave empty for local-only): ")
+	// Ask for remote URL (default to config repo)
+	fmt.Printf("  Git remote URL (enter 'none' for local-only)\n")
+	fmt.Printf("  [%s]: ", DefaultConfigRepoURL)
 	remoteURL, err := reader.ReadString('\n')
 	if err != nil {
 		return fmt.Errorf("failed to read input: %w", err)
 	}
 	remoteURL = strings.TrimSpace(remoteURL)
+
+	// Use default if empty, skip if "none"
+	if remoteURL == "" {
+		remoteURL = DefaultConfigRepoURL
+	} else if strings.ToLower(remoteURL) == "none" {
+		remoteURL = ""
+	}
 
 	// Check if config directory exists and is empty (can clone directly)
 	dirExists := false
@@ -339,6 +350,54 @@ func setupMachineConfig(configDir string) error {
 				}
 				fmt.Println("  Storage host cannot be empty.")
 			}
+		} else {
+			// Storage role - optionally add working-set hosts
+			fmt.Printf("\n  Add working-set hosts? [y/N]: ")
+			wsResponse, err := reader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("failed to read input: %w", err)
+			}
+			wsResponse = strings.TrimSpace(strings.ToLower(wsResponse))
+
+			if wsResponse == "y" || wsResponse == "yes" {
+				config.WorkingSetHosts = make(map[string]string)
+				for {
+					fmt.Printf("  Working-set name (e.g. laptop): ")
+					wsName, err := reader.ReadString('\n')
+					if err != nil {
+						return fmt.Errorf("failed to read input: %w", err)
+					}
+					wsName = strings.TrimSpace(wsName)
+					if wsName == "" {
+						fmt.Println("  Name cannot be empty.")
+						continue
+					}
+
+					fmt.Printf("  Working-set host/IP (e.g. root@10.0.0.1): ")
+					wsHost, err := reader.ReadString('\n')
+					if err != nil {
+						return fmt.Errorf("failed to read input: %w", err)
+					}
+					wsHost = strings.TrimSpace(wsHost)
+					if wsHost == "" {
+						fmt.Println("  Host/IP cannot be empty.")
+						continue
+					}
+
+					config.WorkingSetHosts[wsName] = wsHost
+					fmt.Printf("  Added: %s -> %s\n", wsName, wsHost)
+
+					fmt.Printf("  Add another? [y/N]: ")
+					another, err := reader.ReadString('\n')
+					if err != nil {
+						return fmt.Errorf("failed to read input: %w", err)
+					}
+					another = strings.TrimSpace(strings.ToLower(another))
+					if another != "y" && another != "yes" {
+						break
+					}
+				}
+			}
 		}
 	} else {
 		fmt.Println("  Non-interactive terminal detected, defaulting to storage role")
@@ -354,6 +413,12 @@ func setupMachineConfig(configDir string) error {
 	fmt.Printf("  Role:    %s\n", config.Role)
 	if config.StorageHost != "" {
 		fmt.Printf("  Storage: %s\n", config.StorageHost)
+	}
+	if len(config.WorkingSetHosts) > 0 {
+		fmt.Printf("  Working-set hosts:\n")
+		for name, host := range config.WorkingSetHosts {
+			fmt.Printf("    %s: %s\n", name, host)
+		}
 	}
 
 	return nil

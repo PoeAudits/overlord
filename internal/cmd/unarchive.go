@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
@@ -68,15 +67,11 @@ func (m categoryPickerModel) View() string {
 	var b strings.Builder
 
 	// Styles
-	cyan := lipgloss.Color("86")
-	green := lipgloss.Color("82")
-	gray := lipgloss.Color("245")
-	white := lipgloss.Color("255")
-
-	promptStyle := lipgloss.NewStyle().Foreground(cyan).Bold(true)
-	selectedStyle := lipgloss.NewStyle().Foreground(green).Bold(true)
-	normalStyle := lipgloss.NewStyle().Foreground(white)
-	helpStyle := lipgloss.NewStyle().Foreground(gray)
+	s := NewStyles()
+	promptStyle := s.Prompt
+	selectedStyle := s.Selected
+	normalStyle := s.Name
+	helpStyle := s.Desc
 
 	// Header
 	b.WriteString(promptStyle.Render("Select category:"))
@@ -129,9 +124,9 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 	projectName := args[0]
 
 	// Load registry
-	reg, err := registry.Load(registry.DefaultRegistryPath)
+	reg, err := loadRegistry()
 	if err != nil {
-		return fmt.Errorf("failed to load registry: %w", err)
+		return err
 	}
 
 	// Resolve project name (support aliases)
@@ -205,23 +200,13 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create target directory: %w", err)
 	}
 
-	// Move directory (try rename first, fallback to copy+delete for cross-filesystem)
-	if err := os.Rename(sourcePath, targetPath); err != nil {
-		// Check if it's a cross-device link error
-		if strings.Contains(err.Error(), "cross-device") || strings.Contains(err.Error(), "invalid cross-device link") {
-			fmt.Println("Cross-filesystem move detected, copying files...")
-			if err := copyDirectory(sourcePath, targetPath); err != nil {
-				return fmt.Errorf("failed to copy directory: %w", err)
-			}
-
-			// Remove source after successful copy
-			if err := os.RemoveAll(sourcePath); err != nil {
-				return fmt.Errorf("failed to remove source directory after copy: %w", err)
-			}
-		} else {
-			return fmt.Errorf("failed to move directory: %w", err)
-		}
+	// Move directory
+	if err := moveDirectory(sourcePath, targetPath); err != nil {
+		return fmt.Errorf("failed to move directory: %w", err)
 	}
+
+	// Define styles for output
+	s := NewStyles()
 
 	// Restore thoughts directories from archive (secondary operation - warn on failure, don't fail unarchive)
 	thoughtsDir := reg.Settings.ThoughtsDir
@@ -231,8 +216,7 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 	thoughtsWarnings, err = MoveThoughtsFromArchive(thoughtsDir, resolvedName)
 	if err != nil {
 		// Thoughts restore failed - warn but continue (project unarchive succeeded)
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
-		fmt.Printf("%s Failed to restore thoughts directories: %v\n", warnStyle.Render("Warning:"), err)
+		fmt.Printf("%s Failed to restore thoughts directories: %v\n", s.StrongWarn.Render("Warning:"), err)
 	} else {
 		// Check if any thoughts were actually restored (not just warnings about missing archive)
 		// If archive didn't exist, we still need to update symlinks if thoughts exist in main location
@@ -246,7 +230,7 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 	}
 
 	// Update symlinks in the restored thoughts projects directory
-	expandedThoughtsDir, expandErr := expandPath(thoughtsDir)
+	expandedThoughtsDir, expandErr := registry.ExpandPath(thoughtsDir)
 	if expandErr == nil {
 		thoughtsPaths := GetThoughtsPaths(expandedThoughtsDir, resolvedName)
 		// Check if thoughts projects directory exists (either restored or pre-existing)
@@ -267,18 +251,13 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 	reg.Projects[resolvedName] = project
 
 	// Save registry
-	if err := registry.Save(registry.DefaultRegistryPath, reg); err != nil {
-		return fmt.Errorf("failed to save registry: %w", err)
+	if err := saveRegistry(reg); err != nil {
+		return err
 	}
 
-	// Define styles for output
-	cyan := lipgloss.Color("86")
-	green := lipgloss.Color("82")
-	gray := lipgloss.Color("245")
-
-	labelStyle := lipgloss.NewStyle().Foreground(cyan).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(green).Bold(true)
-	pathStyle := lipgloss.NewStyle().Foreground(gray)
+	labelStyle := s.Label
+	successStyle := s.Success
+	pathStyle := s.Path
 
 	// Print success message
 	fmt.Printf("%s '%s' to category '%s'\n",
@@ -296,9 +275,8 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 
 	// Print any warnings from thoughts restore
 	if len(thoughtsWarnings) > 0 {
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
 		for _, warning := range thoughtsWarnings {
-			fmt.Printf("%s %s\n", warnStyle.Render("Warning:"), warning)
+			fmt.Printf("%s %s\n", s.StrongWarn.Render("Warning:"), warning)
 		}
 		fmt.Println()
 	}

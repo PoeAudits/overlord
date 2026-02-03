@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 func TestRoleIsValid(t *testing.T) {
@@ -87,6 +89,43 @@ func TestMachineConfigValidate(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "storage_host should not be set for storage role",
+		},
+		{
+			name: "storage with valid working_set_hosts",
+			config: MachineConfig{
+				Name: "desktop",
+				Role: RoleStorage,
+				WorkingSetHosts: map[string]string{
+					"poe-vps": "100.100.74.127",
+					"laptop":  "192.168.1.50",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "working-set with working_set_hosts set",
+			config: MachineConfig{
+				Name:        "laptop",
+				Role:        RoleWorkingSet,
+				StorageHost: "storage.local",
+				WorkingSetHosts: map[string]string{
+					"poe-vps": "100.100.74.127",
+				},
+			},
+			wantErr: true,
+			errMsg:  "working_set_hosts should not be set for working-set role",
+		},
+		{
+			name: "storage with empty host value in map",
+			config: MachineConfig{
+				Name: "desktop",
+				Role: RoleStorage,
+				WorkingSetHosts: map[string]string{
+					"poe-vps": "",
+				},
+			},
+			wantErr: true,
+			errMsg:  "working_set_hosts value for \"poe-vps\" cannot be empty",
 		},
 	}
 
@@ -240,6 +279,45 @@ func TestSave(t *testing.T) {
 		}
 		if loaded.StorageHost != original.StorageHost {
 			t.Errorf("StorageHost = %v, want %v", loaded.StorageHost, original.StorageHost)
+		}
+	})
+
+	t.Run("round trip with working_set_hosts", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		configPath := filepath.Join(dir, "machine.yaml")
+
+		original := &MachineConfig{
+			Name: "storage-roundtrip",
+			Role: RoleStorage,
+			WorkingSetHosts: map[string]string{
+				"poe-vps": "100.100.74.127",
+				"laptop":  "192.168.1.50",
+			},
+		}
+
+		if err := Save(configPath, original); err != nil {
+			t.Fatalf("Save() error = %v, want nil", err)
+		}
+
+		loaded, err := Load(configPath)
+		if err != nil {
+			t.Fatalf("Load() error = %v, want nil", err)
+		}
+
+		if loaded.Name != original.Name {
+			t.Errorf("Name = %v, want %v", loaded.Name, original.Name)
+		}
+		if loaded.Role != original.Role {
+			t.Errorf("Role = %v, want %v", loaded.Role, original.Role)
+		}
+		if len(loaded.WorkingSetHosts) != len(original.WorkingSetHosts) {
+			t.Fatalf("WorkingSetHosts length = %d, want %d", len(loaded.WorkingSetHosts), len(original.WorkingSetHosts))
+		}
+		for name, host := range original.WorkingSetHosts {
+			if loaded.WorkingSetHosts[name] != host {
+				t.Errorf("WorkingSetHosts[%s] = %v, want %v", name, loaded.WorkingSetHosts[name], host)
+			}
 		}
 	})
 }
@@ -421,13 +499,13 @@ func TestExpandPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := expandPath(tt.path)
+			result, err := registry.ExpandPath(tt.path)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("expandPath() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("registry.ExpandPath() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && result != tt.expected {
-				t.Errorf("expandPath() = %v, want %v", result, tt.expected)
+				t.Errorf("registry.ExpandPath() = %v, want %v", result, tt.expected)
 			}
 		})
 	}

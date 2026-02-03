@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/PoeAudits/overlord/internal/registry"
@@ -15,27 +14,32 @@ import (
 
 // addFlags holds the flags for the add command
 type addFlags struct {
+	name        string
 	category    string
 	description string
 	aliases     []string
 	// Language shorthand flags
-	langPy  bool
-	langTs  bool
-	langGo  bool
-	langSol bool
+	langPy   bool
+	langTs   bool
+	langGo   bool
+	langSol  bool
+	langBase bool
 }
 
 var addOpts addFlags
 
 // addCmd represents the add command
 var addCmd = &cobra.Command{
-	Use:   "add <name> <path>",
+	Use:   "add [path]",
 	Short: "Register an existing project directory in the registry",
 	Long: `Register an existing project directory in the registry.
 
+The project name is derived from the directory name by default.
+Use --name to override.
+
 The command will:
   - Validate the project path exists
-  - Auto-detect language from project files (or use --py/--ts/--go/--sol)
+  - Auto-detect language from project files (or use --py/--ts/--go/--sol/--base)
   - Auto-detect category from path (or use --category)
   - Create thoughts directories with symlinks
   - Register project in registry
@@ -45,25 +49,80 @@ Language auto-detection checks for:
   - pyproject.toml or requirements.txt → Python
   - package.json → TypeScript
   - foundry.toml or hardhat.config.* → Solidity
-  - Default: base
+  - Errors if no markers found (use --base for language-agnostic projects)
 
-Category auto-detection (if path is under ~/Overlord/):
-  - ~/Overlord/projects/contracts/ → contracts
-  - ~/Overlord/projects/web/ → web
-  - ~/Overlord/projects/services/ → services
-  - etc.
+Category auto-detection requires the project to be under the base directory
+(~/Overlord/ by default). The category is inferred from the subdirectory.
 
 Examples:
-  overlord add my-api ~/Overlord/projects/services/my-api
-  overlord add my-app ./my-app --category=web --ts
-  overlord add my-lib ../my-lib --py --description="Python library"
-  overlord add my-contract ~/contracts/my-contract --sol --alias=mc`,
-	Args: cobra.ExactArgs(2),
-	RunE: runAdd,
+  overlord add                            # Add current directory
+  overlord add .                          # Same as above
+  overlord add ../my-project              # Add relative path
+  overlord add ~/Overlord/projects/web/x  # Add absolute path
+  overlord add --name=custom-name         # Override derived name
+  overlord add --py                       # Specify language explicitly
+  overlord add . --alias=mp               # Add with alias
+  overlord add my-api ~/path/to/api       # Legacy: explicit name + path`,
+	Args:    cobra.RangeArgs(0, 2),
+	PreRunE: validateAddFlags,
+	RunE:    runAdd,
+}
+
+// formatAddUsage returns a helpful usage string for the add command
+func formatAddUsage() string {
+	validCats := make([]string, 0, len(registry.ValidCategories()))
+	for _, c := range registry.ValidCategories() {
+		validCats = append(validCats, string(c))
+	}
+
+	return fmt.Sprintf(`Usage: overlord add [path] [options]
+       overlord add <name> <path>   (legacy two-argument form)
+
+The project name is derived from the directory name by default.
+
+Categories (auto-detected from path, or use --category):
+  %s
+
+Language flags (auto-detected, or specify one):
+  --py    Python
+  --ts    TypeScript
+  --go    Go
+  --sol   Solidity
+  --base  Language-agnostic
+
+Options:
+  --name="..."          Override auto-detected project name
+  --description="..."   Project description
+  --alias=<name>        Add alias (can be repeated)
+  --category=<cat>      Override auto-detected category
+
+Examples:
+  overlord add                          # Add current directory
+  overlord add .                        # Same as above
+  overlord add --name=custom --py       # Custom name, Python
+  overlord add ../my-lib --sol          # Relative path, Solidity`, strings.Join(validCats, ", "))
+}
+
+// validateAddFlags validates flags and provides helpful error messages
+func validateAddFlags(cmd *cobra.Command, args []string) error {
+	// Check that only one language flag is set
+	if countTrue(addOpts.langPy, addOpts.langTs, addOpts.langGo, addOpts.langSol, addOpts.langBase) > 1 {
+		return fmt.Errorf("only one language flag can be set (--py, --ts, --go, --sol, or --base)")
+	}
+
+	// Warn if --name is provided with 2 args (name comes from first arg)
+	if addOpts.name != "" && len(args) == 2 {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: --name is ignored when using two-argument form (name comes from first argument)\n")
+	}
+
+	return nil
 }
 
 func init() {
 	rootCmd.AddCommand(addCmd)
+
+	// Name override flag
+	addCmd.Flags().StringVar(&addOpts.name, "name", "", "Override auto-detected project name")
 
 	// Category flag
 	addCmd.Flags().StringVar(&addOpts.category, "category", "", "Project category (auto-detect if not specified)")
@@ -79,10 +138,12 @@ func init() {
 	addCmd.Flags().BoolVar(&addOpts.langTs, "ts", false, "Use TypeScript language")
 	addCmd.Flags().BoolVar(&addOpts.langGo, "go", false, "Use Go language")
 	addCmd.Flags().BoolVar(&addOpts.langSol, "sol", false, "Use Solidity language")
+	addCmd.Flags().BoolVar(&addOpts.langBase, "base", false, "Use base (language-agnostic)")
 }
 
-// detectLanguage detects the language from project files
-func detectLanguage(projectPath string) registry.Language {
+// detectLanguage detects the language from project files.
+// Returns an error if no recognized language marker files are found.
+func detectLanguage(projectPath string) (registry.Language, error) {
 	// Check for language-specific files
 	checks := []struct {
 		files []string
@@ -97,32 +158,31 @@ func detectLanguage(projectPath string) registry.Language {
 	for _, check := range checks {
 		for _, file := range check.files {
 			if _, err := os.Stat(filepath.Join(projectPath, file)); err == nil {
-				return check.lang
+				return check.lang, nil
 			}
 		}
 	}
 
-	return registry.LanguageBase
+	return "", fmt.Errorf("could not auto-detect language in %s\nNo recognized files found (go.mod, pyproject.toml, package.json, foundry.toml)\nSpecify: --py, --ts, --go, --sol, or --base", projectPath)
 }
 
-// detectCategory detects the category from the project path
+// detectCategory detects the category from the project path.
+// Both projectPath and baseDir should already be expanded/absolute paths.
 func detectCategory(projectPath, baseDir string) (registry.Category, error) {
-	// Expand both paths for comparison
-	expandedPath, err := expandPath(projectPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to expand project path: %w", err)
-	}
-
-	expandedBase, err := expandPath(baseDir)
-	if err != nil {
-		return "", fmt.Errorf("failed to expand base directory: %w", err)
-	}
-
 	// Check if path is under base directory
-	relPath, err := filepath.Rel(expandedBase, expandedPath)
+	relPath, err := filepath.Rel(baseDir, projectPath)
 	if err != nil || strings.HasPrefix(relPath, "..") {
-		// Path is not under base directory
-		return "", fmt.Errorf("cannot auto-detect category: path is not under base directory (%s)", baseDir)
+		// Build helpful error listing all category paths
+		var sb strings.Builder
+		sb.WriteString(fmt.Sprintf("cannot auto-detect category: path is not under base directory\n"))
+		sb.WriteString(fmt.Sprintf("  Path:     %s\n", projectPath))
+		sb.WriteString(fmt.Sprintf("  Base dir: %s\n\n", baseDir))
+		sb.WriteString("Projects must be under one of:\n")
+		for _, cat := range registry.ValidCategories() {
+			sb.WriteString(fmt.Sprintf("  %s%-30s → %s\n", baseDir+"/", cat.Path(), string(cat)))
+		}
+		sb.WriteString(fmt.Sprintf("\nOr specify manually: --category=<category>"))
+		return "", fmt.Errorf("%s", sb.String())
 	}
 
 	// Try to match category from path
@@ -133,7 +193,16 @@ func detectCategory(projectPath, baseDir string) (registry.Category, error) {
 		}
 	}
 
-	return "", fmt.Errorf("cannot auto-detect category from path, please specify --category")
+	// Path is under base dir but doesn't match any known category subdirectory
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("cannot auto-detect category from path\n"))
+	sb.WriteString(fmt.Sprintf("  Path (relative): %s\n\n", relPath))
+	sb.WriteString("Expected subdirectory structure:\n")
+	for _, cat := range registry.ValidCategories() {
+		sb.WriteString(fmt.Sprintf("  %-30s → %s\n", cat.Path(), string(cat)))
+	}
+	sb.WriteString(fmt.Sprintf("\nOr specify manually: --category=<category>"))
+	return "", fmt.Errorf("%s", sb.String())
 }
 
 // getLanguageFromFlags determines the language from flags
@@ -147,6 +216,8 @@ func getLanguageFromFlags() (registry.Language, bool) {
 		return registry.LanguageGo, true
 	case addOpts.langSol:
 		return registry.LanguageSolidity, true
+	case addOpts.langBase:
+		return registry.LanguageBase, true
 	default:
 		return "", false
 	}
@@ -203,20 +274,54 @@ func createThoughtsStructure(name, projectPath, thoughtsDir string) error {
 	return nil
 }
 
+// resolveAddArgs resolves the project name and path from command arguments and flags.
+//
+//	0 args: path = ".", name = basename(cwd)
+//	1 arg:  path = args[0], name = basename(resolved path)
+//	2 args: name = args[0], path = args[1]  (legacy backward-compatible form)
+//
+// The --name flag overrides the auto-derived name in the 0/1-arg modes.
+func resolveAddArgs(args []string) (name, projectPath string, err error) {
+	switch len(args) {
+	case 0:
+		projectPath = "."
+	case 1:
+		projectPath = args[0]
+	case 2:
+		// Legacy two-argument form: overlord add <name> <path>
+		return args[0], args[1], nil
+	}
+
+	// Resolve to absolute to derive a stable directory name
+	expanded, err := registry.ExpandPath(projectPath)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to resolve path: %w", err)
+	}
+
+	// Derive name from directory basename
+	name = filepath.Base(expanded)
+
+	// --name flag overrides
+	if addOpts.name != "" {
+		name = addOpts.name
+	}
+
+	return name, projectPath, nil
+}
+
 func runAdd(cmd *cobra.Command, args []string) error {
-	name := args[0]
-	projectPath := args[1]
+	// Resolve name and path from args
+	name, projectPath, err := resolveAddArgs(args)
+	if err != nil {
+		return err
+	}
 
 	// Define styles for output
-	cyan := lipgloss.Color("86")
-	green := lipgloss.Color("82")
-	yellow := lipgloss.Color("220")
-	gray := lipgloss.Color("245")
-
-	labelStyle := lipgloss.NewStyle().Foreground(cyan).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(green).Bold(true)
-	warnStyle := lipgloss.NewStyle().Foreground(yellow)
-	pathStyle := lipgloss.NewStyle().Foreground(gray)
+	s := NewStyles()
+	labelStyle := s.Label
+	successStyle := s.Success
+	warnStyle := s.Warn
+	pathStyle := s.Path
 
 	// Validate name
 	if err := validateName(name); err != nil {
@@ -224,35 +329,40 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Expand and validate project path
-	expandedPath, err := expandPath(projectPath)
+	expandedPath, err := registry.ExpandPath(projectPath)
 	if err != nil {
 		return fmt.Errorf("failed to expand project path: %w", err)
 	}
 
 	// Check if directory exists
 	if _, err := os.Stat(expandedPath); os.IsNotExist(err) {
-		return fmt.Errorf("Error: project directory does not exist\nPath: %s\nUse 'overlord new' to create a new project", expandedPath)
+		return fmt.Errorf("project directory does not exist: %s\nUse 'overlord new' to create a new project", expandedPath)
 	}
 
 	// Load registry
-	reg, err := registry.Load(registry.DefaultRegistryPath)
+	reg, err := loadRegistry()
 	if err != nil {
-		return fmt.Errorf("failed to load registry: %w", err)
+		return err
 	}
 
-	// Check if project already exists
+	// Check if project name already exists
 	if _, exists := reg.GetProject(name); exists {
-		return fmt.Errorf("Error: project '%s' already exists\nUse 'overlord info %s' to see details", name, name)
+		return fmt.Errorf("project '%s' already exists in registry\nUse 'overlord info %s' to see details", name, name)
 	}
 
 	// Expand base directory
-	baseDir, err := expandPath(reg.Settings.BaseDir)
+	baseDir, err := expandBaseDir(reg)
 	if err != nil {
-		return fmt.Errorf("failed to expand base directory: %w", err)
+		return err
+	}
+
+	// Check if this path is already registered under a different name
+	if existingName, _, found := reg.FindProjectByPath(expandedPath, baseDir); found {
+		return fmt.Errorf("this directory is already registered as project '%s'\nUse 'overlord info %s' to see details", existingName, existingName)
 	}
 
 	// Expand thoughts directory
-	thoughtsDir, err := expandPath(reg.Settings.ThoughtsDir)
+	thoughtsDir, err := registry.ExpandPath(reg.Settings.ThoughtsDir)
 	if err != nil {
 		return fmt.Errorf("failed to expand thoughts directory: %w", err)
 	}
@@ -262,7 +372,11 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	if flagLang, hasFlag := getLanguageFromFlags(); hasFlag {
 		lang = flagLang
 	} else {
-		lang = detectLanguage(expandedPath)
+		detected, langErr := detectLanguage(expandedPath)
+		if langErr != nil {
+			return langErr
+		}
+		lang = detected
 		fmt.Printf("%s %s\n", warnStyle.Render("Auto-detected language:"), string(lang))
 	}
 
@@ -278,9 +392,9 @@ func runAdd(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("invalid category '%s'\nValid categories: %s", addOpts.category, strings.Join(validCats, ", "))
 		}
 	} else {
-		detectedCat, err := detectCategory(expandedPath, baseDir)
-		if err != nil {
-			return err
+		detectedCat, catErr := detectCategory(expandedPath, baseDir)
+		if catErr != nil {
+			return catErr
 		}
 		category = detectedCat
 		fmt.Printf("%s %s\n", warnStyle.Render("Auto-detected category:"), string(category))
@@ -338,8 +452,8 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	reg.Projects[name] = project
 
 	// Save registry
-	if err := registry.Save(registry.DefaultRegistryPath, reg); err != nil {
-		return fmt.Errorf("failed to save registry: %w", err)
+	if err := saveRegistry(reg); err != nil {
+		return err
 	}
 	fmt.Println(" done")
 

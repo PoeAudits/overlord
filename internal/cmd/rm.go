@@ -1,14 +1,9 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
-	"github.com/PoeAudits/overlord/internal/registry"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -18,14 +13,14 @@ var (
 
 // rmCmd represents the rm command
 var rmCmd = &cobra.Command{
-	Use:   "rm <name>",
-	Short: "Remove a project from the registry",
-	Long: `Remove a project from the registry. By default, only removes the registry
-entry and leaves the project directory intact.
+	Use:   "rm <name> [name...]",
+	Short: "Remove one or more projects from the registry",
+	Long: `Remove one or more projects from the registry. By default, only removes the
+registry entries and leaves project directories intact.
 
-Use --force to also delete the project directory from disk (requires confirmation).
+Use --force to also delete project directories from disk (requires confirmation).
 
-The name argument can be either a project name or alias.
+Name arguments can be project names or aliases.
 
 Note: Thoughts directories are never deleted and remain at:
   ~/thoughts/plans/<project>/
@@ -33,9 +28,10 @@ Note: Thoughts directories are never deleted and remain at:
   ~/thoughts/sessions/<project>/
 
 Examples:
-  overlord rm myproject              # Remove from registry only
+  overlord rm myproject              # Remove one project from registry
+  overlord rm proj1 proj2 proj3      # Remove multiple projects
   overlord rm myproject --force      # Remove from registry and delete files`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.MinimumNArgs(1),
 	RunE: runRm,
 }
 
@@ -45,114 +41,107 @@ func init() {
 }
 
 func runRm(cmd *cobra.Command, args []string) error {
-	name := args[0]
-
 	// Load registry
-	reg, err := registry.Load(registry.DefaultRegistryPath)
+	reg, err := loadRegistry()
 	if err != nil {
-		return fmt.Errorf("failed to load registry: %w", err)
+		return err
 	}
 
-	// Resolve project using fuzzy matching
-	result, err := reg.ResolveOne(name)
-	if err != nil {
-		return fmt.Errorf("Error: project '%s' not found\nRun 'overlord list' to see all projects", name)
+	// Resolve all projects first before making any changes
+	type resolvedProject struct {
+		name string
+		path string
 	}
-	projectName := result.Name
-	project := result.Project
+	var resolved []resolvedProject
+	var resolveErrors []string
 
-	// Get absolute project path
-	projectPath, err := expandProjectPath(project.Path, reg.Settings.BaseDir)
-	if err != nil {
-		return fmt.Errorf("failed to expand project path: %w", err)
+	for _, name := range args {
+		result, err := reg.ResolveOne(name)
+		if err != nil {
+			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s' not found", name))
+			continue
+		}
+		projectPath, err := expandProjectPath(result.Project.Path, reg.Settings.BaseDir)
+		if err != nil {
+			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': failed to expand path: %v", name, err))
+			continue
+		}
+		resolved = append(resolved, resolvedProject{name: result.Name, path: projectPath})
+	}
+
+	// If any names failed to resolve, report and abort
+	if len(resolveErrors) > 0 {
+		for _, e := range resolveErrors {
+			fmt.Fprintf(os.Stderr, "Error: %s\n", e)
+		}
+		return fmt.Errorf("failed to resolve %d project(s). Run 'overlord list' to see all projects", len(resolveErrors))
 	}
 
 	// Handle force mode (delete files)
 	if rmForce {
-		// Check if directory exists
-		if _, err := os.Stat(projectPath); os.IsNotExist(err) {
-			fmt.Printf("Warning: Project directory does not exist: %s\n", projectPath)
-			fmt.Println("Removing from registry only...")
-		} else if err != nil {
-			return fmt.Errorf("failed to check project directory: %w", err)
-		} else {
-			// Directory exists, prompt for confirmation
-			confirmed, err := confirmDelete(projectName, projectPath)
-			if err != nil {
-				return fmt.Errorf("failed to read confirmation: %w", err)
-			}
-
-			if !confirmed {
-				fmt.Println("Cancelled")
-				return nil
-			}
-
-			// Delete directory
-			if err := os.RemoveAll(projectPath); err != nil {
-				return fmt.Errorf("failed to delete project directory: %w", err)
+		for _, p := range resolved {
+			if _, err := os.Stat(p.path); os.IsNotExist(err) {
+				fmt.Printf("Warning: Project directory does not exist: %s\n", p.path)
+				fmt.Println("Removing from registry only...")
+			} else if err != nil {
+				return fmt.Errorf("failed to check project directory '%s': %w", p.name, err)
+			} else {
+				confirmed, err := confirmDelete(p.name, p.path)
+				if err != nil {
+					return fmt.Errorf("failed to read confirmation: %w", err)
+				}
+				if !confirmed {
+					fmt.Printf("Skipping '%s'\n", p.name)
+					continue
+				}
+				if err := os.RemoveAll(p.path); err != nil {
+					return fmt.Errorf("failed to delete project directory '%s': %w", p.name, err)
+				}
 			}
 		}
 	}
 
-	// Remove from registry
-	delete(reg.Projects, projectName)
+	// Remove all from registry
+	for _, p := range resolved {
+		delete(reg.Projects, p.name)
+	}
 
 	// Save registry
-	if err := registry.Save(registry.DefaultRegistryPath, reg); err != nil {
-		return fmt.Errorf("failed to save registry: %w", err)
+	if err := saveRegistry(reg); err != nil {
+		return err
 	}
 
 	// Define styles for output
-	cyan := lipgloss.Color("86")
-	green := lipgloss.Color("82")
-	gray := lipgloss.Color("245")
+	s := NewStyles()
+	labelStyle := s.Label
+	successStyle := s.Success
+	pathStyle := s.Path
 
-	labelStyle := lipgloss.NewStyle().Foreground(cyan).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(green).Bold(true)
-	pathStyle := lipgloss.NewStyle().Foreground(gray)
-
-	// Print success message
-	if rmForce {
-		fmt.Printf("%s '%s'\n", successStyle.Render("Deleted project"), projectName)
-		fmt.Printf("%s %s\n", labelStyle.Render("Path:"), pathStyle.Render(projectPath))
-	} else {
-		fmt.Printf("%s '%s'\n", successStyle.Render("Removed from registry"), projectName)
-		fmt.Printf("%s %s\n", labelStyle.Render("Directory:"), pathStyle.Render(projectPath))
+	// Print success messages
+	for _, p := range resolved {
+		if rmForce {
+			fmt.Printf("%s '%s'\n", successStyle.Render("Deleted project"), p.name)
+			fmt.Printf("%s %s\n", labelStyle.Render("Path:"), pathStyle.Render(p.path))
+		} else {
+			fmt.Printf("%s '%s'\n", successStyle.Render("Removed from registry"), p.name)
+			fmt.Printf("%s %s\n", labelStyle.Render("Directory:"), pathStyle.Render(p.path))
+		}
 	}
 
 	// Print thoughts note
 	thoughtsDir := reg.Settings.ThoughtsDir
-	fmt.Printf("\n%s Thoughts at %s/{plans,logs,sessions}/%s/ remain intact\n",
-		labelStyle.Render("Note:"), thoughtsDir, projectName)
+	if len(resolved) == 1 {
+		fmt.Printf("\n%s Thoughts at %s/{plans,logs,sessions}/%s/ remain intact\n",
+			labelStyle.Render("Note:"), thoughtsDir, resolved[0].name)
+	} else {
+		fmt.Printf("\n%s Thoughts directories remain intact at %s/\n",
+			labelStyle.Render("Note:"), thoughtsDir)
+	}
 
 	return nil
 }
 
 // confirmDelete prompts the user for confirmation before deleting
 func confirmDelete(projectName, projectPath string) (bool, error) {
-	fmt.Printf("Delete project '%s' and all files at %s? [y/N]: ", projectName, projectPath)
-
-	reader := bufio.NewReader(os.Stdin)
-	response, err := reader.ReadString('\n')
-	if err != nil {
-		return false, err
-	}
-
-	response = strings.TrimSpace(strings.ToLower(response))
-	return response == "y" || response == "yes", nil
-}
-
-// expandProjectPath expands a project path to absolute path
-func expandProjectPath(projectPath, baseDir string) (string, error) {
-	// Expand base dir if it starts with ~
-	expandedBaseDir, err := expandPath(baseDir)
-	if err != nil {
-		return "", fmt.Errorf("failed to expand base dir: %w", err)
-	}
-
-	// Resolve project path (handles both relative and absolute paths)
-	fullPath := resolveProjectPath(projectPath, expandedBaseDir)
-
-	// Clean the path
-	return filepath.Clean(fullPath), nil
+	return confirmAction(fmt.Sprintf("Delete project '%s' and all files at %s?", projectName, projectPath))
 }

@@ -1,18 +1,14 @@
 package cmd
 
 import (
-	"bufio"
+	"context"
 	"fmt"
 	"os"
-	"strings"
 
-	"github.com/PoeAudits/overlord/internal/gitops"
 	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/registry"
 	"github.com/PoeAudits/overlord/internal/sync"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 // deactivateFlags holds the flags for the deactivate command
@@ -74,17 +70,12 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
 	// Define styles for output
-	cyan := lipgloss.Color("86")
-	green := lipgloss.Color("82")
-	yellow := lipgloss.Color("220")
-	red := lipgloss.Color("196")
-	gray := lipgloss.Color("245")
-
-	labelStyle := lipgloss.NewStyle().Foreground(cyan).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(green).Bold(true)
-	warnStyle := lipgloss.NewStyle().Foreground(yellow)
-	errorStyle := lipgloss.NewStyle().Foreground(red).Bold(true)
-	infoStyle := lipgloss.NewStyle().Foreground(gray)
+	s := NewStyles()
+	labelStyle := s.Label
+	successStyle := s.Success
+	warnStyle := s.Warn
+	errorStyle := s.Error
+	infoStyle := s.Info
 
 	// 1. Load machine config
 	machineConfig, err := machine.Load(machine.DefaultConfigPath)
@@ -95,9 +86,9 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 	isWorkingSet := machineConfig.Role == machine.RoleWorkingSet
 
 	// 2. Load registry
-	reg, err := registry.Load(registry.DefaultRegistryPath)
+	reg, err := loadRegistry()
 	if err != nil {
-		return fmt.Errorf("failed to load registry: %w", err)
+		return err
 	}
 
 	// 3. Resolve project using fuzzy matching
@@ -121,11 +112,14 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 	}
 
 	// 6. Get project path
-	baseDir, err := expandPath(reg.Settings.BaseDir)
+	baseDir, err := registry.ExpandPath(reg.Settings.BaseDir)
 	if err != nil {
 		return fmt.Errorf("failed to expand base directory: %w", err)
 	}
 	projectPath := resolveProjectPath(project.Path, baseDir)
+
+	// Remote base dir: unexpanded so ~ expands on the remote side
+	remoteBaseDir := reg.Settings.BaseDir
 
 	// 7. Sync to storage if on working-set machine
 	syncSucceeded := true
@@ -137,7 +131,7 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 			fmt.Printf("  %s Local directory not found, skipping sync\n", warnStyle.Render("Warning:"))
 		} else {
 			// Build remote path
-			remotePath := sync.FormatRemotePath(machineConfig.StorageHost, resolveProjectPath(project.Path, baseDir))
+			remotePath := sync.FormatRemotePath(machineConfig.StorageHost, resolveProjectPath(project.Path, remoteBaseDir))
 
 			// Merge exclusion patterns
 			excludes := make([]string, 0, len(reg.Settings.Sync.DefaultExclude)+len(project.Sync.Exclude))
@@ -152,7 +146,7 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 				Excludes: excludes,
 			}
 
-			_, err := rsync.Push(pushOpts)
+			_, err := rsync.Push(context.Background(), pushOpts)
 			if err != nil {
 				syncSucceeded = false
 				fmt.Printf("  %s Sync failed: %v\n", errorStyle.Render("Error:"), err)
@@ -180,8 +174,8 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 	reg.Projects[projectName] = project
 
 	// 9. Save registry
-	if err := registry.Save(registry.DefaultRegistryPath, reg); err != nil {
-		return fmt.Errorf("failed to save registry: %w", err)
+	if err := saveRegistry(reg); err != nil {
+		return err
 	}
 	fmt.Printf("  %s\n", successStyle.Render("Done"))
 
@@ -192,27 +186,10 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("%s Committing registry changes...\n", labelStyle.Render(stepNum))
 
-	gitRepoPath, err := registry.ExpandPath("~/.config/overlord")
-	if err != nil {
-		return fmt.Errorf("failed to expand git repo path: %w", err)
+	if err := commitAndPushRegistry(fmt.Sprintf("deactivate %s", projectName)); err != nil {
+		return err
 	}
-
-	git := gitops.New(gitRepoPath)
-
-	if err := git.Add("registry.yaml"); err != nil {
-		return fmt.Errorf("failed to stage registry: %w", err)
-	}
-
-	if err := git.Commit(fmt.Sprintf("deactivate %s", projectName)); err != nil {
-		return fmt.Errorf("failed to commit registry: %w", err)
-	}
-
-	// Push - warn but don't fail if push fails
-	if err := git.Push(); err != nil {
-		fmt.Printf("  %s Failed to push registry: %v\n", warnStyle.Render("Warning:"), err)
-	} else {
-		fmt.Printf("  %s\n", successStyle.Render("Done"))
-	}
+	fmt.Printf("  %s\n", successStyle.Render("Done"))
 
 	// 11. Remove local directory if on working-set and not --keep-local
 	if isWorkingSet && !deactivateOpts.keepLocal {
@@ -271,22 +248,5 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 
 // confirmDirectoryRemoval prompts the user for confirmation before removing directory
 func confirmDirectoryRemoval(projectName, projectPath string) (bool, error) {
-	// Check if we're in a terminal
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		// Not interactive - don't proceed
-		return false, nil
-	}
-
-	fmt.Printf("\nRemove local directory for '%s'?\n", projectName)
-	fmt.Printf("  Path: %s\n", projectPath)
-	fmt.Printf("  [y/N]: ")
-
-	reader := bufio.NewReader(os.Stdin)
-	response, err := reader.ReadString('\n')
-	if err != nil {
-		return false, err
-	}
-
-	response = strings.TrimSpace(strings.ToLower(response))
-	return response == "y" || response == "yes", nil
+	return confirmAction(fmt.Sprintf("Remove local directory for '%s'?\n  Path: %s\n ", projectName, projectPath))
 }

@@ -9,6 +9,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+// configErr stores any error from initConfig for later reporting
+var configErr error
+
 var (
 	cfgFile string
 	version = "0.1.0" // Will be set by build flags later
@@ -36,7 +39,10 @@ Configuration is stored at ~/.config/overlord/`,
 	SilenceUsage:       true,
 	DisableFlagParsing: false,
 	Args:               cobra.ArbitraryArgs,
-	RunE:               runRoot,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		return configErr
+	},
+	RunE: runRoot,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -71,26 +77,36 @@ func flagErrorFunc(cmd *cobra.Command, err error) error {
 
 	// Handle unknown flag errors with suggestions
 	if strings.Contains(errStr, "unknown flag") {
+		// Common flag suggestions shared between new and add commands
+		flagSuggestions := map[string]string{
+			"--python":     "Use --py for Python",
+			"--typescript": "Use --ts for TypeScript",
+			"--golang":     "Use --go for Go",
+			"--solidity":   "Use --sol for Solidity",
+			"--lang":       "Language flags are: --py, --ts, --go, --sol, --base",
+			"--language":   "Language flags are: --py, --ts, --go, --sol, --base",
+			"--cat":        "Use --category=<category>",
+			"--type":       "Use --category=<category>",
+			"--template":   "Language flags are: --py, --ts, --go, --sol, --base",
+		}
+
 		if cmd.Name() == "new" {
-			// Check for common flag mistakes
-			flagSuggestions := map[string]string{
-				"--base":       "Language flags are: --py, --ts, --go, --sol (or omit for base)",
-				"--python":     "Use --py for Python",
-				"--typescript": "Use --ts for TypeScript",
-				"--golang":     "Use --go for Go",
-				"--solidity":   "Use --sol for Solidity",
-				"--lang":       "Language flags are: --py, --ts, --go, --sol",
-				"--language":   "Language flags are: --py, --ts, --go, --sol",
-				"--cat":        "Use --category=<category>",
-				"--type":       "Use --category=<category>",
-				"--template":   "Language flags are: --py, --ts, --go, --sol",
-			}
+			flagSuggestions["--base"] = "Language flags are: --py, --ts, --go, --sol (or omit for base)"
 			for flag, suggestion := range flagSuggestions {
 				if strings.Contains(errStr, flag) {
 					return fmt.Errorf("%s\n\n%s\n\n%s", errStr, suggestion, formatNewUsage())
 				}
 			}
 			return fmt.Errorf("%s\n\n%s", errStr, formatNewUsage())
+		}
+
+		if cmd.Name() == "add" {
+			for flag, suggestion := range flagSuggestions {
+				if strings.Contains(errStr, flag) {
+					return fmt.Errorf("%s\n\n%s\n\n%s", errStr, suggestion, formatAddUsage())
+				}
+			}
+			return fmt.Errorf("%s\n\n%s", errStr, formatAddUsage())
 		}
 	}
 
@@ -109,6 +125,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 }
 
 // initConfig reads in config file and ENV variables if set.
+// Any fatal errors are stored in configErr and surfaced via PersistentPreRunE.
 func initConfig() {
 	if cfgFile != "" {
 		// Use config file from the flag
@@ -117,8 +134,8 @@ func initConfig() {
 		// Find home directory
 		home, err := os.UserHomeDir()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			configErr = fmt.Errorf("failed to determine home directory: %w", err)
+			return
 		}
 
 		// Search config in ~/.config/overlord directory with name "config" (without extension)

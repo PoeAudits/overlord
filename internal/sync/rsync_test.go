@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -24,7 +25,7 @@ type MockExecutor struct {
 	RecordedArgs []string
 }
 
-func (m *MockExecutor) Execute(name string, args ...string) ([]byte, int, error) {
+func (m *MockExecutor) Execute(ctx context.Context, name string, args ...string) ([]byte, int, error) {
 	m.RecordedName = name
 	m.RecordedArgs = args
 
@@ -164,6 +165,26 @@ func TestRsync_buildArgs(t *testing.T) {
 			},
 			wantArgs: []string{"-avz", "--progress", "--dry-run", "--delete", "--exclude=node_modules", "/local/path/", "host:/remote/path"},
 		},
+		{
+			name: "with SSH command",
+			opts: RsyncOptions{
+				Source:     "/local/path",
+				Dest:       "host:/remote/path",
+				SSHCommand: "ssh -o ControlMaster=auto -o ControlPath=/tmp/ssh-%r@%h:%p",
+			},
+			wantArgs: []string{"-avz", "--progress", "-e", "ssh -o ControlMaster=auto -o ControlPath=/tmp/ssh-%r@%h:%p", "/local/path/", "host:/remote/path"},
+		},
+		{
+			name: "with SSH command and other options",
+			opts: RsyncOptions{
+				Source:     "/local/path",
+				Dest:       "host:/remote/path",
+				Excludes:   []string{"node_modules"},
+				DryRun:     true,
+				SSHCommand: "ssh -o ControlMaster=auto",
+			},
+			wantArgs: []string{"-avz", "--progress", "-e", "ssh -o ControlMaster=auto", "--dry-run", "--exclude=node_modules", "/local/path/", "host:/remote/path"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -265,7 +286,7 @@ func TestRsync_Push(t *testing.T) {
 			}
 			r := NewRsyncWithExecutor(mock)
 
-			result, err := r.Push(tt.opts)
+			result, err := r.Push(context.Background(), tt.opts)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Push() error = %v, wantErr %v", err, tt.wantErr)
@@ -366,7 +387,7 @@ func TestRsync_Pull(t *testing.T) {
 			}
 			r := NewRsyncWithExecutor(mock)
 
-			result, err := r.Pull(tt.opts)
+			result, err := r.Pull(context.Background(), tt.opts)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Pull() error = %v, wantErr %v", err, tt.wantErr)
@@ -457,7 +478,7 @@ func TestRsync_DryRun(t *testing.T) {
 			}
 			r := NewRsyncWithExecutor(mock)
 
-			output, err := r.DryRun(tt.opts)
+			output, err := r.DryRun(context.Background(), tt.opts)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DryRun() error = %v, wantErr %v", err, tt.wantErr)
@@ -531,207 +552,6 @@ func TestFormatRemotePath(t *testing.T) {
 	}
 }
 
-func TestFormatRemotePathWithUser(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		user string
-		host string
-		path string
-		want string
-	}{
-		{
-			name: "user, host, and path",
-			user: "admin",
-			host: "myhost",
-			path: "/home/admin/data",
-			want: "admin@myhost:/home/admin/data",
-		},
-		{
-			name: "root user",
-			user: "root",
-			host: "server.example.com",
-			path: "/etc/config",
-			want: "root@server.example.com:/etc/config",
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			got := FormatRemotePathWithUser(tt.user, tt.host, tt.path)
-			if got != tt.want {
-				t.Errorf("FormatRemotePathWithUser() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestParseRemotePath(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		remotePath string
-		wantUser   string
-		wantHost   string
-		wantPath   string
-		wantErr    bool
-		errMsg     string
-	}{
-		{
-			name:       "host and path",
-			remotePath: "myhost:/home/user/data",
-			wantUser:   "",
-			wantHost:   "myhost",
-			wantPath:   "/home/user/data",
-			wantErr:    false,
-		},
-		{
-			name:       "user, host, and path",
-			remotePath: "admin@myhost:/home/admin/data",
-			wantUser:   "admin",
-			wantHost:   "myhost",
-			wantPath:   "/home/admin/data",
-			wantErr:    false,
-		},
-		{
-			name:       "hostname with domain",
-			remotePath: "user@server.example.com:/var/www",
-			wantUser:   "user",
-			wantHost:   "server.example.com",
-			wantPath:   "/var/www",
-			wantErr:    false,
-		},
-		{
-			name:       "relative path",
-			remotePath: "backup-server:backups/daily",
-			wantUser:   "",
-			wantHost:   "backup-server",
-			wantPath:   "backups/daily",
-			wantErr:    false,
-		},
-		{
-			name:       "empty path",
-			remotePath: "host:",
-			wantUser:   "",
-			wantHost:   "host",
-			wantPath:   "",
-			wantErr:    false,
-		},
-		{
-			name:       "missing colon",
-			remotePath: "myhost/home/user/data",
-			wantErr:    true,
-			errMsg:     "missing colon separator",
-		},
-		{
-			name:       "empty host",
-			remotePath: ":/path",
-			wantErr:    true,
-			errMsg:     "empty host",
-		},
-		{
-			name:       "empty host with user",
-			remotePath: "user@:/path",
-			wantErr:    true,
-			errMsg:     "empty host",
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			user, host, path, err := ParseRemotePath(tt.remotePath)
-
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ParseRemotePath() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if tt.wantErr && err != nil && !strings.Contains(err.Error(), tt.errMsg) {
-				t.Errorf("ParseRemotePath() error = %v, want error containing %q", err, tt.errMsg)
-				return
-			}
-
-			if !tt.wantErr {
-				if user != tt.wantUser {
-					t.Errorf("ParseRemotePath() user = %q, want %q", user, tt.wantUser)
-				}
-				if host != tt.wantHost {
-					t.Errorf("ParseRemotePath() host = %q, want %q", host, tt.wantHost)
-				}
-				if path != tt.wantPath {
-					t.Errorf("ParseRemotePath() path = %q, want %q", path, tt.wantPath)
-				}
-			}
-		})
-	}
-}
-
-func TestIsRemotePath(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		path string
-		want bool
-	}{
-		{
-			name: "remote path with host",
-			path: "myhost:/home/user/data",
-			want: true,
-		},
-		{
-			name: "remote path with user and host",
-			path: "user@myhost:/home/user/data",
-			want: true,
-		},
-		{
-			name: "local absolute path",
-			path: "/home/user/data",
-			want: false,
-		},
-		{
-			name: "local relative path",
-			path: "data/files",
-			want: false,
-		},
-		{
-			name: "local path with colon in name",
-			path: "/home/user/file:with:colons",
-			want: false,
-		},
-		{
-			name: "empty path",
-			path: "",
-			want: false,
-		},
-		{
-			name: "windows drive letter",
-			path: "C:/Users/data",
-			want: false,
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			got := IsRemotePath(tt.path)
-			if got != tt.want {
-				t.Errorf("IsRemotePath(%q) = %v, want %v", tt.path, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestNewRsync(t *testing.T) {
 	t.Parallel()
 
@@ -775,7 +595,7 @@ func TestRsync_Push_VerifiesArguments(t *testing.T) {
 		Delete:   true,
 	}
 
-	_, err := r.Push(opts)
+	_, err := r.Push(context.Background(), opts)
 	if err != nil {
 		t.Fatalf("Push() error = %v", err)
 	}

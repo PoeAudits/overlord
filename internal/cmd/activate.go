@@ -3,9 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/PoeAudits/overlord/internal/gitops"
 	"github.com/PoeAudits/overlord/internal/registry"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -43,9 +41,9 @@ func runActivate(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
 	// Load registry
-	reg, err := registry.Load(registry.DefaultRegistryPath)
+	reg, err := loadRegistry()
 	if err != nil {
-		return fmt.Errorf("failed to load registry: %w", err)
+		return err
 	}
 
 	// Resolve project using fuzzy matching
@@ -63,11 +61,7 @@ func runActivate(cmd *cobra.Command, args []string) error {
 
 	// Check if already active for sync
 	if project.Sync.Status == registry.SyncActive {
-		// Define styles for output
-		yellow := lipgloss.Color("220")
-		infoStyle := lipgloss.NewStyle().Foreground(yellow)
-
-		fmt.Printf("%s Project '%s' is already active for sync\n", infoStyle.Render("Info:"), projectName)
+		fmt.Printf("%s Project '%s' is already active for sync\n", NewStyles().Warn.Render("Info:"), projectName)
 		return nil
 	}
 
@@ -76,41 +70,18 @@ func runActivate(cmd *cobra.Command, args []string) error {
 	reg.Projects[projectName] = project
 
 	// Save registry
-	if err := registry.Save(registry.DefaultRegistryPath, reg); err != nil {
-		return fmt.Errorf("failed to save registry: %w", err)
+	if err := saveRegistry(reg); err != nil {
+		return err
 	}
 
 	// Commit and push registry changes
-	gitRepoPath, err := registry.ExpandPath("~/.config/overlord")
-	if err != nil {
-		return fmt.Errorf("failed to expand git repo path: %w", err)
+	if err := commitAndPushRegistry(fmt.Sprintf("activate %s", projectName)); err != nil {
+		return err
 	}
 
-	git := gitops.New(gitRepoPath)
-
-	// Stage, commit, and push
-	if err := git.Add("registry.yaml"); err != nil {
-		return fmt.Errorf("failed to stage registry: %w", err)
-	}
-
-	if err := git.Commit(fmt.Sprintf("activate %s", projectName)); err != nil {
-		return fmt.Errorf("failed to commit registry: %w", err)
-	}
-
-	// Push - warn but don't fail if push fails
-	if err := git.Push(); err != nil {
-		// Define warning style
-		yellow := lipgloss.Color("220")
-		warnStyle := lipgloss.NewStyle().Foreground(yellow)
-		fmt.Printf("%s Failed to push registry: %v\n", warnStyle.Render("Warning:"), err)
-	}
-
-	// Define styles for success output
-	green := lipgloss.Color("82")
-	cyan := lipgloss.Color("86")
-
-	successStyle := lipgloss.NewStyle().Foreground(green).Bold(true)
-	labelStyle := lipgloss.NewStyle().Foreground(cyan)
+	s := NewStyles()
+	successStyle := s.Success
+	labelStyle := s.Label
 
 	// Print success message
 	fmt.Printf("%s '%s'\n", successStyle.Render("✓ Activated"), projectName)

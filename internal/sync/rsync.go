@@ -2,19 +2,10 @@ package sync
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
-)
-
-// Direction represents the sync direction
-type Direction string
-
-const (
-	// DirectionPush syncs from local to remote
-	DirectionPush Direction = "push"
-	// DirectionPull syncs from remote to local
-	DirectionPull Direction = "pull"
 )
 
 // RsyncOptions configures an rsync operation
@@ -33,6 +24,12 @@ type RsyncOptions struct {
 
 	// Delete if true, deletes extraneous files from destination
 	Delete bool
+
+	// SSHCommand overrides the SSH command used by rsync (passed via -e flag).
+	// When set, rsync uses this instead of the default SSH transport.
+	// Typically used for SSH ControlMaster multiplexing, e.g.:
+	//   "ssh -o ControlMaster=auto -o ControlPath=/tmp/ssh-%r@%h:%p"
+	SSHCommand string
 }
 
 // Validate checks if the options are valid
@@ -59,15 +56,15 @@ type RsyncResult struct {
 // This allows for mocking in tests
 type CommandExecutor interface {
 	// Execute runs a command and returns the combined output and error
-	Execute(name string, args ...string) (output []byte, exitCode int, err error)
+	Execute(ctx context.Context, name string, args ...string) (output []byte, exitCode int, err error)
 }
 
 // DefaultExecutor uses os/exec to run commands
 type DefaultExecutor struct{}
 
 // Execute runs a command using os/exec
-func (e *DefaultExecutor) Execute(name string, args ...string) ([]byte, int, error) {
-	cmd := exec.Command(name, args...)
+func (e *DefaultExecutor) Execute(ctx context.Context, name string, args ...string) ([]byte, int, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -126,6 +123,11 @@ func (r *Rsync) buildArgs(opts RsyncOptions) []string {
 		"--progress", // show progress during transfer
 	}
 
+	// Custom SSH command (for ControlMaster multiplexing)
+	if opts.SSHCommand != "" {
+		args = append(args, "-e", opts.SSHCommand)
+	}
+
 	if opts.DryRun {
 		args = append(args, "--dry-run")
 	}
@@ -153,7 +155,7 @@ func (r *Rsync) buildArgs(opts RsyncOptions) []string {
 
 // Push syncs files from local to remote (local -> remote)
 // The remote path should be in the format: user@host:path or host:path
-func (r *Rsync) Push(opts RsyncOptions) (*RsyncResult, error) {
+func (r *Rsync) Push(ctx context.Context, opts RsyncOptions) (*RsyncResult, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid options: %w", err)
 	}
@@ -164,7 +166,7 @@ func (r *Rsync) Push(opts RsyncOptions) (*RsyncResult, error) {
 	}
 
 	args := r.buildArgs(opts)
-	output, exitCode, err := r.executor.Execute("rsync", args...)
+	output, exitCode, err := r.executor.Execute(ctx, "rsync", args...)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +185,7 @@ func (r *Rsync) Push(opts RsyncOptions) (*RsyncResult, error) {
 
 // Pull syncs files from remote to local (remote -> local)
 // The remote path should be in the format: user@host:path or host:path
-func (r *Rsync) Pull(opts RsyncOptions) (*RsyncResult, error) {
+func (r *Rsync) Pull(ctx context.Context, opts RsyncOptions) (*RsyncResult, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid options: %w", err)
 	}
@@ -194,7 +196,7 @@ func (r *Rsync) Pull(opts RsyncOptions) (*RsyncResult, error) {
 	}
 
 	args := r.buildArgs(opts)
-	output, exitCode, err := r.executor.Execute("rsync", args...)
+	output, exitCode, err := r.executor.Execute(ctx, "rsync", args...)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +215,7 @@ func (r *Rsync) Pull(opts RsyncOptions) (*RsyncResult, error) {
 
 // DryRun performs a dry run of the sync operation and returns what would be transferred
 // This is useful for previewing changes before actually syncing
-func (r *Rsync) DryRun(opts RsyncOptions) (string, error) {
+func (r *Rsync) DryRun(ctx context.Context, opts RsyncOptions) (string, error) {
 	// Force dry-run mode
 	opts.DryRun = true
 
@@ -227,7 +229,7 @@ func (r *Rsync) DryRun(opts RsyncOptions) (string, error) {
 	}
 
 	args := r.buildArgs(opts)
-	output, exitCode, err := r.executor.Execute("rsync", args...)
+	output, exitCode, err := r.executor.Execute(ctx, "rsync", args...)
 	if err != nil {
 		return "", err
 	}
@@ -243,57 +245,4 @@ func (r *Rsync) DryRun(opts RsyncOptions) (string, error) {
 // It combines host and path into the format expected by rsync: host:path
 func FormatRemotePath(host, path string) string {
 	return fmt.Sprintf("%s:%s", host, path)
-}
-
-// FormatRemotePathWithUser formats a remote path with user for rsync
-// It combines user, host and path into the format: user@host:path
-func FormatRemotePathWithUser(user, host, path string) string {
-	return fmt.Sprintf("%s@%s:%s", user, host, path)
-}
-
-// ParseRemotePath parses a remote path in the format [user@]host:path
-// Returns user (empty if not specified), host, and path
-func ParseRemotePath(remotePath string) (user, host, path string, err error) {
-	// Find the colon that separates host from path
-	colonIdx := strings.Index(remotePath, ":")
-	if colonIdx == -1 {
-		return "", "", "", fmt.Errorf("invalid remote path format: missing colon separator")
-	}
-
-	hostPart := remotePath[:colonIdx]
-	path = remotePath[colonIdx+1:]
-
-	// Check for user@host format
-	atIdx := strings.Index(hostPart, "@")
-	if atIdx != -1 {
-		user = hostPart[:atIdx]
-		host = hostPart[atIdx+1:]
-	} else {
-		host = hostPart
-	}
-
-	if host == "" {
-		return "", "", "", fmt.Errorf("invalid remote path format: empty host")
-	}
-
-	return user, host, path, nil
-}
-
-// IsRemotePath checks if a path is a remote path (contains host:path format)
-func IsRemotePath(path string) bool {
-	// Remote paths contain a colon but don't start with / (which would be absolute local path)
-	// and the colon is not at position 1 (which would be Windows drive letter)
-	colonIdx := strings.Index(path, ":")
-	if colonIdx == -1 {
-		return false
-	}
-	// Not a Windows drive letter (e.g., C:)
-	if colonIdx == 1 {
-		return false
-	}
-	// Not an absolute path that happens to contain a colon
-	if strings.HasPrefix(path, "/") {
-		return false
-	}
-	return true
 }

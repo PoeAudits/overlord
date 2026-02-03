@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/PoeAudits/overlord/internal/machine"
@@ -440,7 +442,7 @@ type MockRsyncExecutor struct {
 	Calls      []string
 }
 
-func (m *MockRsyncExecutor) Execute(name string, args ...string) ([]byte, int, error) {
+func (m *MockRsyncExecutor) Execute(ctx context.Context, name string, args ...string) ([]byte, int, error) {
 	m.CallCount++
 	m.Calls = append(m.Calls, name+" "+joinArgs(args))
 
@@ -448,8 +450,8 @@ func (m *MockRsyncExecutor) Execute(name string, args ...string) ([]byte, int, e
 	var output string
 	if len(args) >= 2 {
 		source := args[len(args)-2]
-		// If source contains ":", it's a remote path (pull)
-		if sync.IsRemotePath(source) {
+		// If source contains ":" and doesn't start with "/", it's a remote path (pull)
+		if strings.Contains(source, ":") && !strings.HasPrefix(source, "/") {
 			output = m.PullOutput
 		} else {
 			output = m.PushOutput
@@ -571,12 +573,14 @@ sent 5,000 bytes  received 100 bytes  10,200.00 bytes/sec`,
 
 			rsync := sync.NewRsyncWithExecutor(mockExec)
 
-			conflicts, err := sync.DetectConflictsWithRsync(
+			conflicts, err := sync.DetectConflictsWithRsyncSSH(
+				context.Background(),
 				rsync,
 				"/local/path",
 				"remote-host",
 				"/remote/path",
 				[]string{},
+				"",
 			)
 
 			if err != nil {
@@ -635,12 +639,14 @@ sent 100 bytes  received 20 bytes  240.00 bytes/sec`,
 
 	excludes := []string{"node_modules", ".git", ".cache"}
 
-	_, err := sync.DetectConflictsWithRsync(
+	_, err := sync.DetectConflictsWithRsyncSSH(
+		context.Background(),
 		rsync,
 		"/local/path",
 		"remote-host",
 		"/remote/path",
 		excludes,
+		"",
 	)
 
 	if err != nil {
@@ -688,7 +694,7 @@ sent 1,234 bytes  received 56 bytes  2,580.00 bytes/sec`,
 	rsync := sync.NewRsyncWithExecutor(mockExec)
 
 	// Test dry-run
-	output, err := rsync.DryRun(sync.RsyncOptions{
+	output, err := rsync.DryRun(context.Background(), sync.RsyncOptions{
 		Source:   "/local/path",
 		Dest:     "remote-host:/remote/path",
 		Excludes: []string{},
@@ -718,34 +724,41 @@ sent 1,234 bytes  received 56 bytes  2,580.00 bytes/sec`,
 // TestMachineRoleBehavior tests different behavior based on machine role
 func TestMachineRoleBehavior(t *testing.T) {
 	tests := []struct {
-		name        string
-		role        machine.Role
-		storageHost string
-		expectSync  bool
-		description string
+		name            string
+		role            machine.Role
+		storageHost     string
+		workingSetHosts map[string]string
+		expectPush      bool // storage pushes to working-set
+		expectBidir     bool // working-set does bidirectional sync
+		description     string
 	}{
 		{
-			name:        "storage machine",
-			role:        machine.RoleStorage,
-			storageHost: "",
-			expectSync:  false,
-			description: "Storage machines should not initiate sync",
+			name: "storage machine",
+			role: machine.RoleStorage,
+			workingSetHosts: map[string]string{
+				"poe-vps": "100.100.74.127",
+			},
+			expectPush:  true,
+			expectBidir: false,
+			description: "Storage machines push to working-set hosts",
 		},
 		{
 			name:        "working-set machine",
 			role:        machine.RoleWorkingSet,
 			storageHost: "storage-host",
-			expectSync:  true,
-			description: "Working-set machines should initiate sync",
+			expectPush:  false,
+			expectBidir: true,
+			description: "Working-set machines do bidirectional sync with storage",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := &machine.MachineConfig{
-				Name:        "test-machine",
-				Role:        tt.role,
-				StorageHost: tt.storageHost,
+				Name:            "test-machine",
+				Role:            tt.role,
+				StorageHost:     tt.storageHost,
+				WorkingSetHosts: tt.workingSetHosts,
 			}
 
 			// Validate config
@@ -753,11 +766,16 @@ func TestMachineRoleBehavior(t *testing.T) {
 				t.Fatalf("invalid config: %v", err)
 			}
 
-			// Check if sync should be initiated
-			shouldSync := config.Role == machine.RoleWorkingSet
+			// Storage machines push to working-set
+			shouldPush := config.Role == machine.RoleStorage
+			if shouldPush != tt.expectPush {
+				t.Errorf("%s: expected push=%v, got %v", tt.description, tt.expectPush, shouldPush)
+			}
 
-			if shouldSync != tt.expectSync {
-				t.Errorf("%s: expected sync=%v, got %v", tt.description, tt.expectSync, shouldSync)
+			// Working-set machines do bidirectional sync
+			shouldBidir := config.Role == machine.RoleWorkingSet
+			if shouldBidir != tt.expectBidir {
+				t.Errorf("%s: expected bidir=%v, got %v", tt.description, tt.expectBidir, shouldBidir)
 			}
 		})
 	}

@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 // thoughtsSubdirs defines the 8 thoughts subdirectories per project
@@ -95,7 +96,7 @@ func ThoughtsExist(paths ThoughtsPaths) (exists bool, missing []string) {
 // Uses rename first, fallback to copy+delete for cross-filesystem moves.
 func MoveThoughtsToArchive(thoughtsDir, projectName string) (warnings []string, err error) {
 	// Expand thoughts directory
-	expandedThoughtsDir, err := expandPath(thoughtsDir)
+	expandedThoughtsDir, err := registry.ExpandPath(thoughtsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to expand thoughts directory: %w", err)
 	}
@@ -144,7 +145,7 @@ func MoveThoughtsToArchive(thoughtsDir, projectName string) (warnings []string, 
 // Handles case where archive doesn't exist (project archived before this feature).
 func MoveThoughtsFromArchive(thoughtsDir, projectName string) (warnings []string, err error) {
 	// Expand thoughts directory
-	expandedThoughtsDir, err := expandPath(thoughtsDir)
+	expandedThoughtsDir, err := registry.ExpandPath(thoughtsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to expand thoughts directory: %w", err)
 	}
@@ -236,30 +237,6 @@ func UpdateProjectSymlinks(thoughtsProjectDir, actualProjectPath string) error {
 		// Create new symlink
 		if err := os.Symlink(linkTarget, linkPath); err != nil {
 			return fmt.Errorf("failed to create symlink for %s: %w", target, err)
-		}
-	}
-
-	return nil
-}
-
-// moveDirectory moves a directory from src to dst.
-// Uses rename first, fallback to copy+delete for cross-filesystem moves.
-func moveDirectory(src, dst string) error {
-	// Try rename first (fast, same filesystem)
-	if err := os.Rename(src, dst); err != nil {
-		// Check if it's a cross-device link error
-		if strings.Contains(err.Error(), "cross-device") || strings.Contains(err.Error(), "invalid cross-device link") {
-			// Cross-filesystem move - copy then delete
-			if err := copyDirectory(src, dst); err != nil {
-				return fmt.Errorf("failed to copy directory: %w", err)
-			}
-
-			// Remove source after successful copy
-			if err := os.RemoveAll(src); err != nil {
-				return fmt.Errorf("failed to remove source directory after copy: %w", err)
-			}
-		} else {
-			return fmt.Errorf("failed to move directory: %w", err)
 		}
 	}
 

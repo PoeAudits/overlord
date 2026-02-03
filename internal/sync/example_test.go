@@ -1,6 +1,7 @@
 package sync_test
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/PoeAudits/overlord/internal/sync"
@@ -23,7 +24,7 @@ func ExampleRsync_Push() {
 	}
 
 	// Perform the sync
-	result, err := r.Push(opts)
+	result, err := r.Push(context.Background(), opts)
 	if err != nil {
 		fmt.Printf("Sync failed: %v\n", err)
 		return
@@ -38,7 +39,7 @@ func ExampleRsync_Pull() {
 
 	// Configure pull options
 	opts := sync.RsyncOptions{
-		Source: sync.FormatRemotePathWithUser("admin", "storage-server", "/data/project"),
+		Source: sync.FormatRemotePath("storage-server", "/data/project"),
 		Dest:   "/home/user/project",
 		Excludes: []string{
 			".cache",
@@ -47,7 +48,7 @@ func ExampleRsync_Pull() {
 	}
 
 	// Perform the sync
-	result, err := r.Pull(opts)
+	result, err := r.Pull(context.Background(), opts)
 	if err != nil {
 		fmt.Printf("Sync failed: %v\n", err)
 		return
@@ -71,7 +72,7 @@ func ExampleRsync_DryRun() {
 	}
 
 	// Preview what would be synced
-	output, err := r.DryRun(opts)
+	output, err := r.DryRun(context.Background(), opts)
 	if err != nil {
 		fmt.Printf("Dry run failed: %v\n", err)
 		return
@@ -85,32 +86,4 @@ func ExampleFormatRemotePath() {
 	remotePath := sync.FormatRemotePath("myserver", "/home/user/data")
 	fmt.Println(remotePath)
 	// Output: myserver:/home/user/data
-}
-
-func ExampleFormatRemotePathWithUser() {
-	// Format a remote path with user for rsync
-	remotePath := sync.FormatRemotePathWithUser("admin", "myserver", "/home/admin/data")
-	fmt.Println(remotePath)
-	// Output: admin@myserver:/home/admin/data
-}
-
-func ExampleParseRemotePath() {
-	// Parse a remote path
-	user, host, path, err := sync.ParseRemotePath("admin@myserver:/home/admin/data")
-	if err != nil {
-		fmt.Printf("Parse error: %v\n", err)
-		return
-	}
-
-	fmt.Printf("User: %q, Host: %q, Path: %q\n", user, host, path)
-	// Output: User: "admin", Host: "myserver", Path: "/home/admin/data"
-}
-
-func ExampleIsRemotePath() {
-	// Check if paths are remote
-	fmt.Println(sync.IsRemotePath("myserver:/data"))
-	fmt.Println(sync.IsRemotePath("/local/path"))
-	// Output:
-	// true
-	// false
 }

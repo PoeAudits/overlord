@@ -41,9 +41,9 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
 	// Load registry
-	reg, err := registry.Load(registry.DefaultRegistryPath)
+	reg, err := loadRegistry()
 	if err != nil {
-		return fmt.Errorf("failed to load registry: %w", err)
+		return err
 	}
 
 	// Resolve project using fuzzy matching
@@ -63,23 +63,16 @@ func runInfo(cmd *cobra.Command, args []string) error {
 }
 
 func outputInfoHuman(name string, project registry.Project, settings registry.Settings) error {
-	// Define colors (same as list command)
-	cyan := lipgloss.Color("86")
-	green := lipgloss.Color("82")
-	yellow := lipgloss.Color("220")
-	gray := lipgloss.Color("245")
-	purple := lipgloss.Color("99")
-	white := lipgloss.Color("255")
-
 	// Define styles
-	labelStyle := lipgloss.NewStyle().Foreground(cyan).Bold(true)
-	valueStyle := lipgloss.NewStyle().Foreground(white)
-	categoryStyle := lipgloss.NewStyle().Foreground(purple)
-	langStyle := lipgloss.NewStyle().Foreground(yellow)
-	statusActiveStyle := lipgloss.NewStyle().Foreground(green)
-	statusArchivedStyle := lipgloss.NewStyle().Foreground(gray)
-	pathStyle := lipgloss.NewStyle().Foreground(gray)
-	sectionStyle := lipgloss.NewStyle().Foreground(cyan).Bold(true)
+	s := NewStyles()
+	labelStyle := s.Label
+	valueStyle := s.Value
+	categoryStyle := s.Category
+	langStyle := lipgloss.NewStyle().Foreground(ColorYellow)
+	statusActiveStyle := s.Success
+	statusArchivedStyle := s.Info
+	pathStyle := s.Path
+	sectionStyle := s.Section
 
 	// Format aliases
 	aliasesStr := "-"
@@ -157,25 +150,11 @@ type thoughtsPaths struct {
 }
 
 func getThoughtsPaths(projectName, thoughtsDir string) thoughtsPaths {
-	// Convert to tilde notation for display
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		homeDir = ""
-	}
-
-	formatPath := func(path string) string {
-		if homeDir != "" && strings.HasPrefix(path, homeDir) {
-			return "~" + strings.TrimPrefix(path, homeDir)
-		}
-		return path
-	}
-
 	// Expand thoughts dir if it starts with ~
 	expandedThoughtsDir := thoughtsDir
-	if strings.HasPrefix(thoughtsDir, "~") {
-		if homeDir != "" {
-			expandedThoughtsDir = filepath.Join(homeDir, strings.TrimPrefix(thoughtsDir, "~"))
-		}
+	homeDir, err := os.UserHomeDir()
+	if err == nil && strings.HasPrefix(thoughtsDir, "~") {
+		expandedThoughtsDir = filepath.Join(homeDir, strings.TrimPrefix(thoughtsDir, "~"))
 	}
 
 	plansPath := filepath.Join(expandedThoughtsDir, "plans", projectName) + "/"
@@ -183,8 +162,8 @@ func getThoughtsPaths(projectName, thoughtsDir string) thoughtsPaths {
 	sessionsPath := filepath.Join(expandedThoughtsDir, "sessions", projectName) + "/"
 
 	return thoughtsPaths{
-		Plans:    formatPath(plansPath),
-		Logs:     formatPath(logsPath),
-		Sessions: formatPath(sessionsPath),
+		Plans:    formatPathWithTilde(plansPath),
+		Logs:     formatPathWithTilde(logsPath),
+		Sessions: formatPathWithTilde(sessionsPath),
 	}
 }

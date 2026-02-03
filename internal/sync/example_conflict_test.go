@@ -6,30 +6,6 @@ import (
 	"github.com/PoeAudits/overlord/internal/sync"
 )
 
-// Example demonstrates basic conflict detection usage
-func ExampleDetectConflicts() {
-	// Note: This example would require a real rsync setup
-	// In practice, you would call:
-	//
-	// conflicts, err := sync.DetectConflicts(
-	//     "/local/project/path",
-	//     "remote-host",
-	//     "/remote/project/path",
-	//     []string{"node_modules", ".git"},
-	// )
-	//
-	// if err != nil {
-	//     log.Fatal(err)
-	// }
-	//
-	// for _, conflict := range conflicts {
-	//     fmt.Printf("%s: %s\n", conflict.Type, conflict.Path)
-	// }
-
-	fmt.Println("Conflict detection example")
-	// Output: Conflict detection example
-}
-
 // Example demonstrates how to interpret conflict types
 func ExampleConflictType() {
 	conflicts := []sync.Conflict{

@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/PoeAudits/overlord/internal/registry"
@@ -90,7 +89,7 @@ func runInitCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve to absolute path
-	absPath, err := expandPath(targetPath)
+	absPath, err := registry.ExpandPath(targetPath)
 	if err != nil {
 		return fmt.Errorf("failed to resolve path: %w", err)
 	}
@@ -118,7 +117,13 @@ func runInitCmd(cmd *cobra.Command, args []string) error {
 	if flagLang, hasFlag := getInitLanguage(); hasFlag {
 		lang = flagLang
 	} else {
-		lang = detectLanguage(absPath)
+		detected, err := detectLanguage(absPath)
+		if err != nil {
+			// For init, default to base if auto-detection fails
+			lang = registry.LanguageBase
+		} else {
+			lang = detected
+		}
 	}
 
 	// Determine description
@@ -128,15 +133,11 @@ func runInitCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Styles
-	cyan := lipgloss.Color("86")
-	green := lipgloss.Color("82")
-	yellow := lipgloss.Color("220")
-	gray := lipgloss.Color("245")
-
-	labelStyle := lipgloss.NewStyle().Foreground(cyan).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(green).Bold(true)
-	warnStyle := lipgloss.NewStyle().Foreground(yellow)
-	pathStyle := lipgloss.NewStyle().Foreground(gray)
+	s := NewStyles()
+	labelStyle := s.Label
+	successStyle := s.Success
+	warnStyle := s.Warn
+	pathStyle := s.Path
 
 	fmt.Printf("%s %s\n", labelStyle.Render("Initializing:"), pathStyle.Render(absPath))
 	fmt.Printf("%s %s\n", labelStyle.Render("Language:"), string(lang))

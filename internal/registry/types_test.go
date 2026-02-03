@@ -20,6 +20,7 @@ func TestCategoryPath(t *testing.T) {
 		{CategoryCoreAgents, "core/agents/"},
 		{CategoryCoreTools, "core/tools/"},
 		{CategorySandbox, "sandbox/"},
+		{CategoryConfig, "config/"},
 	}
 
 	for _, tt := range tests {
@@ -38,6 +39,7 @@ func TestCategoryIsValid(t *testing.T) {
 	}{
 		{CategoryContracts, true},
 		{CategoryWeb, true},
+		{CategoryConfig, true},
 		{Category("invalid"), false},
 		{Category(""), false},
 	}
@@ -267,6 +269,45 @@ func TestProjectValidate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "valid project with last_opened",
+			project: Project{
+				Path:        "/home/user/project",
+				Category:    CategoryWeb,
+				Lang:        LanguageTypeScript,
+				Created:     "2026-01-22",
+				Description: "Test project",
+				Status:      Status{State: StateActive},
+				LastOpened:  "2026-02-01T12:00:00Z",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid project without last_opened (empty)",
+			project: Project{
+				Path:        "/home/user/project",
+				Category:    CategoryWeb,
+				Lang:        LanguageTypeScript,
+				Created:     "2026-01-22",
+				Description: "Test project",
+				Status:      Status{State: StateActive},
+				LastOpened:  "",
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid last_opened format",
+			project: Project{
+				Path:        "/home/user/project",
+				Category:    CategoryWeb,
+				Lang:        LanguageTypeScript,
+				Created:     "2026-01-22",
+				Description: "Test project",
+				Status:      Status{State: StateActive},
+				LastOpened:  "2026-02-01",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -487,6 +528,126 @@ func TestRegistryGetProjectByAlias(t *testing.T) {
 				t.Errorf("GetProjectByAlias() name = %v, want %v", name, tt.wantName)
 			}
 		})
+	}
+}
+
+func TestFindProjectByPath(t *testing.T) {
+	reg := Registry{
+		Projects: map[string]Project{
+			"overlord-v2": {
+				Path: "core/tools/overlord-v2",
+			},
+			"myapp": {
+				Path: "projects/web/myapp",
+			},
+			"api-service": {
+				Path: "projects/services/api-service",
+			},
+			"absolute-project": {
+				Path: "/opt/custom/absolute-project",
+			},
+		},
+	}
+
+	baseDir := "/home/user/Overlord"
+
+	tests := []struct {
+		name      string
+		absPath   string
+		wantName  string
+		wantFound bool
+	}{
+		{
+			name:      "exact match on project root",
+			absPath:   "/home/user/Overlord/projects/web/myapp",
+			wantName:  "myapp",
+			wantFound: true,
+		},
+		{
+			name:      "subdirectory of project",
+			absPath:   "/home/user/Overlord/projects/web/myapp/src/components",
+			wantName:  "myapp",
+			wantFound: true,
+		},
+		{
+			name:      "deeply nested subdirectory",
+			absPath:   "/home/user/Overlord/core/tools/overlord-v2/internal/cmd",
+			wantName:  "overlord-v2",
+			wantFound: true,
+		},
+		{
+			name:      "no match - outside all projects",
+			absPath:   "/home/user/other-dir",
+			wantFound: false,
+		},
+		{
+			name:      "no match - partial directory name",
+			absPath:   "/home/user/Overlord/projects/web/myapp-extended",
+			wantFound: false,
+		},
+		{
+			name:      "no match - base dir only",
+			absPath:   "/home/user/Overlord",
+			wantFound: false,
+		},
+		{
+			name:      "absolute path project - exact match",
+			absPath:   "/opt/custom/absolute-project",
+			wantName:  "absolute-project",
+			wantFound: true,
+		},
+		{
+			name:      "absolute path project - subdirectory",
+			absPath:   "/opt/custom/absolute-project/src",
+			wantName:  "absolute-project",
+			wantFound: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			name, _, found := reg.FindProjectByPath(tt.absPath, baseDir)
+			if found != tt.wantFound {
+				t.Errorf("FindProjectByPath() found = %v, want %v", found, tt.wantFound)
+			}
+			if found && name != tt.wantName {
+				t.Errorf("FindProjectByPath() name = %q, want %q", name, tt.wantName)
+			}
+		})
+	}
+}
+
+func TestFindProjectByPath_MostSpecificWins(t *testing.T) {
+	// When projects are nested, the most specific (longest path) should win
+	reg := Registry{
+		Projects: map[string]Project{
+			"parent": {
+				Path: "projects/web",
+			},
+			"child": {
+				Path: "projects/web/child-app",
+			},
+		},
+	}
+
+	baseDir := "/home/user/Overlord"
+
+	// Inside child-app - should match child, not parent
+	name, _, found := reg.FindProjectByPath("/home/user/Overlord/projects/web/child-app/src", baseDir)
+	if !found {
+		t.Fatal("expected to find a project")
+	}
+	if name != "child" {
+		t.Errorf("FindProjectByPath() name = %q, want %q (most specific match)", name, "child")
+	}
+
+	// Inside parent but outside child - should match parent
+	name, _, found = reg.FindProjectByPath("/home/user/Overlord/projects/web/other-dir", baseDir)
+	if !found {
+		t.Fatal("expected to find a project")
+	}
+	if name != "parent" {
+		t.Errorf("FindProjectByPath() name = %q, want %q", name, "parent")
 	}
 }
 

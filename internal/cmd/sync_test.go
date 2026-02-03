@@ -245,4 +245,8 @@ func TestSyncFlags(t *testing.T) {
 	if opts.force {
 		t.Error("expected force to default to false")
 	}
+
+	if opts.host != "" {
+		t.Error("expected host to default to empty string")
+	}
 }

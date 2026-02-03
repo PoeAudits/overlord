@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/sahilm/fuzzy"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -25,6 +24,7 @@ type projectItem struct {
 	description string
 	path        string
 	status      registry.State
+	aliases     []string
 }
 
 // pickerModel is the Bubbletea model for the interactive picker
@@ -39,6 +39,7 @@ type pickerModel struct {
 	height     int
 	maxNameLen int
 	maxCatLen  int
+	lastQuery  string
 }
 
 func newPickerModel(projects []projectItem) pickerModel {
@@ -123,14 +124,17 @@ func (m pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.textInput, cmd = m.textInput.Update(msg)
 
-	// Filter projects based on input
-	m.filterProjects()
+	// Filter projects based on input (only if query changed)
+	if m.textInput.Value() != m.lastQuery {
+		m.filterProjects()
+	}
 
 	return m, cmd
 }
 
 func (m *pickerModel) filterProjects() {
 	query := m.textInput.Value()
+	m.lastQuery = query
 
 	if query == "" {
 		m.filtered = m.projects
@@ -141,7 +145,11 @@ func (m *pickerModel) filterProjects() {
 	// Build list of searchable strings
 	targets := make([]string, len(m.projects))
 	for i, p := range m.projects {
-		targets[i] = p.name
+		if len(p.aliases) > 0 {
+			targets[i] = p.name + " " + strings.Join(p.aliases, " ")
+		} else {
+			targets[i] = p.name
+		}
 	}
 
 	// Perform fuzzy match
@@ -163,30 +171,25 @@ func (m pickerModel) View() string {
 	var b strings.Builder
 
 	// Styles
-	cyan := lipgloss.Color("86")
-	green := lipgloss.Color("82")
-	gray := lipgloss.Color("245")
-	purple := lipgloss.Color("99")
-	white := lipgloss.Color("255")
-
-	promptStyle := lipgloss.NewStyle().Foreground(cyan).Bold(true)
-	selectedStyle := lipgloss.NewStyle().Foreground(green).Bold(true)
-	nameStyle := lipgloss.NewStyle().Foreground(white)
-	categoryStyle := lipgloss.NewStyle().Foreground(purple)
-	descStyle := lipgloss.NewStyle().Foreground(gray)
-	cursorStyle := lipgloss.NewStyle().Foreground(green).Bold(true)
+	s := NewStyles()
+	promptStyle := s.Prompt
+	selectedStyle := s.Selected
+	nameStyle := s.Name
+	categoryStyle := s.Category
+	descStyle := s.Desc
+	cursorStyle := s.Cursor
 
 	// Header
 	b.WriteString(promptStyle.Render("Find project: "))
 	b.WriteString(m.textInput.View())
 	b.WriteString("\n\n")
 
-	// Calculate visible items (limit to terminal height - 5 for header/footer)
-	maxVisible := 15
+	// Calculate visible items (limit to terminal height minus header/footer)
+	maxVisible := maxPickerVisibleItems
 	if m.height > 0 {
-		maxVisible = m.height - 5
-		if maxVisible < 5 {
-			maxVisible = 5
+		maxVisible = m.height - pickerHeaderFooterLines
+		if maxVisible < minPickerVisibleItems {
+			maxVisible = minPickerVisibleItems
 		}
 	}
 
@@ -217,19 +220,22 @@ func (m pickerModel) View() string {
 
 			// Format: name (padded) | category (padded) | description (truncated)
 			name := p.name
+			aliasStr := ""
+			if len(p.aliases) > 0 {
+				aliasStr = " (" + strings.Join(p.aliases, ", ") + ")"
+			}
 			if i == m.cursor {
-				name = selectedStyle.Render(padRight(name, m.maxNameLen))
+				name = selectedStyle.Render(padRight(name, m.maxNameLen)) + descStyle.Render(aliasStr)
 			} else {
-				name = nameStyle.Render(padRight(name, m.maxNameLen))
+				name = nameStyle.Render(padRight(name, m.maxNameLen)) + descStyle.Render(aliasStr)
 			}
 
 			category := categoryStyle.Render(padRight(p.category, m.maxCatLen))
 
 			// Truncate description
 			desc := p.description
-			maxDescLen := 40
-			if len(desc) > maxDescLen {
-				desc = desc[:maxDescLen-3] + "..."
+			if len(desc) > maxDescDisplayLen {
+				desc = desc[:maxDescDisplayLen-3] + "..."
 			}
 			desc = descStyle.Render(desc)
 
@@ -277,9 +283,9 @@ func init() {
 // RunOpen executes the open command (exported for root command handler)
 func RunOpen(cmd *cobra.Command, args []string) error {
 	// Load registry
-	reg, err := registry.Load(registry.DefaultRegistryPath)
+	reg, err := loadRegistry()
 	if err != nil {
-		return fmt.Errorf("failed to load registry: %w", err)
+		return err
 	}
 
 	var projectName string
@@ -346,6 +352,15 @@ func RunOpen(cmd *cobra.Command, args []string) error {
 			projectName, projectName, project.Category)
 	}
 
+	// Record last opened timestamp (save only, no commit+push)
+	project.LastOpened = time.Now().UTC().Format(time.RFC3339)
+	reg.Projects[projectName] = project
+	if err := saveRegistry(reg); err != nil {
+		// Warn but don't fail - opening the project is more important
+		s := NewStyles()
+		fmt.Printf("%s failed to record open time: %v\n", s.Warn.Render("Warning:"), err)
+	}
+
 	// Open the project
 	return openProject(projectName, project, reg.Settings)
 }
@@ -372,6 +387,7 @@ func showPicker(reg *registry.Registry, initialQuery string) (string, registry.P
 			description: proj.Description,
 			path:        proj.Path,
 			status:      proj.Status.State,
+			aliases:     proj.Aliases,
 		})
 	}
 
@@ -415,6 +431,7 @@ func showPickerWithResults(results []registry.ResolveResult) (string, registry.P
 			description: r.Project.Description,
 			path:        r.Project.Path,
 			status:      r.Project.Status.State,
+			aliases:     r.Project.Aliases,
 		})
 	}
 
@@ -462,7 +479,7 @@ func runPicker(items []projectItem, initialQuery string) (*projectItem, error) {
 // openProject opens a project in tmux
 func openProject(name string, project registry.Project, settings registry.Settings) error {
 	// Expand base directory
-	baseDir, err := expandPath(settings.BaseDir)
+	baseDir, err := registry.ExpandPath(settings.BaseDir)
 	if err != nil {
 		return fmt.Errorf("failed to expand base directory: %w", err)
 	}
@@ -476,75 +493,47 @@ func openProject(name string, project registry.Project, settings registry.Settin
 	}
 
 	// Define styles for output
-	cyan := lipgloss.Color("86")
-	green := lipgloss.Color("82")
-	yellow := lipgloss.Color("220")
-	gray := lipgloss.Color("245")
-
-	labelStyle := lipgloss.NewStyle().Foreground(cyan).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(green).Bold(true)
-	warnStyle := lipgloss.NewStyle().Foreground(yellow)
-	pathStyle := lipgloss.NewStyle().Foreground(gray)
+	s := NewStyles()
+	labelStyle := s.Label
+	successStyle := s.Success
+	warnStyle := s.Warn
+	pathStyle := s.Path
 
 	// Check if tmux is available
 	if _, err := exec.LookPath("tmux"); err != nil {
 		return fmt.Errorf("Error: tmux not found in PATH\nInstall tmux to use workspace features")
 	}
 
-	// Check if session already exists
-	checkSession := exec.Command("tmux", "has-session", "-t", name)
-	sessionExists := checkSession.Run() == nil
+	// Create tmux session helper
+	session := &tmuxSession{
+		Name: name,
+		Dir:  projectPath,
+	}
 
-	if sessionExists {
+	// Check if session already exists
+	if session.exists() {
 		fmt.Printf("%s %s\n", labelStyle.Render("Attaching to session:"), name)
 	} else {
 		fmt.Printf("%s %s\n", labelStyle.Render("Creating session:"), name)
 		fmt.Printf("%s %s\n", labelStyle.Render("Path:"), pathStyle.Render(projectPath))
 
-		// Create new session (detached) with window named "base" for .tmux.local compatibility
-		createSession := exec.Command("tmux", "new-session", "-d", "-s", name, "-n", "base", "-c", projectPath)
-		if output, err := createSession.CombinedOutput(); err != nil {
-			return fmt.Errorf("failed to create tmux session: %s", strings.TrimSpace(string(output)))
+		// Create new session
+		if err := session.create(); err != nil {
+			return err
 		}
 
 		// Source .tmux.local if it exists
-		tmuxLocalPath := filepath.Join(projectPath, ".tmux.local")
-		if _, err := os.Stat(tmuxLocalPath); err == nil {
-			// Run .tmux.local as a bash script with environment variables
-			tmuxSource := exec.Command("bash", tmuxLocalPath)
-			tmuxSource.Env = append(os.Environ(),
-				fmt.Sprintf("TMUX_SESSION=%s", name),
-				fmt.Sprintf("TMUX_PROJECT_DIR=%s", projectPath),
-			)
-			if output, err := tmuxSource.CombinedOutput(); err != nil {
-				fmt.Printf("%s failed to source .tmux.local: %s\n", warnStyle.Render("Warning:"), strings.TrimSpace(string(output)))
-			}
+		if err := session.sourceLocal(); err != nil {
+			fmt.Printf("%s %v\n", warnStyle.Render("Warning:"), err)
 		}
 
 		fmt.Printf("%s\n", successStyle.Render("Session created!"))
 	}
 
 	// Attach to session (or switch if already in tmux)
-	if os.Getenv("TMUX") != "" {
-		// Already in tmux, switch client
-		switchCmd := exec.Command("tmux", "switch-client", "-t", name)
-		switchCmd.Stdin = os.Stdin
-		switchCmd.Stdout = os.Stdout
-		switchCmd.Stderr = os.Stderr
-		if err := switchCmd.Run(); err != nil {
-			fmt.Printf("%s failed to switch to session: %v\n", warnStyle.Render("Warning:"), err)
-			fmt.Printf("Attach manually: tmux attach -t %s\n", name)
-		}
-	} else {
-		// Not in tmux, attach
-		attachCmd := exec.Command("tmux", "attach", "-t", name)
-		attachCmd.Stdin = os.Stdin
-		attachCmd.Stdout = os.Stdout
-		attachCmd.Stderr = os.Stderr
-		if err := attachCmd.Run(); err != nil {
-			fmt.Printf("%s failed to attach to session: %v\n", warnStyle.Render("Warning:"), err)
-			fmt.Printf("Attach manually: tmux attach -t %s\n", name)
-		}
+	if err := session.attachOrSwitch(); err != nil {
+		fmt.Printf("%s %v\n", warnStyle.Render("Warning:"), err)
+		fmt.Printf("Attach manually: tmux attach -t %s\n", name)
 	}
 
 	return nil

@@ -3,6 +3,8 @@ package cmd
 import (
 	"strings"
 	"testing"
+
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 func TestValidateName(t *testing.T) {
@@ -108,9 +110,9 @@ func TestExpandPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := expandPath(tt.input)
+			_, err := registry.ExpandPath(tt.input)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("expandPath(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+				t.Errorf("registry.ExpandPath(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
 			}
 		})
 	}

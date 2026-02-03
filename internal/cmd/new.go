@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/PoeAudits/overlord/internal/registry"
@@ -20,6 +19,7 @@ import (
 type newFlags struct {
 	category    string
 	description string
+	aliases     []string
 	noGit       bool
 	noOpen      bool
 	// Language shorthand flags
@@ -53,7 +53,8 @@ Examples:
   overlord new my-api --category=services --go
   overlord new my-app --category=web --ts --description="Web application"
   overlord new my-lib --category=libs --py --no-git
-  overlord new sandbox-test --category=sandbox --no-open`,
+  overlord new sandbox-test --category=sandbox --no-open
+  overlord new my-project --category=cli --go --alias=mp`,
 	Args: cobra.ExactArgs(1),
 	RunE: runNew,
 }
@@ -78,12 +79,14 @@ Language flags (optional, defaults to base):
 
 Options:
   --description="..."   Project description
+  --alias=<name>        Add alias (can be repeated)
   --no-git              Skip git initialization
   --no-open             Don't open workspace after creation
 
 Examples:
   overlord new my-api --category=services --go
   overlord new my-app --category=web --ts --description="Web app"
+  overlord new my-project --category=cli --go --alias=mp
   overlord new sandbox-test --category=sandbox`, strings.Join(validCats, ", "))
 }
 
@@ -95,6 +98,9 @@ func init() {
 
 	// Description flag
 	newCmd.Flags().StringVar(&newOpts.description, "description", "", "Project description")
+
+	// Alias flag (can be repeated)
+	newCmd.Flags().StringArrayVar(&newOpts.aliases, "alias", []string{}, "Add alias (can be repeated)")
 
 	// Language shorthand flags
 	newCmd.Flags().BoolVar(&newOpts.langPy, "py", false, "Use Python language")
@@ -110,8 +116,8 @@ func init() {
 	newCmd.PreRunE = validateNewFlags
 }
 
-// nameRegex validates project names
-var nameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
+// nameRegex validates project name characters (length checked separately via maxProjectNameLen)
+var nameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 
 // validateNewFlags validates required flags and provides helpful error messages
 func validateNewFlags(cmd *cobra.Command, args []string) error {
@@ -130,20 +136,7 @@ func validateNewFlags(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check that only one language flag is set
-	langCount := 0
-	if newOpts.langPy {
-		langCount++
-	}
-	if newOpts.langTs {
-		langCount++
-	}
-	if newOpts.langGo {
-		langCount++
-	}
-	if newOpts.langSol {
-		langCount++
-	}
-	if langCount > 1 {
+	if countTrue(newOpts.langPy, newOpts.langTs, newOpts.langGo, newOpts.langSol) > 1 {
 		return fmt.Errorf("only one language flag can be set (--py, --ts, --go, or --sol)")
 	}
 
@@ -156,8 +149,8 @@ func validateName(name string) error {
 		return fmt.Errorf("project name cannot be empty")
 	}
 
-	if len(name) > 64 {
-		return fmt.Errorf("project name too long (max 64 characters)")
+	if len(name) > maxProjectNameLen {
+		return fmt.Errorf("project name too long (max %d characters)", maxProjectNameLen)
 	}
 
 	if !nameRegex.MatchString(name) {
@@ -181,40 +174,6 @@ func getLanguage() registry.Language {
 	default:
 		return registry.LanguageBase
 	}
-}
-
-// expandPath expands ~ to the user's home directory and resolves
-// relative paths (e.g., ".", "..", "./foo") to absolute paths.
-func expandPath(path string) (string, error) {
-	if len(path) == 0 {
-		return "", fmt.Errorf("path cannot be empty")
-	}
-
-	if path[0] == '~' {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("failed to get home directory: %w", err)
-		}
-
-		if len(path) == 1 {
-			path = homeDir
-		} else if path[1] == '/' || path[1] == filepath.Separator {
-			path = filepath.Join(homeDir, path[2:])
-		} else {
-			return "", fmt.Errorf("~user expansion not supported, use absolute path")
-		}
-	}
-
-	// Resolve relative paths to absolute
-	if !filepath.IsAbs(path) {
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			return "", fmt.Errorf("failed to resolve absolute path: %w", err)
-		}
-		path = absPath
-	}
-
-	return path, nil
 }
 
 // cleanup removes created directories on failure
@@ -242,15 +201,11 @@ func runNew(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
 	// Define styles for output
-	cyan := lipgloss.Color("86")
-	green := lipgloss.Color("82")
-	yellow := lipgloss.Color("220")
-	gray := lipgloss.Color("245")
-
-	labelStyle := lipgloss.NewStyle().Foreground(cyan).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(green).Bold(true)
-	warnStyle := lipgloss.NewStyle().Foreground(yellow)
-	pathStyle := lipgloss.NewStyle().Foreground(gray)
+	s := NewStyles()
+	labelStyle := s.Label
+	successStyle := s.Success
+	warnStyle := s.Warn
+	pathStyle := s.Path
 
 	// Validate name
 	if err := validateName(name); err != nil {
@@ -264,9 +219,9 @@ func runNew(cmd *cobra.Command, args []string) error {
 	lang := getLanguage()
 
 	// Load registry
-	reg, err := registry.Load(registry.DefaultRegistryPath)
+	reg, err := loadRegistry()
 	if err != nil {
-		return fmt.Errorf("failed to load registry: %w", err)
+		return err
 	}
 
 	// Check if project already exists
@@ -275,13 +230,13 @@ func runNew(cmd *cobra.Command, args []string) error {
 	}
 
 	// Expand base directory
-	baseDir, err := expandPath(reg.Settings.BaseDir)
+	baseDir, err := expandBaseDir(reg)
 	if err != nil {
-		return fmt.Errorf("failed to expand base directory: %w", err)
+		return err
 	}
 
 	// Expand thoughts directory
-	thoughtsDir, err := expandPath(reg.Settings.ThoughtsDir)
+	thoughtsDir, err := registry.ExpandPath(reg.Settings.ThoughtsDir)
 	if err != nil {
 		return fmt.Errorf("failed to expand thoughts directory: %w", err)
 	}
@@ -360,6 +315,18 @@ func runNew(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Println(" done")
 
+	// 2b. Generate .env.pass template from pass store (best-effort)
+	fmt.Printf("  Generating .env.pass template...")
+	envCount, envErr := GenerateEnvPassFile(projectPath)
+	if envErr != nil {
+		fmt.Println()
+		fmt.Printf("  %s %s\n", warnStyle.Render("Warning:"), envErr)
+	} else if envCount == 0 {
+		fmt.Println(" skipped (no pass entries)")
+	} else {
+		fmt.Printf(" done (%d entries)\n", envCount)
+	}
+
 	// 3. Create thoughts directories (all 8 subdirectories under ~/thoughts/projects/{name}/)
 	fmt.Printf("  Creating thoughts structure...")
 
@@ -422,31 +389,30 @@ func runNew(cmd *cobra.Command, args []string) error {
 			fmt.Println()
 			fmt.Printf("  %s git not found, skipping initialization\n", warnStyle.Render("Warning:"))
 		} else {
-			// git init
-			gitInit := exec.Command("git", "init")
-			gitInit.Dir = projectPath
-			if output, err := gitInit.CombinedOutput(); err != nil {
-				fmt.Println()
-				fmt.Printf("  %s git init failed: %s\n", warnStyle.Render("Warning:"), strings.TrimSpace(string(output)))
-			} else {
-				// git add .
-				gitAdd := exec.Command("git", "add", ".")
-				gitAdd.Dir = projectPath
-				if output, err := gitAdd.CombinedOutput(); err != nil {
+			// Run git commands sequentially, break on error
+			gitCommands := []struct {
+				args []string
+				name string
+			}{
+				{[]string{"init"}, "git init"},
+				{[]string{"add", "."}, "git add"},
+				{[]string{"commit", "-m", "Initial commit"}, "git commit"},
+			}
+
+			success := true
+			for _, gitCmd := range gitCommands {
+				cmd := exec.Command("git", gitCmd.args...)
+				cmd.Dir = projectPath
+				if output, err := cmd.CombinedOutput(); err != nil {
 					fmt.Println()
-					fmt.Printf("  %s git add failed: %s\n", warnStyle.Render("Warning:"), strings.TrimSpace(string(output)))
-				} else {
-					// git commit
-					gitCommit := exec.Command("git", "commit", "-m", "Initial commit")
-					gitCommit.Dir = projectPath
-					if output, err := gitCommit.CombinedOutput(); err != nil {
-						fmt.Println()
-						fmt.Printf("  %s git commit failed: %s\n", warnStyle.Render("Warning:"), strings.TrimSpace(string(output)))
-					} else {
-						fmt.Println(" done")
-						_ = output // suppress unused warning
-					}
+					fmt.Printf("  %s %s failed: %s\n", warnStyle.Render("Warning:"), gitCmd.name, strings.TrimSpace(string(output)))
+					success = false
+					break
 				}
+			}
+
+			if success {
+				fmt.Println(" done")
 			}
 		}
 	} else {
@@ -465,7 +431,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 		Lang:        lang,
 		Created:     time.Now().Format("2006-01-02"),
 		Description: description,
-		Aliases:     []string{},
+		Aliases:     newOpts.aliases,
 		Tags:        []string{},
 		Status:      registry.Status{State: registry.StateActive},
 	}
@@ -477,8 +443,8 @@ func runNew(cmd *cobra.Command, args []string) error {
 	reg.Projects[name] = project
 
 	// Save registry
-	if err := registry.Save(registry.DefaultRegistryPath, reg); err != nil {
-		return fmt.Errorf("failed to save registry: %w", err)
+	if err := saveRegistry(reg); err != nil {
+		return err
 	}
 	fmt.Println(" done")
 
@@ -490,6 +456,9 @@ func runNew(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Printf("%s %s\n", labelStyle.Render("Project path:"), pathStyle.Render(projectPath))
 	fmt.Printf("%s %s\n", labelStyle.Render("Thoughts:"), pathStyle.Render(thoughtsProjectBase))
+	if len(newOpts.aliases) > 0 {
+		fmt.Printf("%s %s\n", labelStyle.Render("Aliases:"), strings.Join(newOpts.aliases, ", "))
+	}
 	fmt.Println()
 
 	// 6. Open workspace (unless --no-open)
@@ -503,51 +472,29 @@ func runNew(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 
-		// Create tmux session
-		tmuxNew := exec.Command("tmux", "new-session", "-d", "-s", name, "-c", projectPath)
-		if output, err := tmuxNew.CombinedOutput(); err != nil {
-			// Session might already exist
-			if !strings.Contains(string(output), "duplicate session") {
-				fmt.Printf("%s failed to create tmux session: %s\n", warnStyle.Render("Warning:"), strings.TrimSpace(string(output)))
+		// Create and configure tmux session
+		session := &tmuxSession{
+			Name: name,
+			Dir:  projectPath,
+		}
+
+		// Create session (skip if already exists)
+		if !session.exists() {
+			if err := session.create(); err != nil {
+				fmt.Printf("%s %v\n", warnStyle.Render("Warning:"), err)
 				return nil
 			}
-		}
 
-		// Source .tmux.local
-		tmuxLocalPath := filepath.Join(projectPath, ".tmux.local")
-		if _, err := os.Stat(tmuxLocalPath); err == nil {
-			// Run .tmux.local as a bash script with environment variables
-			tmuxSource := exec.Command("bash", tmuxLocalPath)
-			tmuxSource.Env = append(os.Environ(),
-				fmt.Sprintf("TMUX_SESSION=%s", name),
-				fmt.Sprintf("TMUX_PROJECT_DIR=%s", projectPath),
-			)
-			if output, err := tmuxSource.CombinedOutput(); err != nil {
-				fmt.Printf("%s failed to source .tmux.local: %s\n", warnStyle.Render("Warning:"), strings.TrimSpace(string(output)))
+			// Source .tmux.local
+			if err := session.sourceLocal(); err != nil {
+				fmt.Printf("%s %v\n", warnStyle.Render("Warning:"), err)
 			}
 		}
 
-		// Attach to session (or switch if already in tmux)
-		if os.Getenv("TMUX") != "" {
-			// Already in tmux, switch client
-			tmuxSwitch := exec.Command("tmux", "switch-client", "-t", name)
-			tmuxSwitch.Stdin = os.Stdin
-			tmuxSwitch.Stdout = os.Stdout
-			tmuxSwitch.Stderr = os.Stderr
-			if err := tmuxSwitch.Run(); err != nil {
-				fmt.Printf("%s failed to switch to session: %v\n", warnStyle.Render("Warning:"), err)
-				fmt.Printf("Attach manually: tmux attach -t %s\n", name)
-			}
-		} else {
-			// Not in tmux, attach
-			tmuxAttach := exec.Command("tmux", "attach", "-t", name)
-			tmuxAttach.Stdin = os.Stdin
-			tmuxAttach.Stdout = os.Stdout
-			tmuxAttach.Stderr = os.Stderr
-			if err := tmuxAttach.Run(); err != nil {
-				fmt.Printf("%s failed to attach to session: %v\n", warnStyle.Render("Warning:"), err)
-				fmt.Printf("Attach manually: tmux attach -t %s\n", name)
-			}
+		// Attach or switch to session
+		if err := session.attachOrSwitch(); err != nil {
+			fmt.Printf("%s %v\n", warnStyle.Render("Warning:"), err)
+			fmt.Printf("Attach manually: tmux attach -t %s\n", name)
 		}
 	} else {
 		fmt.Printf("To open workspace: overlord open %s\n", name)
