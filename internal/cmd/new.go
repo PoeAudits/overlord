@@ -317,55 +317,12 @@ func runNew(cmd *cobra.Command, args []string) error {
 
 	// 3. Create thoughts directories (all 8 subdirectories under ~/thoughts/projects/{name}/)
 	fmt.Printf("  Creating thoughts structure...")
-
-	// Get paths for all 8 thoughts subdirectories using the helper function
-	thoughtsPaths := GetThoughtsPaths(thoughtsDir, name)
 	thoughtsProjectBase := filepath.Join(thoughtsDir, "projects", name)
+	c.add(thoughtsProjectBase) // Track for cleanup on failure
 
-	// Create all 8 thoughts subdirectories
-	for _, dir := range thoughtsPaths.toSlice() {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create thoughts directory %s: %w", dir, err)
-		}
-		c.add(dir)
+	if err := CreateThoughtsStructure(thoughtsDir, name, projectPath); err != nil {
+		return err
 	}
-	// Also track the project base directory for cleanup
-	c.add(thoughtsProjectBase)
-
-	// Create relative symlinks in docs/ subdirectory
-	// Calculate relative path from thoughts/projects/{name}/docs/ to project directory
-	readmeSrc := filepath.Join(projectPath, "README.md")
-	agentsSrc := filepath.Join(projectPath, "AGENTS.md")
-
-	readmeLink := filepath.Join(thoughtsPaths.Docs, "README.md")
-	agentsLink := filepath.Join(thoughtsPaths.Docs, "AGENTS.md")
-
-	// Calculate relative path from docs/ subdirectory to project
-	relPath, err := filepath.Rel(thoughtsPaths.Docs, projectPath)
-	if err != nil {
-		return fmt.Errorf("failed to calculate relative path: %w", err)
-	}
-
-	// Create symlinks using relative paths
-	readmeRelTarget := filepath.Join(relPath, "README.md")
-	agentsRelTarget := filepath.Join(relPath, "AGENTS.md")
-
-	if err := os.Symlink(readmeRelTarget, readmeLink); err != nil {
-		return fmt.Errorf("failed to create README.md symlink: %w", err)
-	}
-
-	if err := os.Symlink(agentsRelTarget, agentsLink); err != nil {
-		return fmt.Errorf("failed to create AGENTS.md symlink: %w", err)
-	}
-
-	// Verify symlinks point to existing files
-	if _, err := os.Stat(readmeSrc); err != nil {
-		return fmt.Errorf("README.md not found at %s", readmeSrc)
-	}
-	if _, err := os.Stat(agentsSrc); err != nil {
-		return fmt.Errorf("AGENTS.md not found at %s", agentsSrc)
-	}
-
 	fmt.Println(" done")
 
 	// 4. Initialize git repository

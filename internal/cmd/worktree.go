@@ -304,6 +304,18 @@ func ensureUniqueBranch(repoPath, baseName string) string {
 	return name
 }
 
+// resolveBranchArg resolves branch name from args or current worktree context.
+// Used by attach and remove commands.
+func resolveBranchArg(args []string, info *worktreeInfo, usage string) (string, error) {
+	if len(args) > 0 {
+		return args[0], nil
+	}
+	if info.isWorktree {
+		return info.currentBranch, nil
+	}
+	return "", fmt.Errorf("no branch specified and not in a worktree\n%s", usage)
+}
+
 func runWorktreeNew(cmd *cobra.Command, args []string) error {
 	s := NewStyles()
 
@@ -494,14 +506,10 @@ func runWorktreeAttach(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var branch string
-	if len(args) > 0 {
-		branch = args[0]
-	} else if info.isWorktree {
-		// Use current worktree's branch
-		branch = info.currentBranch
-	} else {
-		return fmt.Errorf("no branch specified and not in a worktree\nUsage: overlord worktree attach <branch>")
+	// Resolve branch from args or current worktree
+	branch, err := resolveBranchArg(args, info, "Usage: overlord worktree attach <branch>")
+	if err != nil {
+		return err
 	}
 
 	sessionName := worktreeSessionName(info.projectName, branch)
@@ -554,14 +562,10 @@ func runWorktreeRemove(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var branch string
-	if len(args) > 0 {
-		branch = args[0]
-	} else if info.isWorktree {
-		// Use current worktree's branch
-		branch = info.currentBranch
-	} else {
-		return fmt.Errorf("no branch specified and not in a worktree\nUsage: overlord worktree remove <branch>")
+	// Resolve branch from args or current worktree
+	branch, err := resolveBranchArg(args, info, "Usage: overlord worktree remove <branch>")
+	if err != nil {
+		return err
 	}
 
 	// Check if worktree exists

@@ -195,6 +195,34 @@ func MoveThoughtsFromArchive(thoughtsDir, projectName string) (warnings []string
 	return warnings, nil
 }
 
+// CreateThoughtsStructure creates thoughts directories and symlinks for a project.
+// Creates all 8 subdirectories under ~/thoughts/projects/{name}/ and symlinks in docs/.
+// The projectPath should be an absolute path to the project directory.
+func CreateThoughtsStructure(thoughtsDir, projectName, projectPath string) error {
+	// Ensure project path is absolute
+	absProjectPath, err := filepath.Abs(projectPath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	// Get all 8 thoughts subdirectory paths
+	paths := GetThoughtsPaths(thoughtsDir, projectName)
+
+	// Create all 8 subdirectories
+	for _, dir := range paths.toSlice() {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create thoughts directory %s: %w", dir, err)
+		}
+	}
+
+	// Create symlinks in docs/ subdirectory
+	if err := UpdateProjectSymlinks(paths.Docs, absProjectPath); err != nil {
+		return fmt.Errorf("failed to create symlinks: %w", err)
+	}
+
+	return nil
+}
+
 // UpdateProjectSymlinks updates symlinks in the thoughts project directory to point to the actual project location.
 // thoughtsProjectDir should be the docs subdirectory: ~/thoughts/projects/{name}/docs/
 // Removes existing symlinks and creates new relative symlinks for README.md and AGENTS.md.

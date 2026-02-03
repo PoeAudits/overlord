@@ -16,6 +16,58 @@ import (
 
 const envPassFile = ".env.pass"
 
+// envProjectInfo holds resolved project information for env commands.
+type envProjectInfo struct {
+	Name        string
+	Project     registry.Project
+	ProjectRoot string
+	MatchInfo   string // how the match was made (for display)
+}
+
+// resolveEnvProject resolves a project from args or current working directory.
+// If args is non-empty, uses fuzzy matching. Otherwise, detects from cwd.
+func resolveEnvProject(args []string, reg *registry.Registry, baseDir, cwdUsage string) (*envProjectInfo, error) {
+	info := &envProjectInfo{}
+
+	if len(args) > 0 {
+		// Explicit project name — resolve via fuzzy matching
+		result, err := reg.ResolveOne(args[0])
+		if err != nil {
+			return nil, fmt.Errorf("project '%s' not found in registry\nrun 'overlord list' to see all projects", args[0])
+		}
+		info.Name = result.Name
+		info.Project = result.Project
+
+		if result.MatchedOn != "name" {
+			info.MatchInfo = result.MatchedOn
+			if strings.HasPrefix(info.MatchInfo, "alias:") {
+				info.MatchInfo = fmt.Sprintf("alias '%s'", strings.TrimPrefix(info.MatchInfo, "alias:"))
+			}
+		}
+	} else {
+		// No args — auto-detect project from current working directory
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get working directory: %w", err)
+		}
+
+		name, proj, found := reg.FindProjectByPath(cwd, baseDir)
+		if !found {
+			return nil, fmt.Errorf("not inside a project directory\n%s", cwdUsage)
+		}
+		info.Name = name
+		info.Project = proj
+	}
+
+	// Derive and verify project root
+	info.ProjectRoot = resolveProjectPath(info.Project.Path, baseDir)
+	if _, err := os.Stat(info.ProjectRoot); os.IsNotExist(err) {
+		return nil, fmt.Errorf("project directory does not exist: %s", info.ProjectRoot)
+	}
+
+	return info, nil
+}
+
 // envEntry represents a single entry in an .env.pass template file.
 type envEntry struct {
 	Key       string // environment variable name
@@ -138,64 +190,28 @@ func runEnvPull(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Expand base directory (needed for both resolution paths)
+	// Expand base directory
 	baseDir, err := expandBaseDir(reg)
 	if err != nil {
 		return err
 	}
 
-	var projectName string
-	var project registry.Project
-	var matchInfo string
-
-	if len(args) > 0 {
-		// Explicit project name — resolve via fuzzy matching
-		result, err := reg.ResolveOne(args[0])
-		if err != nil {
-			return fmt.Errorf("project '%s' not found in registry\nrun 'overlord list' to see all projects", args[0])
-		}
-		projectName = result.Name
-		project = result.Project
-
-		if result.MatchedOn != "name" {
-			matchInfo = result.MatchedOn
-			if strings.HasPrefix(matchInfo, "alias:") {
-				matchInfo = fmt.Sprintf("alias '%s'", strings.TrimPrefix(matchInfo, "alias:"))
-			}
-		}
-	} else {
-		// No args — auto-detect project from current working directory
-		cwd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get working directory: %w", err)
-		}
-
-		name, proj, found := reg.FindProjectByPath(cwd, baseDir)
-		if !found {
-			return fmt.Errorf("not inside a project directory\nspecify a project name: overlord env pull <project>")
-		}
-		projectName = name
-		project = proj
+	// Resolve project from args or cwd
+	info, err := resolveEnvProject(args, reg, baseDir, "specify a project name: overlord env pull <project>")
+	if err != nil {
+		return err
 	}
 
-	// Derive project root
-	projectRoot := resolveProjectPath(project.Path, baseDir)
-
-	// Verify project directory exists
-	if _, err := os.Stat(projectRoot); os.IsNotExist(err) {
-		return fmt.Errorf("project directory does not exist: %s", projectRoot)
-	}
-
-	envPath := filepath.Join(projectRoot, ".env")
-	envPassPath := filepath.Join(projectRoot, envPassFile)
+	envPath := filepath.Join(info.ProjectRoot, ".env")
+	envPassPath := filepath.Join(info.ProjectRoot, envPassFile)
 
 	// Try .env.pass template first
 	if _, err := os.Stat(envPassPath); err == nil {
-		return pullFromTemplate(envPassPath, envPath, projectName, matchInfo, successStyle, labelStyle)
+		return pullFromTemplate(envPassPath, envPath, info.Name, info.MatchInfo, successStyle, labelStyle)
 	}
 
 	// Fall back to blob approach (overlord/env/<project-name> in pass)
-	return pullFromBlob(envPath, projectName, matchInfo, successStyle, labelStyle)
+	return pullFromBlob(envPath, info.Name, info.MatchInfo, successStyle, labelStyle)
 }
 
 // pullFromTemplate reads a .env.pass template, resolves pass references, and writes .env.
@@ -392,37 +408,13 @@ func runEnvGenerate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var projectName string
-	var project registry.Project
-
-	if len(args) > 0 {
-		result, err := reg.ResolveOne(args[0])
-		if err != nil {
-			return fmt.Errorf("project '%s' not found in registry\nrun 'overlord list' to see all projects", args[0])
-		}
-		projectName = result.Name
-		project = result.Project
-	} else {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get working directory: %w", err)
-		}
-
-		name, proj, found := reg.FindProjectByPath(cwd, baseDir)
-		if !found {
-			return fmt.Errorf("not inside a project directory\nspecify a project name: overlord env generate <project>")
-		}
-		projectName = name
-		project = proj
+	// Resolve project from args or cwd
+	info, err := resolveEnvProject(args, reg, baseDir, "specify a project name: overlord env generate <project>")
+	if err != nil {
+		return err
 	}
 
-	projectRoot := resolveProjectPath(project.Path, baseDir)
-
-	if _, err := os.Stat(projectRoot); os.IsNotExist(err) {
-		return fmt.Errorf("project directory does not exist: %s", projectRoot)
-	}
-
-	envPassPath := filepath.Join(projectRoot, envPassFile)
+	envPassPath := filepath.Join(info.ProjectRoot, envPassFile)
 
 	// Check if .env.pass already exists
 	if _, err := os.Stat(envPassPath); err == nil && !envGenerateForce {
@@ -446,7 +438,7 @@ func runEnvGenerate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to write %s: %w", envPassFile, err)
 	}
 
-	fmt.Printf("%s Generated %s for '%s'\n", successStyle.Render("✓"), envPassFile, projectName)
+	fmt.Printf("%s Generated %s for '%s'\n", successStyle.Render("✓"), envPassFile, info.Name)
 	fmt.Printf("  %s %s (%d entries from pass)\n",
 		labelStyle.Render("Template:"), envPassPath, len(entries))
 	fmt.Printf("  %s overlord env\n", labelStyle.Render("Pull with:"))

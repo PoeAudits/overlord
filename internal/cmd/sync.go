@@ -118,20 +118,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 	// 4. Pull git registry first
 	fmt.Printf("\n%s Pulling registry from git...\n", s.Label.Render("Step 1:"))
-
-	gitRepoPath, err := registry.ExpandPath("~/.config/overlord")
-	if err != nil {
-		return fmt.Errorf("failed to expand git repo path: %w", err)
-	}
-
-	git := gitops.New(gitRepoPath)
-	git.Env = []string{mux.GitSSHEnv()}
-	if err := git.Pull(context.Background()); err != nil {
-		fmt.Printf("  %s Failed to pull registry: %v\n", s.Warn.Render("Warning:"), err)
-		fmt.Printf("  Continuing with local registry...\n")
-	} else {
-		fmt.Printf("  %s\n", s.Success.Render("Done"))
-	}
+	pullGitRegistry(mux.GitSSHEnv(), s)
 
 	// 5. Load registry
 	reg, err := loadRegistry()
@@ -140,33 +127,12 @@ func runSync(cmd *cobra.Command, args []string) error {
 	}
 
 	// 6. Determine which projects to sync
-	var projectsToSync map[string]registry.Project
-
-	if len(args) > 0 {
-		// Specific project requested
-		projectName := args[0]
-		result, err := reg.ResolveOne(projectName)
-		if err != nil {
-			return fmt.Errorf("project '%s' not found\nRun 'overlord list' to see all projects", projectName)
-		}
-
-		// Check if project has sync enabled
-		if result.Project.Sync.Status != registry.SyncActive {
-			return fmt.Errorf("project '%s' is not active for sync\nRun 'overlord activate %s' to enable sync first", result.Name, result.Name)
-		}
-
-		projectsToSync = map[string]registry.Project{
-			result.Name: result.Project,
-		}
-	} else {
-		// Get all sync-active projects
-		projectsToSync = getSyncActiveProjects(reg)
+	projectsToSync, err := resolveSyncProjects(args, reg, s)
+	if err != nil {
+		return err
 	}
-
-	if len(projectsToSync) == 0 {
-		fmt.Printf("%s No projects are active for sync\n", s.Info.Render("Info:"))
-		fmt.Printf("  Run 'overlord activate <project>' to enable sync for a project\n")
-		return nil
+	if projectsToSync == nil {
+		return nil // No projects to sync (message already printed)
 	}
 
 	// 7. Expand base directory
@@ -201,14 +167,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 	results := make([]syncResult, 0, len(projectsToSync))
 
-	// Sort project names for consistent output
-	projectNames := make([]string, 0, len(projectsToSync))
-	for name := range projectsToSync {
-		projectNames = append(projectNames, name)
-	}
-	sort.Strings(projectNames)
-
-	for _, name := range projectNames {
+	for _, name := range sortedProjectNames(projectsToSync) {
 		project := projectsToSync[name]
 		ctx := &syncContext{
 			name:           name,
@@ -256,6 +215,75 @@ func getSyncActiveProjects(reg *registry.Registry) map[string]registry.Project {
 		}
 	}
 	return result
+}
+
+// pullGitRegistry pulls the registry from git using SSH multiplexing.
+// Continues on failure with a warning (non-fatal).
+func pullGitRegistry(sshEnv string, s Styles) {
+	gitRepoPath, err := registry.ExpandPath("~/.config/overlord")
+	if err != nil {
+		fmt.Printf("  %s Failed to expand git repo path: %v\n", s.Warn.Render("Warning:"), err)
+		fmt.Printf("  Continuing with local registry...\n")
+		return
+	}
+
+	git := gitops.New(gitRepoPath)
+	if sshEnv != "" {
+		git.Env = []string{sshEnv}
+	}
+	if err := git.Pull(context.Background()); err != nil {
+		fmt.Printf("  %s Failed to pull registry: %v\n", s.Warn.Render("Warning:"), err)
+		fmt.Printf("  Continuing with local registry...\n")
+	} else {
+		fmt.Printf("  %s\n", s.Success.Render("Done"))
+	}
+}
+
+// resolveSyncProjects determines which projects to sync based on args.
+// If args is empty, returns all sync-active projects.
+// If args has a project name, resolves it and verifies it's sync-active.
+// Returns nil map (not error) if no projects to sync, with a message printed.
+func resolveSyncProjects(args []string, reg *registry.Registry, s Styles) (map[string]registry.Project, error) {
+	var projectsToSync map[string]registry.Project
+
+	if len(args) > 0 {
+		// Specific project requested
+		projectName := args[0]
+		result, err := reg.ResolveOne(projectName)
+		if err != nil {
+			return nil, fmt.Errorf("project '%s' not found\nRun 'overlord list' to see all projects", projectName)
+		}
+
+		// Check if project has sync enabled
+		if result.Project.Sync.Status != registry.SyncActive {
+			return nil, fmt.Errorf("project '%s' is not active for sync\nRun 'overlord activate %s' to enable sync first", result.Name, result.Name)
+		}
+
+		projectsToSync = map[string]registry.Project{
+			result.Name: result.Project,
+		}
+	} else {
+		// Get all sync-active projects
+		projectsToSync = getSyncActiveProjects(reg)
+	}
+
+	if len(projectsToSync) == 0 {
+		fmt.Printf("%s No projects are active for sync\n", s.Info.Render("Info:"))
+		fmt.Printf("  Run 'overlord activate <project>' to enable sync for a project\n")
+		return nil, nil
+	}
+
+	return projectsToSync, nil
+}
+
+// sortedProjectNames returns project names sorted alphabetically.
+func sortedProjectNames(projects map[string]registry.Project) []string {
+	names := make([]string, 0, len(projects))
+	for name := range projects {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // syncContext bundles all parameters needed for syncing a project from a
@@ -657,20 +685,7 @@ func runSyncFromStorage(cmd *cobra.Command, args []string, machineConfig *machin
 
 	// Pull git registry first
 	fmt.Printf("\n%s Pulling registry from git...\n", s.Label.Render("Step 1:"))
-
-	gitRepoPath, err := registry.ExpandPath("~/.config/overlord")
-	if err != nil {
-		return fmt.Errorf("failed to expand git repo path: %w", err)
-	}
-
-	git := gitops.New(gitRepoPath)
-	git.Env = []string{mux.GitSSHEnv()}
-	if err := git.Pull(context.Background()); err != nil {
-		fmt.Printf("  %s Failed to pull registry: %v\n", s.Warn.Render("Warning:"), err)
-		fmt.Printf("  Continuing with local registry...\n")
-	} else {
-		fmt.Printf("  %s\n", s.Success.Render("Done"))
-	}
+	pullGitRegistry(mux.GitSSHEnv(), s)
 
 	// Load registry
 	reg, err := loadRegistry()
@@ -679,28 +694,12 @@ func runSyncFromStorage(cmd *cobra.Command, args []string, machineConfig *machin
 	}
 
 	// Determine which projects to sync
-	var projectsToSync map[string]registry.Project
-
-	if len(args) > 0 {
-		projectName := args[0]
-		result, err := reg.ResolveOne(projectName)
-		if err != nil {
-			return fmt.Errorf("project '%s' not found\nRun 'overlord list' to see all projects", projectName)
-		}
-		if result.Project.Sync.Status != registry.SyncActive {
-			return fmt.Errorf("project '%s' is not active for sync\nRun 'overlord activate %s' to enable sync first", result.Name, result.Name)
-		}
-		projectsToSync = map[string]registry.Project{
-			result.Name: result.Project,
-		}
-	} else {
-		projectsToSync = getSyncActiveProjects(reg)
+	projectsToSync, err := resolveSyncProjects(args, reg, s)
+	if err != nil {
+		return err
 	}
-
-	if len(projectsToSync) == 0 {
-		fmt.Printf("%s No projects are active for sync\n", s.Info.Render("Info:"))
-		fmt.Printf("  Run 'overlord activate <project>' to enable sync for a project\n")
-		return nil
+	if projectsToSync == nil {
+		return nil // No projects to sync (message already printed)
 	}
 
 	// Expand base directory
@@ -732,14 +731,7 @@ func runSyncFromStorage(cmd *cobra.Command, args []string, machineConfig *machin
 
 	results := make([]syncResult, 0, len(projectsToSync))
 
-	// Sort project names for consistent output
-	projectNames := make([]string, 0, len(projectsToSync))
-	for name := range projectsToSync {
-		projectNames = append(projectNames, name)
-	}
-	sort.Strings(projectNames)
-
-	for _, name := range projectNames {
+	for _, name := range sortedProjectNames(projectsToSync) {
 		project := projectsToSync[name]
 		ctx := &hostSyncContext{
 			name:           name,

@@ -210,57 +210,6 @@ func getLanguageFromFlags() (registry.Language, bool) {
 	return languageFromFlags(addOpts.langPy, addOpts.langTs, addOpts.langGo, addOpts.langSol, addOpts.langBase)
 }
 
-// createThoughtsStructure creates thoughts directories and symlinks.
-// Creates all 8 subdirectories under ~/thoughts/projects/{name}/:
-// plans, logs, docs, research, sessions, handoffs, reviews, briefs
-// Symlinks to README.md and AGENTS.md are created in the docs/ subdirectory.
-func createThoughtsStructure(name, projectPath, thoughtsDir string) error {
-	// Expand project path to absolute path
-	absProjectPath, err := filepath.Abs(projectPath)
-	if err != nil {
-		return fmt.Errorf("failed to get absolute path: %w", err)
-	}
-
-	// Get all 8 thoughts subdirectory paths
-	paths := GetThoughtsPaths(thoughtsDir, name)
-
-	// Create all 8 subdirectories
-	for _, dir := range paths.toSlice() {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create thoughts directory %s: %w", dir, err)
-		}
-	}
-
-	// Create symlinks in docs/ subdirectory (not project root)
-	docsDir := paths.Docs
-	readmeLink := filepath.Join(docsDir, "README.md")
-	agentsLink := filepath.Join(docsDir, "AGENTS.md")
-
-	// Calculate relative path from thoughts/projects/{name}/docs/ to project directory
-	relPath, err := filepath.Rel(docsDir, absProjectPath)
-	if err != nil {
-		return fmt.Errorf("failed to calculate relative path: %w", err)
-	}
-
-	// Create symlinks using relative paths
-	readmeRelTarget := filepath.Join(relPath, "README.md")
-	agentsRelTarget := filepath.Join(relPath, "AGENTS.md")
-
-	// Remove existing symlinks if they exist
-	os.Remove(readmeLink)
-	os.Remove(agentsLink)
-
-	if err := os.Symlink(readmeRelTarget, readmeLink); err != nil {
-		return fmt.Errorf("failed to create README.md symlink: %w", err)
-	}
-
-	if err := os.Symlink(agentsRelTarget, agentsLink); err != nil {
-		return fmt.Errorf("failed to create AGENTS.md symlink: %w", err)
-	}
-
-	return nil
-}
-
 // resolveAddArgs resolves the project name and path from command arguments and flags.
 //
 //	0 args: path = ".", name = basename(cwd)
@@ -399,7 +348,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	// Create thoughts structure
 	fmt.Printf("  Creating thoughts structure...")
-	if err := createThoughtsStructure(name, expandedPath, thoughtsDir); err != nil {
+	if err := CreateThoughtsStructure(thoughtsDir, name, expandedPath); err != nil {
 		return err
 	}
 	fmt.Println(" done")
