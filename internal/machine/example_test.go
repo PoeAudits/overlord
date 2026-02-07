@@ -17,20 +17,23 @@ func ExampleLoad() {
 	}
 
 	fmt.Printf("Machine: %s\n", config.Name)
-	fmt.Printf("Role: %s\n", config.Role)
+	fmt.Printf("Syncthing configured: %t\n", config.Syncthing.DeviceID != "")
 }
 
-func ExampleLoad_workingSet() {
+func ExampleLoad_syncthing() {
 	// Create a temporary config file for demonstration
 	dir, _ := os.MkdirTemp("", "example")
 	defer os.RemoveAll(dir)
 
 	configPath := filepath.Join(dir, "machine.yaml")
 	content := `name: laptop
-role: working-set
-storage_host: storage.example.com
+syncthing:
+  device_id: "XXXX-XXXX-XXXX-XXXX"
+  api_url: "http://localhost:8384"
+  api_key: "example-key"
+  address: "tcp://100.100.100.100:22000"
 `
-	os.WriteFile(configPath, []byte(content), 0644)
+	_ = os.WriteFile(configPath, []byte(content), 0644)
 
 	// Load the config
 	config, err := machine.Load(configPath)
@@ -39,71 +42,57 @@ storage_host: storage.example.com
 	}
 
 	fmt.Printf("Machine: %s\n", config.Name)
-	fmt.Printf("Role: %s\n", config.Role)
-	fmt.Printf("Storage Host: %s\n", config.StorageHost)
+	fmt.Printf("Syncthing device: %s\n", config.Syncthing.DeviceID)
 	// Output:
 	// Machine: laptop
-	// Role: working-set
-	// Storage Host: storage.example.com
+	// Syncthing device: XXXX-XXXX-XXXX-XXXX
 }
 
 func ExampleMachineConfig_Validate() {
-	// Valid storage config
-	storageConfig := &machine.MachineConfig{
-		Name: "storage-server",
-		Role: machine.RoleStorage,
+	// Valid minimal config
+	minimal := &machine.MachineConfig{
+		Name: "desktop",
 	}
 
-	if err := storageConfig.Validate(); err != nil {
-		fmt.Printf("Storage config error: %v\n", err)
+	if err := minimal.Validate(); err != nil {
+		fmt.Printf("Minimal config error: %v\n", err)
 	} else {
-		fmt.Println("Storage config is valid")
+		fmt.Println("Minimal config is valid")
 	}
 
-	// Valid working-set config
-	workingSetConfig := &machine.MachineConfig{
-		Name:        "laptop",
-		Role:        machine.RoleWorkingSet,
-		StorageHost: "storage.example.com",
+	// Valid Syncthing config
+	configured := &machine.MachineConfig{
+		Name: "vps",
+		Syncthing: machine.SyncthingConfig{
+			DeviceID: "XXXX-XXXX-XXXX-XXXX",
+			APIURL:   "http://localhost:8384",
+			APIKey:   "key",
+			Address:  "tcp://100.100.100.100:22000",
+		},
 	}
 
-	if err := workingSetConfig.Validate(); err != nil {
-		fmt.Printf("Working-set config error: %v\n", err)
+	if err := configured.Validate(); err != nil {
+		fmt.Printf("Configured config error: %v\n", err)
 	} else {
-		fmt.Println("Working-set config is valid")
+		fmt.Println("Configured config is valid")
 	}
 
-	// Invalid config (missing storage_host for working-set)
-	invalidConfig := &machine.MachineConfig{
-		Name: "laptop",
-		Role: machine.RoleWorkingSet,
+	// Invalid config (missing api_key)
+	invalid := &machine.MachineConfig{
+		Name: "broken",
+		Syncthing: machine.SyncthingConfig{
+			DeviceID: "XXXX-XXXX-XXXX-XXXX",
+			APIURL:   "http://localhost:8384",
+			Address:  "tcp://100.100.100.100:22000",
+		},
 	}
 
-	if err := invalidConfig.Validate(); err != nil {
+	if err := invalid.Validate(); err != nil {
 		fmt.Printf("Invalid config error: %v\n", err)
 	}
 
 	// Output:
-	// Storage config is valid
-	// Working-set config is valid
-	// Invalid config error: storage_host is required for working-set role
-}
-
-func ExampleRole_IsValid() {
-	validRoles := []machine.Role{
-		machine.RoleStorage,
-		machine.RoleWorkingSet,
-	}
-
-	for _, role := range validRoles {
-		fmt.Printf("%s is valid: %v\n", role, role.IsValid())
-	}
-
-	invalidRole := machine.Role("invalid")
-	fmt.Printf("%s is valid: %v\n", invalidRole, invalidRole.IsValid())
-
-	// Output:
-	// storage is valid: true
-	// working-set is valid: true
-	// invalid is valid: false
+	// Minimal config is valid
+	// Configured config is valid
+	// Invalid config error: syncthing config requires device_id, api_url, and api_key
 }

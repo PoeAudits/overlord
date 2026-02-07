@@ -24,9 +24,6 @@ func TestDeactivateCommand(t *testing.T) {
 		Settings: registry.Settings{
 			BaseDir:     tmpDir,
 			ThoughtsDir: "~/thoughts",
-			Sync: registry.SyncSettings{
-				DefaultExclude: []string{"node_modules", ".git"},
-			},
 		},
 		Projects: map[string]registry.Project{
 			"active-synced": {
@@ -65,18 +62,6 @@ func TestDeactivateCommand(t *testing.T) {
 				Aliases:     []string{"pwa", "alias-test"},
 				Status:      registry.Status{State: registry.StateActive},
 				Sync:        registry.ProjectSync{Status: registry.SyncActive},
-			},
-			"project-with-excludes": {
-				Path:        "projects/web/project-with-excludes",
-				Category:    registry.CategoryWeb,
-				Lang:        registry.LanguageTypeScript,
-				Created:     "2024-01-01",
-				Description: "Project with custom excludes",
-				Status:      registry.Status{State: registry.StateActive},
-				Sync: registry.ProjectSync{
-					Status:  registry.SyncActive,
-					Exclude: []string{".cache", "dist/"},
-				},
 			},
 		},
 	}
@@ -194,27 +179,6 @@ func TestDeactivateCommand(t *testing.T) {
 		}
 	})
 
-	t.Run("project with custom excludes", func(t *testing.T) {
-		reg, err := registry.Load(registryPath)
-		if err != nil {
-			t.Fatalf("failed to load registry: %v", err)
-		}
-
-		result, err := reg.ResolveOne("project-with-excludes")
-		if err != nil {
-			t.Fatalf("failed to resolve project: %v", err)
-		}
-
-		// Verify custom excludes are present
-		if len(result.Project.Sync.Exclude) != 2 {
-			t.Errorf("expected 2 custom excludes, got %d", len(result.Project.Sync.Exclude))
-		}
-
-		// Verify global excludes are in settings
-		if len(reg.Settings.Sync.DefaultExclude) != 2 {
-			t.Errorf("expected 2 global excludes, got %d", len(reg.Settings.Sync.DefaultExclude))
-		}
-	})
 }
 
 func TestDeactivateLogic(t *testing.T) {
@@ -290,166 +254,6 @@ func TestDeactivateLogic(t *testing.T) {
 
 			if project.Sync.Status != registry.SyncInactive {
 				t.Error("sync status should be inactive after deactivation")
-			}
-		})
-	}
-}
-
-func TestDeactivateDirectoryRemoval(t *testing.T) {
-	// Create a temporary directory for test
-	tmpDir, err := os.MkdirTemp("", "overlord-deactivate-dir-test")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	t.Run("directory exists and can be removed", func(t *testing.T) {
-		// Create a test directory
-		testDir := filepath.Join(tmpDir, "test-project")
-		if err := os.MkdirAll(testDir, 0755); err != nil {
-			t.Fatalf("failed to create test dir: %v", err)
-		}
-
-		// Create a test file inside
-		testFile := filepath.Join(testDir, "test.txt")
-		if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
-			t.Fatalf("failed to create test file: %v", err)
-		}
-
-		// Verify directory exists
-		if _, err := os.Stat(testDir); os.IsNotExist(err) {
-			t.Fatal("test directory should exist")
-		}
-
-		// Remove directory
-		if err := os.RemoveAll(testDir); err != nil {
-			t.Fatalf("failed to remove directory: %v", err)
-		}
-
-		// Verify directory is removed
-		if _, err := os.Stat(testDir); !os.IsNotExist(err) {
-			t.Error("test directory should be removed")
-		}
-	})
-
-	t.Run("directory does not exist", func(t *testing.T) {
-		testDir := filepath.Join(tmpDir, "non-existent-project")
-
-		// Verify directory does not exist
-		if _, err := os.Stat(testDir); !os.IsNotExist(err) {
-			t.Error("test directory should not exist")
-		}
-	})
-}
-
-func TestDeactivateFlagCombinations(t *testing.T) {
-	tests := []struct {
-		name         string
-		force        bool
-		keepLocal    bool
-		forceRemove  bool
-		syncFailed   bool
-		userConfirms bool // Simulates user confirmation response
-		expectRemove bool
-		description  string
-	}{
-		{
-			name:         "default flags, sync succeeded, user confirms",
-			force:        false,
-			keepLocal:    false,
-			forceRemove:  false,
-			syncFailed:   false,
-			userConfirms: true,
-			expectRemove: true,
-			description:  "Should prompt and remove if user confirms",
-		},
-		{
-			name:         "default flags, sync succeeded, user declines",
-			force:        false,
-			keepLocal:    false,
-			forceRemove:  false,
-			syncFailed:   false,
-			userConfirms: false,
-			expectRemove: false,
-			description:  "Should prompt and not remove if user declines",
-		},
-		{
-			name:         "force flag, sync succeeded",
-			force:        true,
-			keepLocal:    false,
-			forceRemove:  false,
-			syncFailed:   false,
-			userConfirms: false, // Doesn't matter with force
-			expectRemove: true,
-			description:  "Should remove without prompt",
-		},
-		{
-			name:         "keep-local flag",
-			force:        false,
-			keepLocal:    true,
-			forceRemove:  false,
-			syncFailed:   false,
-			userConfirms: true, // Doesn't matter with keep-local
-			expectRemove: false,
-			description:  "Should not remove directory",
-		},
-		{
-			name:         "sync failed, no force-remove",
-			force:        true,
-			keepLocal:    false,
-			forceRemove:  false,
-			syncFailed:   true,
-			userConfirms: true, // Doesn't matter - sync failure blocks removal
-			expectRemove: false,
-			description:  "Should not remove due to sync failure",
-		},
-		{
-			name:         "sync failed, with force-remove",
-			force:        true,
-			keepLocal:    false,
-			forceRemove:  true,
-			syncFailed:   true,
-			userConfirms: false, // Doesn't matter with force
-			expectRemove: true,
-			description:  "Should remove despite sync failure",
-		},
-		{
-			name:         "keep-local overrides force-remove",
-			force:        true,
-			keepLocal:    true,
-			forceRemove:  true,
-			syncFailed:   true,
-			userConfirms: true, // Doesn't matter with keep-local
-			expectRemove: false,
-			description:  "keep-local should take precedence",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Simulate the decision logic from the command
-			// This mirrors the logic in runDeactivate
-			shouldRemove := false
-
-			if !tt.keepLocal {
-				// Check if sync succeeded or force-remove is set
-				if tt.syncFailed && !tt.forceRemove {
-					// Don't remove if sync failed and no force-remove
-					shouldRemove = false
-				} else {
-					// Sync succeeded or force-remove is set
-					// Now check if we should prompt or force
-					if tt.force {
-						shouldRemove = true
-					} else {
-						// Would prompt - use userConfirms to simulate response
-						shouldRemove = tt.userConfirms
-					}
-				}
-			}
-
-			if shouldRemove != tt.expectRemove {
-				t.Errorf("%s: expected remove=%v, got %v", tt.description, tt.expectRemove, shouldRemove)
 			}
 		})
 	}

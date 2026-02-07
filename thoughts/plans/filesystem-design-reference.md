@@ -40,32 +40,6 @@ This document defines the AI-first filesystem structure for multi-machine develo
     └── workflows/          # Dispatch workflow definitions
 ```
 
-## Project Directory (`~/Work/`)
-
-### Structure
-
-```
-~/Work/
-├── core/                   # Essential infrastructure (cannot be archived)
-│   ├── agents/             # Agent tooling (dispatch, orchestration)
-│   │   └── dispatch/
-│   └── tools/              # System utilities
-│       └── overlord/
-│
-├── projects/               # All active development work
-│   ├── contracts/          # Blockchain/Solidity smart contracts
-│   ├── web/                # Web applications, frontends
-│   ├── services/           # Backend APIs, running services
-│   ├── ml/                 # ML, data processing, research
-│   ├── libs/               # Shared libraries (all languages, flat)
-│   └── cli/                # Command-line tools
-│
-├── sandbox/                # Experiments, prototypes, throwaway
-│   └── {experiment-name}/
-│
-└── archive/                # Archived projects (read-only, hidden from agents)
-    └── {project-name}/
-```
 
 ### Category Definitions
 

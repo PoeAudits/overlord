@@ -131,6 +131,20 @@ func (s SyncStatus) IsValid() bool {
 	return s == SyncActive || s == SyncInactive || s == ""
 }
 
+// SyncMethod represents the sync mechanism used for a project.
+type SyncMethod string
+
+// SyncMethod constants
+const (
+	SyncMethodSyncthing SyncMethod = "syncthing"
+)
+
+// IsValid checks if the sync method is valid
+// Empty string is valid for backward compatibility.
+func (m SyncMethod) IsValid() bool {
+	return m == SyncMethodSyncthing || m == ""
+}
+
 // Status represents the project status
 type Status struct {
 	State State `yaml:"state"`
@@ -146,14 +160,17 @@ func (s *Status) Validate() error {
 
 // ProjectSync represents per-project sync configuration
 type ProjectSync struct {
-	Status  SyncStatus `yaml:"status,omitempty"`
-	Exclude []string   `yaml:"exclude,omitempty"`
+	Status SyncStatus `yaml:"status,omitempty"`
+	Method SyncMethod `yaml:"method,omitempty"`
 }
 
 // Validate validates the project sync configuration
 func (ps *ProjectSync) Validate() error {
 	if !ps.Status.IsValid() {
 		return fmt.Errorf("invalid sync status: %s (must be 'active', 'inactive', or empty)", ps.Status)
+	}
+	if !ps.Method.IsValid() {
+		return fmt.Errorf("invalid sync method: %s (must be 'syncthing' or empty)", ps.Method)
 	}
 	return nil
 }
@@ -226,23 +243,10 @@ func (p *Project) Validate() error {
 	return nil
 }
 
-// SyncSettings represents sync configuration
-type SyncSettings struct {
-	DefaultExclude []string `yaml:"default_exclude,omitempty"`
-}
-
-// Validate validates the sync settings
-func (s *SyncSettings) Validate() error {
-	// Permissive validation - empty exclude list is valid
-	// Could add validation for pattern syntax in the future
-	return nil
-}
-
 // Settings represents the registry settings
 type Settings struct {
-	BaseDir     string       `yaml:"base_dir"`
-	ThoughtsDir string       `yaml:"thoughts_dir"`
-	Sync        SyncSettings `yaml:"sync,omitempty"`
+	BaseDir     string `yaml:"base_dir"`
+	ThoughtsDir string `yaml:"thoughts_dir"`
 }
 
 // Validate validates the settings
@@ -255,11 +259,6 @@ func (s *Settings) Validate() error {
 
 	if s.ThoughtsDir == "" {
 		errs = append(errs, "thoughts_dir is required")
-	}
-
-	// Validate sync settings if present
-	if err := s.Sync.Validate(); err != nil {
-		errs = append(errs, err.Error())
 	}
 
 	if len(errs) > 0 {

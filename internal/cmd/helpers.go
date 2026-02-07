@@ -48,6 +48,16 @@ func commitAndPushRegistry(action string) error {
 		return fmt.Errorf("failed to commit registry: %w", err)
 	}
 
+	hasRemote, err := git.HasRemote(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to verify registry remote: %w", err)
+	}
+	if !hasRemote {
+		s := NewStyles()
+		fmt.Printf("  %s Registry committed locally, but no git remote is configured for ~/.config/overlord\n", s.Warn.Render("Warning:"))
+		return nil
+	}
+
 	// Push - warn but don't fail if push fails
 	if err := git.Push(context.Background()); err != nil {
 		s := NewStyles()
@@ -100,6 +110,16 @@ func expandBaseDir(reg *registry.Registry) (string, error) {
 		return "", fmt.Errorf("failed to expand base directory: %w", err)
 	}
 	return baseDir, nil
+}
+
+// resolveProject resolves a project name using fuzzy matching.
+// Returns the resolved name and project, or an error with a helpful message.
+func resolveProject(reg *registry.Registry, name string) (string, registry.Project, error) {
+	result, err := reg.ResolveOne(name)
+	if err != nil {
+		return "", registry.Project{}, fmt.Errorf("project '%s' not found\nRun 'overlord list' to see all projects", name)
+	}
+	return result.Name, result.Project, nil
 }
 
 // countTrue returns the number of true boolean values in the provided flags.

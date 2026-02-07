@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,17 +14,18 @@ import (
 
 	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/registry"
+	"github.com/PoeAudits/overlord/internal/syncthing"
 )
 
 // DefaultConfigRepoURL is the default git remote for the registry config repository.
 const DefaultConfigRepoURL = "git@github.com:PoeAudits/overlord-config.git"
 
 var setupCmd = &cobra.Command{
-	Use:   "setup",
-	Short: "Set up overlord directories and configuration",
-	Long: `Set up all required directories and configuration files for overlord.
+	Use:   "setup [project]",
+	Short: "Set up overlord configuration or bootstrap a project",
+	Long: `Set up overlord configuration (default) or bootstrap a synced project.
 
-Creates:
+When called without arguments, creates:
   - Config directory (~/.config/overlord/)
   - Git repository for registry sync (optional)
   - Registry file (~/.config/overlord/registry.yaml)
@@ -33,8 +35,15 @@ Creates:
   - Thoughts directory (~/thoughts by default)
 
 If directories or files already exist, they are left unchanged.
-Git initialization prompts for a remote URL to clone from (for multi-machine sync).
-Machine config creation prompts for machine role (storage or working-set).`,
+ Git initialization prompts for a remote URL to clone from (for multi-machine sync).
+ Machine config creation stores the current hostname and optional Syncthing config.
+
+When called with a project name, it:
+  - Verifies the Syncthing folder exists
+  - Pulls .env from pass (overlord env pull <name>)
+  - Installs dependencies based on language
+  - Runs .overlord-setup.sh if present`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: runSetup,
 }
 
@@ -43,6 +52,10 @@ func init() {
 }
 
 func runSetup(cmd *cobra.Command, args []string) error {
+	if len(args) > 0 {
+		return runProjectSetup(args[0])
+	}
+
 	fmt.Println("Setting up overlord...")
 
 	// Expand config path first
@@ -73,9 +86,9 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	}
 
 	// Expand paths from settings
-	baseDir, err := registry.ExpandPath(reg.Settings.BaseDir)
+	baseDir, err := expandBaseDir(reg)
 	if err != nil {
-		return fmt.Errorf("failed to expand base_dir: %w", err)
+		return err
 	}
 
 	thoughtsDir, err := registry.ExpandPath(reg.Settings.ThoughtsDir)
@@ -113,6 +126,143 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("\nSetup complete!")
+	return nil
+}
+
+func runProjectSetup(projectArg string) error {
+	s := NewStyles()
+	labelStyle := s.Label
+
+	reg, err := loadRegistry()
+	if err != nil {
+		return err
+	}
+
+	projectName, project, err := resolveProject(reg, projectArg)
+	if err != nil {
+		return err
+	}
+
+	if project.Sync.Status != registry.SyncActive {
+		return fmt.Errorf("project '%s' is not active for sync\nRun 'overlord activate %s' to enable sync first", projectName, projectName)
+	}
+
+	baseDir, err := expandBaseDir(reg)
+	if err != nil {
+		return err
+	}
+	projectRoot := resolveProjectPath(project.Path, baseDir)
+	if _, err := os.Stat(projectRoot); os.IsNotExist(err) {
+		return fmt.Errorf("project directory does not exist: %s", projectRoot)
+	}
+
+	machineConfig, err := machine.Load(machine.DefaultConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to load machine config: %w", err)
+	}
+
+	client, err := localSyncthingClient(machineConfig)
+	if err != nil {
+		return err
+	}
+
+	status, err := client.GetFolderStatus(context.Background(), projectName)
+	if err != nil {
+		if syncthing.IsNotFound(err) {
+			return fmt.Errorf("syncthing folder not found for '%s'", projectName)
+		}
+		return fmt.Errorf("failed to query syncthing status: %w", err)
+	}
+
+	if status.NeedBytes > 0 || status.State != "idle" {
+		fmt.Printf("%s Project is still syncing (%s, need %s)\n", s.Warn.Render("Warning:"), status.State, formatBytes(status.NeedBytes))
+	}
+
+	fmt.Printf("%s Pulling .env from pass...\n", labelStyle.Render("Step 1:"))
+	if err := runEnvPull(envPullCmd, []string{projectName}); err != nil {
+		fmt.Printf("  %s %v\n", s.Warn.Render("Warning:"), err)
+	} else {
+		fmt.Printf("  %s\n", s.Success.Render("Done"))
+	}
+
+	fmt.Printf("%s Installing dependencies...\n", labelStyle.Render("Step 2:"))
+	if err := installDependencies(project, projectRoot); err != nil {
+		return err
+	}
+
+	if err := runProjectSetupScript(projectRoot, s); err != nil {
+		return err
+	}
+
+	fmt.Printf("%s '%s'\n", s.Success.Render("✓ Setup complete"), projectName)
+	return nil
+}
+
+func installDependencies(project registry.Project, projectRoot string) error {
+	s := NewStyles()
+	info := s.Info.Render("Info:")
+
+	switch project.Lang {
+	case registry.LanguageGo:
+		if _, err := os.Stat(filepath.Join(projectRoot, "go.mod")); os.IsNotExist(err) {
+			fmt.Printf("  %s go.mod not found, skipping\n", info)
+			return nil
+		}
+		return runSetupCommand(projectRoot, "go", "mod", "download")
+	case registry.LanguagePython:
+		if _, err := os.Stat(filepath.Join(projectRoot, "pyproject.toml")); os.IsNotExist(err) {
+			if _, err := os.Stat(filepath.Join(projectRoot, "requirements.txt")); os.IsNotExist(err) {
+				fmt.Printf("  %s no Python dependency file found, skipping\n", info)
+				return nil
+			}
+		}
+		if _, err := exec.LookPath("uv"); err != nil {
+			return fmt.Errorf("uv not found in PATH")
+		}
+		return runSetupCommand(projectRoot, "uv", "sync")
+	case registry.LanguageTypeScript:
+		if _, err := os.Stat(filepath.Join(projectRoot, "package.json")); os.IsNotExist(err) {
+			fmt.Printf("  %s package.json not found, skipping\n", info)
+			return nil
+		}
+		if _, err := exec.LookPath("bun"); err == nil {
+			return runSetupCommand(projectRoot, "bun", "install")
+		}
+		if _, err := exec.LookPath("pnpm"); err == nil {
+			return runSetupCommand(projectRoot, "pnpm", "install")
+		}
+		return fmt.Errorf("neither bun nor pnpm found in PATH")
+	case registry.LanguageSolidity:
+		if _, err := os.Stat(filepath.Join(projectRoot, "foundry.toml")); os.IsNotExist(err) {
+			fmt.Printf("  %s foundry.toml not found, skipping\n", info)
+			return nil
+		}
+		return runSetupCommand(projectRoot, "forge", "install")
+	default:
+		fmt.Printf("  %s no dependency installer configured for %s\n", info, project.Lang)
+		return nil
+	}
+}
+
+func runProjectSetupScript(projectRoot string, s Styles) error {
+	setupPath := filepath.Join(projectRoot, ".overlord-setup.sh")
+	if _, err := os.Stat(setupPath); os.IsNotExist(err) {
+		return nil
+	}
+
+	fmt.Printf("%s Running .overlord-setup.sh...\n", s.Label.Render("Step 3:"))
+	return runSetupCommand(projectRoot, "bash", setupPath)
+}
+
+func runSetupCommand(dir string, name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("command failed: %s %v: %w", name, args, err)
+	}
 	return nil
 }
 
@@ -319,88 +469,6 @@ func setupMachineConfig(configDir string) error {
 
 	config := &machine.MachineConfig{
 		Name: hostname,
-		Role: machine.RoleStorage,
-	}
-
-	// If interactive terminal, prompt for role
-	if term.IsTerminal(int(os.Stdin.Fd())) {
-		reader := bufio.NewReader(os.Stdin)
-
-		fmt.Printf("  Machine role? [s]torage / [w]orking-set (default: storage): ")
-		response, err := reader.ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("failed to read input: %w", err)
-		}
-
-		response = strings.TrimSpace(strings.ToLower(response))
-		if response == "w" || response == "working-set" {
-			config.Role = machine.RoleWorkingSet
-
-			// Ask for storage host
-			for {
-				fmt.Printf("  Storage host (hostname or IP of storage machine): ")
-				host, err := reader.ReadString('\n')
-				if err != nil {
-					return fmt.Errorf("failed to read input: %w", err)
-				}
-				host = strings.TrimSpace(host)
-				if host != "" {
-					config.StorageHost = host
-					break
-				}
-				fmt.Println("  Storage host cannot be empty.")
-			}
-		} else {
-			// Storage role - optionally add working-set hosts
-			fmt.Printf("\n  Add working-set hosts? [y/N]: ")
-			wsResponse, err := reader.ReadString('\n')
-			if err != nil {
-				return fmt.Errorf("failed to read input: %w", err)
-			}
-			wsResponse = strings.TrimSpace(strings.ToLower(wsResponse))
-
-			if wsResponse == "y" || wsResponse == "yes" {
-				config.WorkingSetHosts = make(map[string]string)
-				for {
-					fmt.Printf("  Working-set name (e.g. laptop): ")
-					wsName, err := reader.ReadString('\n')
-					if err != nil {
-						return fmt.Errorf("failed to read input: %w", err)
-					}
-					wsName = strings.TrimSpace(wsName)
-					if wsName == "" {
-						fmt.Println("  Name cannot be empty.")
-						continue
-					}
-
-					fmt.Printf("  Working-set host/IP (e.g. root@10.0.0.1): ")
-					wsHost, err := reader.ReadString('\n')
-					if err != nil {
-						return fmt.Errorf("failed to read input: %w", err)
-					}
-					wsHost = strings.TrimSpace(wsHost)
-					if wsHost == "" {
-						fmt.Println("  Host/IP cannot be empty.")
-						continue
-					}
-
-					config.WorkingSetHosts[wsName] = wsHost
-					fmt.Printf("  Added: %s -> %s\n", wsName, wsHost)
-
-					fmt.Printf("  Add another? [y/N]: ")
-					another, err := reader.ReadString('\n')
-					if err != nil {
-						return fmt.Errorf("failed to read input: %w", err)
-					}
-					another = strings.TrimSpace(strings.ToLower(another))
-					if another != "y" && another != "yes" {
-						break
-					}
-				}
-			}
-		}
-	} else {
-		fmt.Println("  Non-interactive terminal detected, defaulting to storage role")
 	}
 
 	// Save machine config
@@ -410,15 +478,10 @@ func setupMachineConfig(configDir string) error {
 
 	fmt.Printf("  Created: %s\n", machineConfigPath)
 	fmt.Printf("  Name:    %s\n", config.Name)
-	fmt.Printf("  Role:    %s\n", config.Role)
-	if config.StorageHost != "" {
-		fmt.Printf("  Storage: %s\n", config.StorageHost)
-	}
-	if len(config.WorkingSetHosts) > 0 {
-		fmt.Printf("  Working-set hosts:\n")
-		for name, host := range config.WorkingSetHosts {
-			fmt.Printf("    %s: %s\n", name, host)
-		}
+	if config.Syncthing.DeviceID != "" {
+		fmt.Printf("  Syncthing: configured\n")
+	} else {
+		fmt.Printf("  Syncthing: not configured\n")
 	}
 
 	return nil

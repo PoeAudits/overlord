@@ -51,10 +51,9 @@ func runDetect(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseDir := reg.Settings.BaseDir
-	expandedBase, err := registry.ExpandPath(baseDir)
+	expandedBase, err := expandBaseDir(reg)
 	if err != nil {
-		return fmt.Errorf("failed to expand base dir: %w", err)
+		return err
 	}
 
 	// Build set of known paths (relative to base dir)

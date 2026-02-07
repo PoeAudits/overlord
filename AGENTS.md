@@ -49,10 +49,7 @@ overlord-v2/
 │   │   ├── types.go               # Registry, Project, Category, Language types
 │   │   ├── store.go               # Load/Save with atomic writes
 │   │   └── resolve.go             # Fuzzy matching and resolution
-│   ├── machine/config.go          # MachineConfig, Role types, Load function
-│   ├── sync/
-│   │   ├── rsync.go               # Rsync wrapper for file sync
-│   │   └── conflict.go            # Conflict detection
+│   ├── machine/config.go          # MachineConfig, Syncthing settings, Load function
 │   ├── gitops/git.go              # Git operations for registry sync
 │   └── templates/
 │       ├── templates.go           # Template loading and rendering
@@ -147,8 +144,6 @@ All long-running operations accept `context.Context` as the first parameter. Thi
 
 **Packages with context support:**
 - `internal/gitops/git.go` — `Add(ctx)`, `Commit(ctx)`, `Push(ctx)`, `Pull(ctx)`
-- `internal/sync/rsync.go` — `Push(ctx)`, `Pull(ctx)`, `DryRun(ctx)`
-- `internal/sync/conflict.go` — `DetectConflictsWithSSH(ctx)`, `DetectConflictsWithRsyncSSH(ctx)`
 - `internal/ssh/mux.go` — `Connect(ctx)`, `Close(ctx)`
 
 **Current usage:** Commands pass `context.Background()` to these methods. Future enhancements can use `context.WithTimeout()` for long operations (e.g., large file syncs, slow git operations).
@@ -159,39 +154,7 @@ All long-running operations accept `context.Context` as the first parameter. Thi
 
 When a function requires many parameters (>5), use a context struct to bundle related parameters. This improves readability and makes it easier to add new parameters without breaking signatures.
 
-**Example:** `syncContext` in `sync.go` bundles 16 parameters into logical groups:
-```go
-type syncContext struct {
-    // Project info
-    name    string
-    project registry.Project
-    
-    // Path info
-    baseDir       string
-    remoteBaseDir string
-    storageHost   string
-    
-    // Sync config
-    globalExcludes []string
-    rsyncClient    *sync.Rsync
-    sshCommand     string
-    sshEnv         string
-    
-    // Options
-    dryRun bool
-    force  bool
-    
-    // Styles
-    styles Styles
-}
-```
-
-**Methods on context structs** extract common operations:
-- `buildExcludes()` — merges global and per-project exclusion patterns
-- `ensureLocalDir()` — creates local directory if needed, returns firstSync flag
-- `detectAndHandleConflicts()` — checks for conflicts and prompts user
-
-**When to use:** Functions with >5 parameters, especially when parameters fall into logical groups (config, options, paths, etc.). Also used for storage-side sync with `hostSyncContext`.
+**When to use:** Functions with >5 parameters, especially when parameters fall into logical groups (config, options, paths, etc.).
 
 ## Multi-Machine Sync
 
@@ -199,44 +162,41 @@ type syncContext struct {
 
 `internal/machine/config.go` — stored at `~/.config/overlord/machine.yaml` (gitignored).
 
-Two roles:
-- **storage** — holds full project set. Optional `working_set_hosts` map (name → `[user@]host`). No `storage_host`.
-- **working-set** — syncs subset from storage. Requires `storage_host`. No `working_set_hosts`.
+Fields:
+- `name` — machine hostname
+- `syncthing` — local device settings and known peers (device_id, api_url, api_key, address, peers)
 
-If file doesn't exist, defaults to storage role with hostname.
+If the file doesn't exist, Overlord creates one with the hostname only. Sync commands require Syncthing config to be filled in.
 
 ### Sync Infrastructure
 
-**Rsync wrapper** (`internal/sync/rsync.go`): Go interface to rsync with `Push()`, `Pull()`, `DryRun()`. Uses `-avz --progress`, auto-adds trailing `/` to source. Supports custom `CommandExecutor` for testing.
-
-**Conflict detection** (`internal/sync/conflict.go`): Bidirectional rsync dry-runs → parse outputs → categorize as `local-only`, `remote-only`, or `both-modified`. Returns all conflicts.
+**Syncthing REST client** (`internal/syncthing/`): manages devices and folders via the Syncthing REST API.
 
 **GitOps** (`internal/gitops/git.go`): `Add()`, `Commit()` (auto-prefixes "overlord: "), `Push()`, `Pull()` (with rebase). Push/Pull gracefully handle repos without remotes.
 
 ### Sync Commands
 
 **`overlord activate <project>`** (`internal/cmd/activate.go`):
-Set `sync.status = active`. Validates not archived. Auto-commits and pushes registry changes.
+- Ensures peer device and folder exist in Syncthing (local + peer)
+- Sets `sync.status = active` and `sync.method = syncthing`
+- Validates not archived, commits and pushes registry changes
 
 **`overlord sync [project]`** (`internal/cmd/sync.go`):
-- **Working-set:** Pull registry → for each active project: detect conflicts → pull from storage → push to storage. First sync creates local dir, skips conflict detection, pull-only.
-- **Storage:** Determine target host (flag / auto-select / TUI picker) → for each active project: create remote dir via SSH → push local → remote.
-- Flags: `--dry-run`, `--force` (skip conflict confirmation), `--host <name>` (storage only)
-- Sync order (working-set): always pull first, then push
+- Shows Syncthing folder status for active projects
+- No file transfer is initiated; sync is continuous via Syncthing
 
 **`overlord deactivate <project>`** (`internal/cmd/deactivate.go`):
-- On working-set: sync final changes to storage first (abort if fails unless `--force-remove`)
-- Set `sync.status = inactive`, commit+push registry
-- On working-set: prompt for directory removal (unless `--keep-local` or `--force`)
-- Never removes directories on storage machines
+- Removes Syncthing folder locally (and optionally on the peer)
+- Sets `sync.status = inactive` and `sync.method = syncthing`
+- Commits and pushes registry changes
 
-### Sync Exclusion Patterns
+### Sync Ignore Patterns
 
-Global defaults in `settings.sync.default_exclude`. Per-project in `project.sync.exclude` (additive to globals).
+Sync ignores are managed via `.stignore` with a shared `.stglobalignore` include. Overlord ensures `.stignore` exists when activating projects.
 
-### Machine-Aware List
+### Synced List Behavior
 
-Storage machines: `overlord list` shows all active projects. Working-set machines: shows only synced projects (`sync.status == active` AND `status.state == active`). Override with `--all` or `--archived`.
+`overlord list --synced` shows active projects with sync status `active` and disk usage for local paths.
 
 ## Thoughts Management
 
@@ -370,7 +330,7 @@ Storage machines: `overlord list` shows all active projects. Working-set machine
 **`.env.pass` template format:**
 ```
 # Secrets from pass
-API_KEY=pass:anthropic-api-key
+API_KEY=pass:ai/anthropic-api-key
 DB_URL=pass:project/db-url
 
 # Literal config
@@ -384,47 +344,6 @@ PORT=3000
 
 **Implementation notes:**
 - `listPassEntries()` walks `$PASSWORD_STORE_DIR` (or `~/.password-store`), returns sorted `.gpg` files
-- `passEntryToEnvVar()` converts pass entry names to env var names: `anthropic-api-key` → `ANTHROPIC_API_KEY`
+- `passEntryToEnvVar()` converts pass entry names to env var names: `ai/anthropic-api-key` → `AI_ANTHROPIC_API_KEY`
 - `parseEnvPassFile()` parses template, `resolveEnvEntries()` fetches from pass, `atomicWriteEnvFile()` writes with 0600
 - Integrated into `overlord new` (step 2b) — generates `.env.pass` if pass store exists (best-effort)
-
-## Makefile Commands
-
-```bash
-# Build & Dev
-make build                          # Build the application
-make install                        # Build and install to ~/.local/bin
-make deploy [VPS=hostname]          # Cross-compile and deploy to VPS
-make test                           # Run tests (go test -v ./...)
-make fmt                            # Format code
-make vet                            # Vet code
-
-# Overlord
-make setup                          # Set up overlord directories and config
-make config                         # Open registry in editor
-make init [PATH=<path>] [LANG=go|py|ts|sol]  # Initialize with templates
-
-# Sync
-make activate NAME=<name>           # Activate sync for a project
-make sync [NAME=<name>]             # Sync all or specific project
-make sync DRY_RUN=1                 # Preview sync changes
-make sync FORCE=1                   # Force sync (skip conflict confirmation)
-make sync HOST=<name>               # Push to specific host (storage only)
-make deactivate NAME=<name>         # Deactivate sync for a project
-
-# Environment Variables
-make env-pull [NAME=<name>]         # Pull .env from .env.pass template
-make env-generate [NAME=<name>]     # Generate .env.pass from pass store
-make env-generate FORCE=1           # Overwrite existing .env.pass
-
-# Worktree Management (via overlord commands)
-make wt-new [BRANCH=name]           # Create worktree + tmux session
-make wt-list                        # List worktrees
-make wt-attach BRANCH=name          # Attach to session
-make wt-remove BRANCH=name          # Remove worktree + kill session
-
-# Tmux (current session utilities)
-make tmux-send WINDOW=x CMD="y"     # Send to current session window
-make tmux-read WINDOW=x             # Read current session pane
-make tmux-list                      # List windows in current session
-```

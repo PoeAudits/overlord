@@ -14,30 +14,28 @@ const (
 	DefaultConfigPath = "~/.config/overlord/machine.yaml"
 )
 
-// Role represents the machine's role in the sync system
-type Role string
-
-// Role constants
-const (
-	RoleStorage    Role = "storage"
-	RoleWorkingSet Role = "working-set"
-)
-
-// IsValid checks if the role is valid
-func (r Role) IsValid() bool {
-	switch r {
-	case RoleStorage, RoleWorkingSet:
-		return true
-	}
-	return false
-}
-
 // MachineConfig represents the machine-specific configuration
 type MachineConfig struct {
-	Name            string            `yaml:"name"`
-	Role            Role              `yaml:"role"`
-	StorageHost     string            `yaml:"storage_host,omitempty"`
-	WorkingSetHosts map[string]string `yaml:"working_set_hosts,omitempty"`
+	Name      string          `yaml:"name"`
+	Syncthing SyncthingConfig `yaml:"syncthing,omitempty"`
+}
+
+// SyncthingConfig represents Syncthing API configuration for this machine.
+type SyncthingConfig struct {
+	DeviceID string                   `yaml:"device_id,omitempty"`
+	APIURL   string                   `yaml:"api_url,omitempty"`
+	APIKey   string                   `yaml:"api_key,omitempty"`
+	Address  string                   `yaml:"address,omitempty"`
+	Peers    map[string]SyncthingPeer `yaml:"peers,omitempty"`
+}
+
+// SyncthingPeer represents a remote Syncthing device and API endpoint.
+type SyncthingPeer struct {
+	DeviceID string `yaml:"device_id,omitempty"`
+	APIURL   string `yaml:"api_url,omitempty"`
+	APIKey   string `yaml:"api_key,omitempty"`
+	Address  string `yaml:"address,omitempty"`
+	BaseDir  string `yaml:"base_dir,omitempty"`
 }
 
 // Validate checks if the machine config is valid
@@ -46,34 +44,52 @@ func (m *MachineConfig) Validate() error {
 		return fmt.Errorf("machine name cannot be empty")
 	}
 
-	if !m.Role.IsValid() {
-		return fmt.Errorf("invalid role: %s (must be 'storage' or 'working-set')", m.Role)
+	if err := m.Syncthing.Validate(); err != nil {
+		return err
 	}
 
-	// StorageHost is required for working-set machines
-	if m.Role == RoleWorkingSet && m.StorageHost == "" {
-		return fmt.Errorf("storage_host is required for working-set role")
+	return nil
+}
+
+// Validate checks if the Syncthing configuration is valid.
+// Empty config is permitted for backward compatibility.
+func (c SyncthingConfig) Validate() error {
+	if c.isZero() {
+		return nil
 	}
 
-	// StorageHost should not be set for storage machines
-	if m.Role == RoleStorage && m.StorageHost != "" {
-		return fmt.Errorf("storage_host should not be set for storage role")
+	if c.DeviceID == "" || c.APIURL == "" || c.APIKey == "" {
+		return fmt.Errorf("syncthing config requires device_id, api_url, and api_key")
 	}
 
-	// WorkingSetHosts must NOT be set for working-set machines
-	if m.Role == RoleWorkingSet && len(m.WorkingSetHosts) > 0 {
-		return fmt.Errorf("working_set_hosts should not be set for working-set role")
+	if c.Address == "" {
+		return fmt.Errorf("syncthing config requires address")
 	}
 
-	// If WorkingSetHosts is set on storage, each value must be non-empty
-	if m.Role == RoleStorage && len(m.WorkingSetHosts) > 0 {
-		for name, host := range m.WorkingSetHosts {
-			if host == "" {
-				return fmt.Errorf("working_set_hosts value for %q cannot be empty", name)
-			}
+	for name, peer := range c.Peers {
+		if err := peer.Validate(); err != nil {
+			return fmt.Errorf("syncthing peer %q: %w", name, err)
 		}
 	}
 
+	return nil
+}
+
+func (c SyncthingConfig) isZero() bool {
+	return c.DeviceID == "" && c.APIURL == "" && c.APIKey == "" && c.Address == "" && len(c.Peers) == 0
+}
+
+// Validate checks if the peer config is valid.
+func (p SyncthingPeer) Validate() error {
+	if p.DeviceID == "" || p.APIURL == "" || p.APIKey == "" {
+		return fmt.Errorf("device_id, api_url, and api_key are required")
+	}
+	if p.Address == "" {
+		return fmt.Errorf("address is required")
+	}
+	if p.BaseDir != "" && !filepath.IsAbs(p.BaseDir) {
+		return fmt.Errorf("base_dir must be an absolute path")
+	}
 	return nil
 }
 
@@ -167,6 +183,5 @@ func defaultConfig() (*MachineConfig, error) {
 
 	return &MachineConfig{
 		Name: hostname,
-		Role: RoleStorage,
 	}, nil
 }

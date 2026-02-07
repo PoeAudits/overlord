@@ -8,27 +8,6 @@ import (
 	"github.com/PoeAudits/overlord/internal/registry"
 )
 
-func TestRoleIsValid(t *testing.T) {
-	tests := []struct {
-		role  Role
-		valid bool
-	}{
-		{RoleStorage, true},
-		{RoleWorkingSet, true},
-		{Role("invalid"), false},
-		{Role(""), false},
-		{Role("STORAGE"), false}, // Case sensitive
-	}
-
-	for _, tt := range tests {
-		t.Run(string(tt.role), func(t *testing.T) {
-			if got := tt.role.IsValid(); got != tt.valid {
-				t.Errorf("Role.IsValid() = %v, want %v", got, tt.valid)
-			}
-		})
-	}
-}
-
 func TestMachineConfigValidate(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -37,19 +16,31 @@ func TestMachineConfigValidate(t *testing.T) {
 		errMsg  string
 	}{
 		{
-			name: "valid storage config",
+			name: "valid minimal config",
 			config: MachineConfig{
-				Name: "storage-server",
-				Role: RoleStorage,
+				Name: "desktop",
 			},
 			wantErr: false,
 		},
 		{
-			name: "valid working-set config",
+			name: "valid syncthing config",
 			config: MachineConfig{
-				Name:        "laptop",
-				Role:        RoleWorkingSet,
-				StorageHost: "storage-server.local",
+				Name: "vps",
+				Syncthing: SyncthingConfig{
+					DeviceID: "XXXX-XXXX-XXXX-XXXX",
+					APIURL:   "http://localhost:8384",
+					APIKey:   "key",
+					Address:  "tcp://100.100.100.100:22000",
+					Peers: map[string]SyncthingPeer{
+						"desktop": {
+							DeviceID: "YYYY-YYYY-YYYY-YYYY",
+							APIURL:   "http://100.100.100.1:8384",
+							APIKey:   "peer-key",
+							Address:  "tcp://100.100.100.1:22000",
+							BaseDir:  "/home/thomas/Overlord",
+						},
+					},
+				},
 			},
 			wantErr: false,
 		},
@@ -57,75 +48,22 @@ func TestMachineConfigValidate(t *testing.T) {
 			name: "empty name",
 			config: MachineConfig{
 				Name: "",
-				Role: RoleStorage,
 			},
 			wantErr: true,
 			errMsg:  "machine name cannot be empty",
 		},
 		{
-			name: "invalid role",
+			name: "invalid syncthing config (missing api_key)",
 			config: MachineConfig{
 				Name: "test",
-				Role: Role("invalid"),
-			},
-			wantErr: true,
-			errMsg:  "invalid role",
-		},
-		{
-			name: "working-set without storage_host",
-			config: MachineConfig{
-				Name: "laptop",
-				Role: RoleWorkingSet,
-			},
-			wantErr: true,
-			errMsg:  "storage_host is required for working-set role",
-		},
-		{
-			name: "storage with storage_host",
-			config: MachineConfig{
-				Name:        "storage-server",
-				Role:        RoleStorage,
-				StorageHost: "should-not-be-set",
-			},
-			wantErr: true,
-			errMsg:  "storage_host should not be set for storage role",
-		},
-		{
-			name: "storage with valid working_set_hosts",
-			config: MachineConfig{
-				Name: "desktop",
-				Role: RoleStorage,
-				WorkingSetHosts: map[string]string{
-					"poe-vps": "100.100.74.127",
-					"laptop":  "192.168.1.50",
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "working-set with working_set_hosts set",
-			config: MachineConfig{
-				Name:        "laptop",
-				Role:        RoleWorkingSet,
-				StorageHost: "storage.local",
-				WorkingSetHosts: map[string]string{
-					"poe-vps": "100.100.74.127",
+				Syncthing: SyncthingConfig{
+					DeviceID: "XXXX-XXXX-XXXX-XXXX",
+					APIURL:   "http://localhost:8384",
+					Address:  "tcp://100.100.100.100:22000",
 				},
 			},
 			wantErr: true,
-			errMsg:  "working_set_hosts should not be set for working-set role",
-		},
-		{
-			name: "storage with empty host value in map",
-			config: MachineConfig{
-				Name: "desktop",
-				Role: RoleStorage,
-				WorkingSetHosts: map[string]string{
-					"poe-vps": "",
-				},
-			},
-			wantErr: true,
-			errMsg:  "working_set_hosts value for \"poe-vps\" cannot be empty",
+			errMsg:  "syncthing config requires device_id, api_url, and api_key",
 		},
 	}
 
@@ -146,14 +84,13 @@ func TestMachineConfigValidate(t *testing.T) {
 }
 
 func TestSave(t *testing.T) {
-	t.Run("valid storage config", func(t *testing.T) {
+	t.Run("valid config", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
 		configPath := filepath.Join(dir, "machine.yaml")
 
 		config := &MachineConfig{
-			Name: "test-storage",
-			Role: RoleStorage,
+			Name: "test-machine",
 		}
 
 		if err := Save(configPath, config); err != nil {
@@ -167,23 +104,24 @@ func TestSave(t *testing.T) {
 		}
 
 		content := string(data)
-		if !contains(content, "name: test-storage") {
+		if !contains(content, "name: test-machine") {
 			t.Errorf("saved file does not contain expected name, got:\n%s", content)
-		}
-		if !contains(content, "role: storage") {
-			t.Errorf("saved file does not contain expected role, got:\n%s", content)
 		}
 	})
 
-	t.Run("valid working-set config", func(t *testing.T) {
+	t.Run("valid syncthing config", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
 		configPath := filepath.Join(dir, "machine.yaml")
 
 		config := &MachineConfig{
-			Name:        "test-laptop",
-			Role:        RoleWorkingSet,
-			StorageHost: "storage.example.com",
+			Name: "test-laptop",
+			Syncthing: SyncthingConfig{
+				DeviceID: "XXXX-XXXX-XXXX-XXXX",
+				APIURL:   "http://localhost:8384",
+				APIKey:   "key",
+				Address:  "tcp://100.100.100.100:22000",
+			},
 		}
 
 		if err := Save(configPath, config); err != nil {
@@ -196,11 +134,8 @@ func TestSave(t *testing.T) {
 		}
 
 		content := string(data)
-		if !contains(content, "role: working-set") {
-			t.Errorf("saved file does not contain expected role, got:\n%s", content)
-		}
-		if !contains(content, "storage_host: storage.example.com") {
-			t.Errorf("saved file does not contain expected storage_host, got:\n%s", content)
+		if !contains(content, "syncthing:") {
+			t.Errorf("saved file does not contain expected syncthing config, got:\n%s", content)
 		}
 	})
 
@@ -222,8 +157,11 @@ func TestSave(t *testing.T) {
 
 		config := &MachineConfig{
 			Name: "laptop",
-			Role: RoleWorkingSet,
-			// Missing StorageHost
+			Syncthing: SyncthingConfig{
+				DeviceID: "XXXX-XXXX-XXXX-XXXX",
+				APIURL:   "http://localhost:8384",
+				Address:  "tcp://100.100.100.100:22000",
+			},
 		}
 
 		err := Save(configPath, config)
@@ -239,7 +177,6 @@ func TestSave(t *testing.T) {
 
 		config := &MachineConfig{
 			Name: "test",
-			Role: RoleStorage,
 		}
 
 		if err := Save(configPath, config); err != nil {
@@ -257,9 +194,7 @@ func TestSave(t *testing.T) {
 		configPath := filepath.Join(dir, "machine.yaml")
 
 		original := &MachineConfig{
-			Name:        "round-trip-test",
-			Role:        RoleWorkingSet,
-			StorageHost: "my-server.local",
+			Name: "round-trip-test",
 		}
 
 		if err := Save(configPath, original); err != nil {
@@ -273,51 +208,6 @@ func TestSave(t *testing.T) {
 
 		if loaded.Name != original.Name {
 			t.Errorf("Name = %v, want %v", loaded.Name, original.Name)
-		}
-		if loaded.Role != original.Role {
-			t.Errorf("Role = %v, want %v", loaded.Role, original.Role)
-		}
-		if loaded.StorageHost != original.StorageHost {
-			t.Errorf("StorageHost = %v, want %v", loaded.StorageHost, original.StorageHost)
-		}
-	})
-
-	t.Run("round trip with working_set_hosts", func(t *testing.T) {
-		t.Parallel()
-		dir := t.TempDir()
-		configPath := filepath.Join(dir, "machine.yaml")
-
-		original := &MachineConfig{
-			Name: "storage-roundtrip",
-			Role: RoleStorage,
-			WorkingSetHosts: map[string]string{
-				"poe-vps": "100.100.74.127",
-				"laptop":  "192.168.1.50",
-			},
-		}
-
-		if err := Save(configPath, original); err != nil {
-			t.Fatalf("Save() error = %v, want nil", err)
-		}
-
-		loaded, err := Load(configPath)
-		if err != nil {
-			t.Fatalf("Load() error = %v, want nil", err)
-		}
-
-		if loaded.Name != original.Name {
-			t.Errorf("Name = %v, want %v", loaded.Name, original.Name)
-		}
-		if loaded.Role != original.Role {
-			t.Errorf("Role = %v, want %v", loaded.Role, original.Role)
-		}
-		if len(loaded.WorkingSetHosts) != len(original.WorkingSetHosts) {
-			t.Fatalf("WorkingSetHosts length = %d, want %d", len(loaded.WorkingSetHosts), len(original.WorkingSetHosts))
-		}
-		for name, host := range original.WorkingSetHosts {
-			if loaded.WorkingSetHosts[name] != host {
-				t.Errorf("WorkingSetHosts[%s] = %v, want %v", name, loaded.WorkingSetHosts[name], host)
-			}
 		}
 	})
 }
@@ -336,13 +226,6 @@ func TestLoad(t *testing.T) {
 			t.Error("Load() returned config with empty name")
 		}
 
-		if config.Role != RoleStorage {
-			t.Errorf("Load() default role = %v, want %v", config.Role, RoleStorage)
-		}
-
-		if config.StorageHost != "" {
-			t.Errorf("Load() default storage_host = %v, want empty", config.StorageHost)
-		}
 	})
 
 	t.Run("valid storage config file", func(t *testing.T) {
@@ -350,7 +233,6 @@ func TestLoad(t *testing.T) {
 		configPath := filepath.Join(dir, "machine.yaml")
 
 		content := `name: test-storage
-role: storage
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatal(err)
@@ -365,48 +247,17 @@ role: storage
 			t.Errorf("Load() name = %v, want %v", config.Name, "test-storage")
 		}
 
-		if config.Role != RoleStorage {
-			t.Errorf("Load() role = %v, want %v", config.Role, RoleStorage)
-		}
-	})
-
-	t.Run("valid working-set config file", func(t *testing.T) {
-		dir := t.TempDir()
-		configPath := filepath.Join(dir, "machine.yaml")
-
-		content := `name: test-laptop
-role: working-set
-storage_host: storage.example.com
-`
-		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
-			t.Fatal(err)
-		}
-
-		config, err := Load(configPath)
-		if err != nil {
-			t.Fatalf("Load() error = %v, want nil", err)
-		}
-
-		if config.Name != "test-laptop" {
-			t.Errorf("Load() name = %v, want %v", config.Name, "test-laptop")
-		}
-
-		if config.Role != RoleWorkingSet {
-			t.Errorf("Load() role = %v, want %v", config.Role, RoleWorkingSet)
-		}
-
-		if config.StorageHost != "storage.example.com" {
-			t.Errorf("Load() storage_host = %v, want %v", config.StorageHost, "storage.example.com")
-		}
 	})
 
 	t.Run("invalid config file", func(t *testing.T) {
 		dir := t.TempDir()
 		configPath := filepath.Join(dir, "machine.yaml")
 
-		// Missing required storage_host for working-set
 		content := `name: test-laptop
-role: working-set
+syncthing:
+  device_id: "XXXX-XXXX-XXXX-XXXX"
+  api_url: "http://localhost:8384"
+  address: "tcp://100.100.100.100:22000"
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatal(err)
@@ -519,14 +370,6 @@ func TestDefaultConfig(t *testing.T) {
 
 	if config.Name == "" {
 		t.Error("defaultConfig() returned config with empty name")
-	}
-
-	if config.Role != RoleStorage {
-		t.Errorf("defaultConfig() role = %v, want %v", config.Role, RoleStorage)
-	}
-
-	if config.StorageHost != "" {
-		t.Errorf("defaultConfig() storage_host = %v, want empty", config.StorageHost)
 	}
 
 	// Verify it's valid

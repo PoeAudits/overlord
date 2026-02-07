@@ -279,7 +279,7 @@ func TestParseEnvPassFile(t *testing.T) {
 
 	t.Run("mixed pass and literal entries", func(t *testing.T) {
 		path := writeTemplate(t, `# API keys
-API_KEY=pass:anthropic-api-key
+API_KEY=pass:ai/anthropic-api-key
 DB_URL=pass:myproject/db-url
 
 # Config
@@ -296,8 +296,8 @@ PORT=3000
 		}
 
 		// Check pass entries
-		if entries[0].Key != "API_KEY" || entries[0].PassEntry != "anthropic-api-key" {
-			t.Errorf("entry[0] = {Key:%q, PassEntry:%q}, want {API_KEY, anthropic-api-key}",
+		if entries[0].Key != "API_KEY" || entries[0].PassEntry != "ai/anthropic-api-key" {
+			t.Errorf("entry[0] = {Key:%q, PassEntry:%q}, want {API_KEY, ai/anthropic-api-key}",
 				entries[0].Key, entries[0].PassEntry)
 		}
 		if entries[1].Key != "DB_URL" || entries[1].PassEntry != "myproject/db-url" {
@@ -946,9 +946,9 @@ func TestPassEntryToEnvVar(t *testing.T) {
 		want  string
 	}{
 		{
-			name:  "simple kebab-case",
-			entry: "anthropic-api-key",
-			want:  "ANTHROPIC_API_KEY",
+			name:  "hierarchical path",
+			entry: "ai/anthropic-api-key",
+			want:  "AI_ANTHROPIC_API_KEY",
 		},
 		{
 			name:  "single word",
@@ -1004,9 +1004,9 @@ func TestPassEntryToEnvVar(t *testing.T) {
 func TestGenerateEnvPassContent(t *testing.T) {
 	t.Run("generates template with header and entries", func(t *testing.T) {
 		entries := []string{
-			"anthropic-api-key",
-			"etherscan-api-key",
-			"openai-api-key",
+			"ai/anthropic-api-key",
+			"data/etherscan-api-key",
+			"ai/openai-api-key",
 		}
 
 		content := generateEnvPassContent(entries)
@@ -1023,14 +1023,14 @@ func TestGenerateEnvPassContent(t *testing.T) {
 		}
 
 		// Check entries
-		if !strings.Contains(content, "ANTHROPIC_API_KEY=pass:anthropic-api-key") {
-			t.Error("content should contain ANTHROPIC_API_KEY entry")
+		if !strings.Contains(content, "AI_ANTHROPIC_API_KEY=pass:ai/anthropic-api-key") {
+			t.Error("content should contain AI_ANTHROPIC_API_KEY entry")
 		}
-		if !strings.Contains(content, "ETHERSCAN_API_KEY=pass:etherscan-api-key") {
-			t.Error("content should contain ETHERSCAN_API_KEY entry")
+		if !strings.Contains(content, "DATA_ETHERSCAN_API_KEY=pass:data/etherscan-api-key") {
+			t.Error("content should contain DATA_ETHERSCAN_API_KEY entry")
 		}
-		if !strings.Contains(content, "OPENAI_API_KEY=pass:openai-api-key") {
-			t.Error("content should contain OPENAI_API_KEY entry")
+		if !strings.Contains(content, "AI_OPENAI_API_KEY=pass:ai/openai-api-key") {
+			t.Error("content should contain AI_OPENAI_API_KEY entry")
 		}
 	})
 
@@ -1104,11 +1104,11 @@ func TestListPassEntries(t *testing.T) {
 		return dir
 	}
 
-	t.Run("finds flat entries", func(t *testing.T) {
+	t.Run("finds hierarchical entries", func(t *testing.T) {
 		storeDir := createMockPassStore(t, []string{
-			"anthropic-api-key",
-			"openai-api-key",
-			"etherscan-api-key",
+			"ai/anthropic-api-key",
+			"ai/openai-api-key",
+			"data/etherscan-api-key",
 		})
 
 		t.Setenv("PASSWORD_STORE_DIR", storeDir)
@@ -1123,14 +1123,14 @@ func TestListPassEntries(t *testing.T) {
 		}
 
 		// Should be sorted
-		if entries[0] != "anthropic-api-key" {
-			t.Errorf("entries[0] = %q, want anthropic-api-key", entries[0])
+		if entries[0] != "ai/anthropic-api-key" {
+			t.Errorf("entries[0] = %q, want ai/anthropic-api-key", entries[0])
 		}
-		if entries[1] != "etherscan-api-key" {
-			t.Errorf("entries[1] = %q, want etherscan-api-key", entries[1])
+		if entries[1] != "ai/openai-api-key" {
+			t.Errorf("entries[1] = %q, want ai/openai-api-key", entries[1])
 		}
-		if entries[2] != "openai-api-key" {
-			t.Errorf("entries[2] = %q, want openai-api-key", entries[2])
+		if entries[2] != "data/etherscan-api-key" {
+			t.Errorf("entries[2] = %q, want data/etherscan-api-key", entries[2])
 		}
 	})
 
@@ -1380,14 +1380,14 @@ func TestGenerateEnvPassFile(t *testing.T) {
 //   - GPG key configured for pass
 //   - overlord binary built: go build -o overlord ./cmd/overlord
 //   - A project registered in the overlord registry
-//   - At least one pass entry (e.g., pass insert anthropic-api-key)
+//   - At least one pass entry (e.g., pass insert ai/anthropic-api-key)
 //
 // Steps:
 //
 // 1. Create a .env.pass template in the project root:
 //      cat > ~/Overlord/projects/web/myproject/.env.pass <<'EOF'
 //      # Secrets
-//      API_KEY=pass:anthropic-api-key
+//      API_KEY=pass:ai/anthropic-api-key
 //
 //      # Config
 //      NODE_ENV=development

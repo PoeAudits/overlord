@@ -126,32 +126,28 @@ func TestProjectSyncValidate(t *testing.T) {
 		{
 			name: "valid active sync",
 			sync: ProjectSync{
-				Status:  SyncActive,
-				Exclude: []string{"*.log", "node_modules/"},
+				Status: SyncActive,
 			},
 			wantErr: false,
 		},
 		{
 			name: "valid inactive sync",
 			sync: ProjectSync{
-				Status:  SyncInactive,
-				Exclude: []string{},
+				Status: SyncInactive,
 			},
 			wantErr: false,
 		},
 		{
 			name: "empty status (backward compat)",
 			sync: ProjectSync{
-				Status:  SyncStatus(""),
-				Exclude: []string{"*.tmp"},
+				Status: SyncStatus(""),
 			},
 			wantErr: false,
 		},
 		{
 			name: "invalid status",
 			sync: ProjectSync{
-				Status:  SyncStatus("invalid"),
-				Exclude: []string{},
+				Status: SyncStatus("invalid"),
 			},
 			wantErr: true,
 		},
@@ -247,8 +243,7 @@ func TestProjectValidate(t *testing.T) {
 				Description: "Test project",
 				Status:      Status{State: StateActive},
 				Sync: ProjectSync{
-					Status:  SyncActive,
-					Exclude: []string{"*.log", "node_modules/"},
+					Status: SyncActive,
 				},
 			},
 			wantErr: false,
@@ -263,8 +258,7 @@ func TestProjectValidate(t *testing.T) {
 				Description: "Test project",
 				Status:      Status{State: StateActive},
 				Sync: ProjectSync{
-					Status:  SyncStatus("invalid"),
-					Exclude: []string{},
+					Status: SyncStatus("invalid"),
 				},
 			},
 			wantErr: true,
@@ -320,45 +314,6 @@ func TestProjectValidate(t *testing.T) {
 	}
 }
 
-func TestSyncSettingsValidate(t *testing.T) {
-	tests := []struct {
-		name     string
-		settings SyncSettings
-		wantErr  bool
-	}{
-		{
-			name: "empty exclude list",
-			settings: SyncSettings{
-				DefaultExclude: []string{},
-			},
-			wantErr: false,
-		},
-		{
-			name: "nil exclude list",
-			settings: SyncSettings{
-				DefaultExclude: nil,
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid exclude patterns",
-			settings: SyncSettings{
-				DefaultExclude: []string{"node_modules", ".venv", "__pycache__", ".git"},
-			},
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := tt.settings.Validate()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("SyncSettings.Validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
 func TestSettingsValidate(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -370,17 +325,6 @@ func TestSettingsValidate(t *testing.T) {
 			settings: Settings{
 				BaseDir:     "/home/user/work",
 				ThoughtsDir: "/home/user/thoughts",
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid settings with sync",
-			settings: Settings{
-				BaseDir:     "/home/user/work",
-				ThoughtsDir: "/home/user/thoughts",
-				Sync: SyncSettings{
-					DefaultExclude: []string{"node_modules", ".venv"},
-				},
 			},
 			wantErr: false,
 		},
@@ -423,30 +367,6 @@ func TestRegistryValidate(t *testing.T) {
 				Settings: Settings{
 					BaseDir:     "/home/user/work",
 					ThoughtsDir: "/home/user/thoughts",
-				},
-				Projects: map[string]Project{
-					"test-project": {
-						Path:        "/home/user/work/test",
-						Category:    CategoryWeb,
-						Lang:        LanguageTypeScript,
-						Created:     "2026-01-22",
-						Description: "Test project",
-						Status:      Status{State: StateActive},
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid registry with sync settings",
-			registry: Registry{
-				Version: 2,
-				Settings: Settings{
-					BaseDir:     "/home/user/work",
-					ThoughtsDir: "/home/user/thoughts",
-					Sync: SyncSettings{
-						DefaultExclude: []string{"node_modules", ".venv", "__pycache__"},
-					},
 				},
 				Projects: map[string]Project{
 					"test-project": {
@@ -708,68 +628,6 @@ func TestRegistryYAMLMarshaling(t *testing.T) {
 	}
 }
 
-func TestSyncSettingsYAMLMarshaling(t *testing.T) {
-	tests := []struct {
-		name     string
-		settings Settings
-	}{
-		{
-			name: "settings without sync (backward compatibility)",
-			settings: Settings{
-				BaseDir:     "/home/user/work",
-				ThoughtsDir: "/home/user/thoughts",
-			},
-		},
-		{
-			name: "settings with empty sync",
-			settings: Settings{
-				BaseDir:     "/home/user/work",
-				ThoughtsDir: "/home/user/thoughts",
-				Sync:        SyncSettings{},
-			},
-		},
-		{
-			name: "settings with sync exclude patterns",
-			settings: Settings{
-				BaseDir:     "/home/user/work",
-				ThoughtsDir: "/home/user/thoughts",
-				Sync: SyncSettings{
-					DefaultExclude: []string{"node_modules", ".venv", "__pycache__", ".git"},
-				},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Marshal to YAML
-			data, err := yaml.Marshal(&tt.settings)
-			if err != nil {
-				t.Fatalf("Failed to marshal settings: %v", err)
-			}
-
-			// Unmarshal back
-			var unmarshaled Settings
-			if err := yaml.Unmarshal(data, &unmarshaled); err != nil {
-				t.Fatalf("Failed to unmarshal settings: %v", err)
-			}
-
-			// Validate unmarshaled settings
-			if err := unmarshaled.Validate(); err != nil {
-				t.Errorf("Unmarshaled settings validation failed: %v", err)
-			}
-
-			// Check that sync settings are preserved
-			if len(tt.settings.Sync.DefaultExclude) > 0 {
-				if len(unmarshaled.Sync.DefaultExclude) != len(tt.settings.Sync.DefaultExclude) {
-					t.Errorf("DefaultExclude length mismatch: got %d, want %d",
-						len(unmarshaled.Sync.DefaultExclude), len(tt.settings.Sync.DefaultExclude))
-				}
-			}
-		})
-	}
-}
-
 func TestBackwardCompatibility(t *testing.T) {
 	// Simulate old registry YAML without sync settings
 	oldRegistryYAML := `version: 2
@@ -795,11 +653,6 @@ projects:
 	// Should validate successfully even without sync settings
 	if err := registry.Validate(); err != nil {
 		t.Errorf("Old registry format validation failed: %v", err)
-	}
-
-	// Sync settings should be empty but valid
-	if err := registry.Settings.Sync.Validate(); err != nil {
-		t.Errorf("Empty sync settings validation failed: %v", err)
 	}
 
 	// Project sync should be empty but valid
@@ -838,8 +691,7 @@ func TestProjectSyncYAMLMarshaling(t *testing.T) {
 				Description: "Test project",
 				Status:      Status{State: StateActive},
 				Sync: ProjectSync{
-					Status:  SyncActive,
-					Exclude: []string{"*.log", "node_modules/"},
+					Status: SyncActive,
 				},
 			},
 		},
@@ -867,8 +719,7 @@ func TestProjectSyncYAMLMarshaling(t *testing.T) {
 				Description: "Test project",
 				Status:      Status{State: StateArchived},
 				Sync: ProjectSync{
-					Status:  SyncActive,
-					Exclude: []string{"*.tmp"},
+					Status: SyncActive,
 				},
 			},
 		},
@@ -901,13 +752,6 @@ func TestProjectSyncYAMLMarshaling(t *testing.T) {
 				}
 			}
 
-			// Check exclude patterns are preserved
-			if len(tt.project.Sync.Exclude) > 0 {
-				if len(unmarshaled.Sync.Exclude) != len(tt.project.Sync.Exclude) {
-					t.Errorf("Exclude length mismatch: got %d, want %d",
-						len(unmarshaled.Sync.Exclude), len(tt.project.Sync.Exclude))
-				}
-			}
 		})
 	}
 }

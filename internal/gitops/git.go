@@ -58,15 +58,11 @@ func (g *GitOps) Commit(ctx context.Context, message string) error {
 // Push pushes commits to the remote repository.
 // If the repository has no remote configured, returns nil with no error.
 func (g *GitOps) Push(ctx context.Context) error {
-	// First check if a remote exists
-	checkRemote := exec.CommandContext(ctx, "git", "-C", g.RepoPath, "remote")
-	remoteOutput, err := checkRemote.CombinedOutput()
+	hasRemote, err := g.HasRemote(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to check git remote: %w (output: %s)", err, strings.TrimSpace(string(remoteOutput)))
+		return err
 	}
-
-	// If no remote configured, skip push (not an error)
-	if len(strings.TrimSpace(string(remoteOutput))) == 0 {
+	if !hasRemote {
 		return nil
 	}
 
@@ -117,15 +113,11 @@ func HasUsableRemote(path string) bool {
 // Pull pulls changes from the remote repository with rebase.
 // If the repository has no remote configured, returns nil with no error.
 func (g *GitOps) Pull(ctx context.Context) error {
-	// First check if a remote exists
-	checkRemote := exec.CommandContext(ctx, "git", "-C", g.RepoPath, "remote")
-	remoteOutput, err := checkRemote.CombinedOutput()
+	hasRemote, err := g.HasRemote(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to check git remote: %w (output: %s)", err, strings.TrimSpace(string(remoteOutput)))
+		return err
 	}
-
-	// If no remote configured, skip pull (not an error)
-	if len(strings.TrimSpace(string(remoteOutput))) == 0 {
+	if !hasRemote {
 		return nil
 	}
 
@@ -140,4 +132,14 @@ func (g *GitOps) Pull(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// HasRemote reports whether the repository has at least one configured remote.
+func (g *GitOps) HasRemote(ctx context.Context) (bool, error) {
+	checkRemote := exec.CommandContext(ctx, "git", "-C", g.RepoPath, "remote")
+	remoteOutput, err := checkRemote.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("failed to check git remote: %w (output: %s)", err, strings.TrimSpace(string(remoteOutput)))
+	}
+	return len(strings.TrimSpace(string(remoteOutput))) > 0, nil
 }

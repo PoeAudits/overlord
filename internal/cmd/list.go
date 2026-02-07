@@ -3,7 +3,9 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,7 +15,6 @@ import (
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/spf13/cobra"
 
-	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/registry"
 )
 
@@ -25,6 +26,7 @@ type listFlags struct {
 	archived   bool
 	all        bool
 	recent     string
+	synced     bool
 }
 
 var listOpts listFlags
@@ -66,6 +68,7 @@ func init() {
 	listCmd.Flags().BoolVar(&listOpts.all, "all", false, "Include all projects (active and archived)")
 	listCmd.Flags().StringVar(&listOpts.recent, "recent", "", "Show recently opened projects (default: 7d, e.g. 30d, 2w, 24h)")
 	listCmd.Flags().Lookup("recent").NoOptDefVal = "7d"
+	listCmd.Flags().BoolVar(&listOpts.synced, "synced", false, "Show synced projects with disk usage")
 }
 
 // RunList is exported so it can be called from root command handler
@@ -82,6 +85,7 @@ type projectOutput struct {
 	Description string   `json:"description"`
 	Status      string   `json:"status"`
 	SyncStatus  string   `json:"sync_status,omitempty"`
+	DiskUsage   string   `json:"disk_usage,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
 	LastOpened  string   `json:"last_opened,omitempty"`
 }
@@ -121,6 +125,8 @@ func filterProjects(reg *registry.Registry) []projectOutput {
 	var candidates map[string]registry.Project
 
 	switch {
+	case listOpts.synced:
+		candidates = getSyncedProjects(reg)
 	case listOpts.all:
 		candidates = reg.Projects
 	case listOpts.archived:
@@ -128,13 +134,7 @@ func filterProjects(reg *registry.Registry) []projectOutput {
 		candidates = reg.GetArchivedProjects()
 	default:
 		// Default: only active projects
-		// On working-set machines, show only synced projects
-		machineConfig, err := machine.Load(machine.DefaultConfigPath)
-		if err == nil && machineConfig.Role == machine.RoleWorkingSet {
-			candidates = getSyncedProjects(reg)
-		} else {
-			candidates = reg.GetActiveProjects()
-		}
+		candidates = reg.GetActiveProjects()
 	}
 
 	// Apply category filter
@@ -183,13 +183,30 @@ func filterProjects(reg *registry.Registry) []projectOutput {
 
 	// Convert to output format and sort
 	result := make([]projectOutput, 0, len(candidates))
+	baseDir := ""
+	if listOpts.synced {
+		expanded, err := expandBaseDir(reg)
+		if err == nil {
+			baseDir = expanded
+		}
+	}
 	for name, proj := range candidates {
 		status := string(proj.Status.State)
 		syncStatus := string(proj.Sync.Status)
+		diskUsage := ""
 
 		// Display "synced" for active projects with sync enabled
 		if proj.Status.State == registry.StateActive && proj.Sync.Status == registry.SyncActive {
 			status = "synced"
+		}
+
+		if listOpts.synced && baseDir != "" {
+			usage, err := projectDiskUsage(proj, baseDir)
+			if err == nil {
+				diskUsage = usage
+			} else {
+				diskUsage = "n/a"
+			}
 		}
 
 		result = append(result, projectOutput{
@@ -200,6 +217,7 @@ func filterProjects(reg *registry.Registry) []projectOutput {
 			Description: proj.Description,
 			Status:      status,
 			SyncStatus:  syncStatus,
+			DiskUsage:   diskUsage,
 			Tags:        proj.Tags,
 			LastOpened:  proj.LastOpened,
 		})
@@ -250,7 +268,6 @@ func statusRank(status string) int {
 }
 
 // getSyncedProjects returns active projects that have sync status 'active'.
-// Used on working-set machines to show only locally synced projects.
 func getSyncedProjects(reg *registry.Registry) map[string]registry.Project {
 	result := make(map[string]registry.Project)
 	for name, project := range reg.Projects {
@@ -321,6 +338,7 @@ func outputListTable(projects []projectOutput) error {
 		Padding(0, 1)
 
 	showRecent := listOpts.recent != ""
+	showDisk := listOpts.synced
 
 	// Build rows
 	rows := make([][]string, 0, len(projects))
@@ -340,12 +358,18 @@ func outputListTable(projects []projectOutput) error {
 		} else {
 			row = append(row, proj.Status)
 		}
+		if showDisk {
+			row = append(row, proj.DiskUsage)
+		}
 
 		rows = append(rows, row)
 	}
 
 	// Determine last column index for styling
 	lastCol := 4
+	if showDisk {
+		lastCol = 5
+	}
 
 	// Create table
 	t := table.New().
@@ -398,9 +422,17 @@ func outputListTable(projects []projectOutput) error {
 		})
 
 	if showRecent {
-		t = t.Headers("NAME", "CATEGORY", "LANG", "DESCRIPTION", "OPENED")
+		if showDisk {
+			t = t.Headers("NAME", "CATEGORY", "LANG", "DESCRIPTION", "OPENED", "DISK")
+		} else {
+			t = t.Headers("NAME", "CATEGORY", "LANG", "DESCRIPTION", "OPENED")
+		}
 	} else {
-		t = t.Headers("NAME", "CATEGORY", "LANG", "DESCRIPTION", "STATUS")
+		if showDisk {
+			t = t.Headers("NAME", "CATEGORY", "LANG", "DESCRIPTION", "STATUS", "DISK")
+		} else {
+			t = t.Headers("NAME", "CATEGORY", "LANG", "DESCRIPTION", "STATUS")
+		}
 	}
 
 	t = t.Rows(rows...)
@@ -485,4 +517,42 @@ func truncate(s string, maxLen int) string {
 		return strings.Repeat(".", maxLen)
 	}
 	return s[:maxLen-3] + "..."
+}
+
+func projectDiskUsage(project registry.Project, baseDir string) (string, error) {
+	projectPath := resolveProjectPath(project.Path, baseDir)
+	size, err := dirSize(projectPath)
+	if err != nil {
+		return "", err
+	}
+	return formatBytes(size), nil
+}
+
+func dirSize(root string) (int64, error) {
+	var total int64
+	if _, err := os.Stat(root); err != nil {
+		return 0, err
+	}
+
+	walkErr := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		total += info.Size()
+		return nil
+	})
+	if walkErr != nil {
+		return 0, walkErr
+	}
+	return total, nil
 }

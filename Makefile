@@ -259,10 +259,10 @@ ifndef NAME
 endif
 	./overlord deactivate $(NAME)
 
-# Sync projects with storage machine
-# Usage: make sync [NAME=<name>] [DRY_RUN=1] [FORCE=1] [HOST=<host>]
+# Show Syncthing status for projects
+# Usage: make sync [NAME=<name>]
 sync:
-	./overlord sync $(NAME) $(if $(DRY_RUN),--dry-run) $(if $(FORCE),--force) $(if $(HOST),--host $(HOST))
+	./overlord sync $(NAME)
 
 # Pull .env file from pass for a project
 # Usage: make env-pull [NAME=<name>]

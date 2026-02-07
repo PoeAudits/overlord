@@ -87,7 +87,7 @@ by resolving pass references and copying literal values.
 
 Template format (.env.pass):
   # Secrets — fetched from pass store
-  API_KEY=pass:anthropic-api-key
+  API_KEY=pass:ai/anthropic-api-key
   DB_URL=pass:myproject/db-url
 
   # Config — written as-is
@@ -116,7 +116,7 @@ by resolving pass references and copying literal values.
 
 Template format (.env.pass):
   # Secrets — fetched from pass store
-  API_KEY=pass:anthropic-api-key
+  API_KEY=pass:ai/anthropic-api-key
   DB_URL=pass:myproject/db-url
 
   # Config — written as-is
@@ -148,8 +148,8 @@ var envGenerateCmd = &cobra.Command{
 from the pass store.
 
 Each pass entry is converted to an environment variable name:
-  anthropic-api-key  →  ANTHROPIC_API_KEY=pass:anthropic-api-key
-  hugging-face-token →  HUGGING_FACE_TOKEN=pass:hugging-face-token
+  ai/anthropic-api-key  →  AI_ANTHROPIC_API_KEY=pass:ai/anthropic-api-key
+  hugging-face-token    →  HUGGING_FACE_TOKEN=pass:hugging-face-token
 
 When run without arguments inside a project directory, the project is detected
 automatically. You can also specify a project name explicitly.
@@ -512,8 +512,8 @@ func listPassEntries() ([]string, error) {
 // passEntryToEnvVar converts a pass entry name to an environment variable name.
 // Replaces hyphens and slashes with underscores and uppercases.
 //
-//	anthropic-api-key  → ANTHROPIC_API_KEY
-//	folder/secret-name → FOLDER_SECRET_NAME
+//	ai/anthropic-api-key → AI_ANTHROPIC_API_KEY
+//	folder/secret-name   → FOLDER_SECRET_NAME
 func passEntryToEnvVar(entry string) string {
 	s := strings.ReplaceAll(entry, "-", "_")
 	s = strings.ReplaceAll(s, "/", "_")
