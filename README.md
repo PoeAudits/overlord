@@ -36,7 +36,7 @@ overlord open
 overlord myproject
 
 # Create a new project
-overlord new my-web-app --category=web --lang=typescript
+overlord new my-web-app --category=web --ts
 
 # Show project details
 overlord info my-web-app
@@ -47,9 +47,9 @@ overlord info my-web-app
 ### Prerequisites
 
 - Go 1.25.5 or later
-- Git (for worktree management and registry sync)
+- Git (for worktree management and backup command)
 - Tmux (for session management)
-- Syncthing (for continuous project sync)
+- Syncthing (for continuous project + registry artifact sync)
 
 ### Build from Source
 
@@ -80,24 +80,26 @@ make deploy VPS=my-server
 
 ## Repositories
 
-Overlord uses two separate git repositories:
+Overlord uses two separate repositories:
 
 | Repository | Purpose | Location |
 |------------|---------|----------|
 | [`PoeAudits/overlord`](https://github.com/PoeAudits/overlord) | Source code (Go project) | `~/Overlord/core/tools/overlord-v2` |
-| [`PoeAudits/overlord-config`](https://github.com/PoeAudits/overlord-config) | Registry + config | `~/.config/overlord/` |
+| [`PoeAudits/overlord-config`](https://github.com/PoeAudits/overlord-config) | Optional disaster-recovery backup target | `~/.local/share/overlord/backup` |
 
-The config repository is shared across machines via git, enabling multi-machine sync of the project registry.
+Operational multi-machine sync is Syncthing-first (not git-based).
 
 ## Configuration
 
-The config directory (`~/.config/overlord/`) is a git repository cloned from `PoeAudits/overlord-config`:
+The config directory (`~/.config/overlord/`) is a Syncthing shared folder (`overlord-config`):
 
-- `registry.yaml` - Project registry with metadata (tracked in git, shared across machines)
-- `machine.yaml` - Machine-specific sync configuration (gitignored, NOT shared)
-- `.gitignore` - Excludes machine-specific files
+- `registry.yaml` - Project registry with metadata (shared across machines)
+- `peers.yaml` - Shared non-sensitive machine peer metadata
+- `registry.lock.yaml` - Single-writer lock artifact for registry mutations
+- `machine.yaml` - Machine-specific sensitive sync configuration (`.stignore`d, NOT shared)
+- `.stignore` - Excludes machine-specific files such as `machine.yaml`
 
-Run `overlord setup` on a new machine to initialize the config directory. The setup command will prompt to clone from the config repo remote for multi-machine sync.
+Run `overlord setup --init` on a new machine to initialize local machine config, configure the Syncthing config folder, and reconcile active projects.
 
 ### Registry Structure
 
@@ -146,25 +148,19 @@ projects:
 
 ### Machine Configuration
 
-For Syncthing integration, create `~/.config/overlord/machine.yaml`:
+For Syncthing integration, `~/.config/overlord/machine.yaml` stores local-only values:
 
 ```yaml
 name: desktop-machine
+role: main
 syncthing:
   device_id: "XXXX-XXXX-XXXX-XXXX"
   api_url: "http://localhost:8384"
   api_key: "<key>"
   address: "tcp://100.x.x.x:22000"
-  peers:
-    vps:
-      device_id: "YYYY-YYYY-YYYY-YYYY"
-      api_url: "http://100.x.x.x:8384"
-      api_key: "<key>"
-      address: "tcp://100.x.x.x:22000"
-      base_dir: "/home/thomas/Overlord"
 ```
 
-If no machine config exists, Overlord creates one with the hostname only. Sync commands require Syncthing config to be filled in.
+Shared peers are defined in `peers.yaml` (not in `machine.yaml`).
 
 ## Usage
 
@@ -349,21 +345,25 @@ When you run `overlord new`, it automatically generates `.env.pass` if your pass
 
 #### Sync Commands
 
-Overlord manages Syncthing-based sync for working across different machines (e.g., desktop and VPS).
+Overlord manages Syncthing-based sync for working across machines with lock-guarded registry writes.
 
 **Activate Sync:**
 ```bash
-# Mark a project for sync
+# Mark one project for sync
 overlord activate my-project
+
+# Bulk activation
+overlord activate app api worker
+overlord activate --all
 
 # Works with fuzzy matching and aliases
 overlord activate mp
 ```
 
 The `activate` command:
-- Ensures the peer device and shared folder exist in Syncthing (local + peer)
+- Ensures the peer device and shared folder exist in local Syncthing
 - Sets `sync.status = active` and `sync.method = syncthing`
-- Automatically commits and pushes the registry change
+- Enforces registry lock ownership before mutating `registry.yaml`
 
 **Sync Status:**
 ```bash
@@ -380,22 +380,37 @@ The `sync` command:
 
 **Deactivate Sync:**
 ```bash
-# Deactivate sync for a project
+# Deactivate one project
 overlord deactivate my-project
 
-# Deactivate and remove folder from peer
-overlord deactivate my-project --peer vps --remove-remote
+# Bulk deactivation
+overlord deactivate app api worker
+overlord deactivate --all
 ```
 
 The `deactivate` command:
-- Removes the Syncthing folder locally (and optionally on the peer)
+- Removes the Syncthing folder locally
 - Sets `sync.status = inactive` and `sync.method = syncthing`
-- Automatically commits and pushes the registry change
+- Enforces registry lock ownership before mutating `registry.yaml`
+
+**Lock Commands:**
+```bash
+overlord sync lock show
+overlord sync lock transfer <machine>
+overlord sync lock claim
+```
+
+**Verification and Backup:**
+```bash
+overlord doctor
+overlord backup
+```
 
 **Sync Workflow Example:**
 ```bash
 # On desktop:
-overlord activate my-web-app    # Register Syncthing folder on both devices
+overlord sync lock show
+overlord activate my-web-app
 overlord sync                   # Check status
 
 # Work on the project...
@@ -404,7 +419,7 @@ overlord sync                   # Check status
 overlord sync my-web-app        # Check sync status
 
 # When done working on this machine:
-overlord deactivate my-web-app  # Remove Syncthing folder (optional: remove peer)
+overlord deactivate my-web-app
 ```
 
 ### Project Resolution
@@ -496,6 +511,11 @@ make clean                          # Clean build artifacts
 make activate NAME=<name>           # Activate sync for a project
 make sync [NAME=<name>]             # Sync all or specific project
 make deactivate NAME=<name>         # Deactivate sync for a project
+make sync-lock-show                 # Show lock owner
+make sync-lock-transfer MACHINE=<name>
+make sync-lock-claim                # Force-claim lock locally
+make doctor                         # Run diagnostic checks
+make backup                         # Push disaster-recovery backup
 ```
 
 ### Environment Variables

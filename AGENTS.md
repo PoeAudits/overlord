@@ -15,14 +15,15 @@ Layered CLI application: Cobra commands → Registry operations (fuzzy matching,
 - Embedded templates for portability
 - Automatic thoughts directory management during archive/unarchive
 
-**Two Repositories:**
+**Two Data Surfaces:**
 
 | Repository | Purpose | Location |
 |------------|---------|----------|
 | `PoeAudits/overlord` | Source code (this Go project) | `~/Overlord/core/tools/overlord-v2` |
-| `PoeAudits/overlord-config` | Registry + config (synced between machines) | `~/.config/overlord/` |
+| `~/.config/overlord/` Syncthing folder | Runtime registry artifacts (`registry.yaml`, `peers.yaml`, `registry.lock.yaml`) | `~/.config/overlord/` |
+| `~/.local/share/overlord/backup` git repo | Optional disaster-recovery snapshots (`overlord backup`) | local repo with GitHub remote |
 
-The config repo contains `registry.yaml` (tracked, shared), `.gitignore`, and `machine.yaml` (gitignored, machine-specific). The `overlord setup` command initializes it.
+`~/.config/overlord/` is Syncthing-managed. `machine.yaml` is local-only and excluded via `.stignore`.
 
 ## Directory Structure
 
@@ -44,12 +45,17 @@ overlord-v2/
 │   │   ├── archive.go, unarchive.go, clear.go, thoughts.go
 │   │   ├── init.go, setup.go, config.go
 │   │   ├── activate.go, sync.go, deactivate.go
+│   │   ├── sync_lock.go            # Registry lock commands (show/transfer/claim)
+│   │   ├── doctor.go, backup.go
+│   │   ├── syncthing_config_folder.go
 │   │   └── env.go, detect.go
 │   ├── registry/                  # Registry types and operations
 │   │   ├── types.go               # Registry, Project, Category, Language types
 │   │   ├── store.go               # Load/Save with atomic writes
 │   │   └── resolve.go             # Fuzzy matching and resolution
 │   ├── machine/config.go          # MachineConfig, Syncthing settings, Load function
+│   ├── machine/peers.go           # Shared peer registry helpers
+│   ├── machine/lock.go            # Registry lock artifact helpers
 │   ├── gitops/git.go              # Git operations for registry sync
 │   └── templates/
 │       ├── templates.go           # Template loading and rendering
@@ -82,8 +88,7 @@ Command files use shared utilities to reduce duplication:
 
 **Helpers** (`helpers.go`): Common operations used across commands:
 - `loadRegistry()` — loads registry with error handling
-- `saveRegistry()` — saves registry with validation
-- `commitAndPushRegistry()` — git add + commit + push for registry changes
+- `saveRegistry()` — saves registry with validation and lock-owner enforcement
 - `confirmAction()` — interactive yes/no confirmation prompt
 - `expandBaseDir()` — expands base_dir from registry settings
 - `countTrue()` — variadic helper to count true boolean flags (used for validation)
@@ -164,7 +169,21 @@ When a function requires many parameters (>5), use a context struct to bundle re
 
 Fields:
 - `name` — machine hostname
-- `syncthing` — local device settings and known peers (device_id, api_url, api_key, address, peers)
+- `role` — machine role (`main`, `vps`, `runner`, `aux`)
+- `syncthing` — local sensitive settings (device_id, api_url, api_key, address)
+
+Shared peer metadata is stored in `~/.config/overlord/peers.yaml`.
+
+### Registry Lock
+
+`~/.config/overlord/registry.lock.yaml` enforces single-writer registry mutations.
+
+Lock commands:
+- `overlord sync lock show`
+- `overlord sync lock transfer <machine>`
+- `overlord sync lock claim`
+
+All commands that mutate `registry.yaml` are guarded via `saveRegistry()` lock checks.
 
 If the file doesn't exist, Overlord creates one with the hostname only. Sync commands require Syncthing config to be filled in.
 
@@ -172,23 +191,31 @@ If the file doesn't exist, Overlord creates one with the hostname only. Sync com
 
 **Syncthing REST client** (`internal/syncthing/`): manages devices and folders via the Syncthing REST API.
 
-**GitOps** (`internal/gitops/git.go`): `Add()`, `Commit()` (auto-prefixes "overlord: "), `Push()`, `Pull()` (with rebase). Push/Pull gracefully handle repos without remotes.
+**Backup Git repo** (`internal/cmd/backup.go`): one-way disaster-recovery snapshots of `registry.yaml` + `peers.yaml` to a dedicated local git repo/remote. Not used in sync-critical flows.
 
 ### Sync Commands
 
-**`overlord activate <project>`** (`internal/cmd/activate.go`):
-- Ensures peer device and folder exist in Syncthing (local + peer)
+**`overlord activate [project ...]`** (`internal/cmd/activate.go`):
+- Supports single, many, or `--all`
+- Ensures peer device and folder exist in Syncthing (local)
 - Sets `sync.status = active` and `sync.method = syncthing`
-- Validates not archived, commits and pushes registry changes
+- Validates not archived and enforces lock ownership before registry writes
 
 **`overlord sync [project]`** (`internal/cmd/sync.go`):
 - Shows Syncthing folder status for active projects
 - No file transfer is initiated; sync is continuous via Syncthing
 
-**`overlord deactivate <project>`** (`internal/cmd/deactivate.go`):
-- Removes Syncthing folder locally (and optionally on the peer)
+**`overlord deactivate [project ...]`** (`internal/cmd/deactivate.go`):
+- Supports single, many, or `--all`
+- Removes Syncthing folder locally
 - Sets `sync.status = inactive` and `sync.method = syncthing`
-- Commits and pushes registry changes
+- Enforces lock ownership before registry writes
+
+**`overlord doctor`** (`internal/cmd/doctor.go`):
+- Verifies machine config, Syncthing connectivity, registry/lock validity, peer reachability, and folder consistency.
+
+**`overlord backup`** (`internal/cmd/backup.go`):
+- Copies `registry.yaml` + `peers.yaml` into a dedicated backup repo, commits timestamped snapshots, and pushes one-way.
 
 ### Sync Ignore Patterns
 
@@ -280,7 +307,7 @@ Sync ignores are managed via `.stignore` with a shared `.stglobalignore` include
 - Do NOT test only happy paths (test error cases)
 - Do NOT define inline styles in command files (use `NewStyles()`)
 - Do NOT duplicate registry load/save logic (use `loadRegistry()`, `saveRegistry()`)
-- Do NOT duplicate git commit logic (use `commitAndPushRegistry()`)
+- Do NOT reintroduce git push/pull into sync command paths (`activate`, `deactivate`, `sync`, `setup --init`)
 - Do NOT use magic numbers (define named constants in `constants.go`)
 - Do NOT use `os.Exit()` outside main (propagate errors via return values)
 - Do NOT leave resource leaks (clean up partial files on failure)

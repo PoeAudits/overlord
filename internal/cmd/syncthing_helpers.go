@@ -15,19 +15,23 @@ import (
 
 type syncthingPeerSelection struct {
 	name string
-	peer machine.SyncthingPeer
+	peer machine.Peer
 }
 
-func resolveSyncthingPeer(config *machine.MachineConfig, requested string) (syncthingPeerSelection, error) {
-	peers := config.Syncthing.Peers
+func resolveSyncthingPeer(peersConfig *machine.PeersConfig, requested string) (syncthingPeerSelection, error) {
+	if peersConfig == nil {
+		return syncthingPeerSelection{}, fmt.Errorf("peers config is not loaded")
+	}
+
+	peers := peersConfig.Peers
 	if len(peers) == 0 {
-		return syncthingPeerSelection{}, fmt.Errorf("no syncthing peers configured in machine.yaml")
+		return syncthingPeerSelection{}, fmt.Errorf("no syncthing peers configured in peers.yaml")
 	}
 
 	if requested != "" {
 		peer, ok := peers[requested]
 		if !ok {
-			return syncthingPeerSelection{}, fmt.Errorf("syncthing peer '%s' not found in machine.yaml", requested)
+			return syncthingPeerSelection{}, fmt.Errorf("syncthing peer '%s' not found in peers.yaml", requested)
 		}
 		return syncthingPeerSelection{name: requested, peer: peer}, nil
 	}
@@ -58,21 +62,6 @@ func localSyncthingClient(config *machine.MachineConfig) (*syncthing.Client, err
 		return nil, err
 	}
 	return syncthing.NewClient(config.Syncthing.APIURL, config.Syncthing.APIKey), nil
-}
-
-func peerSyncthingClient(config *machine.MachineConfig, peerName string) (*syncthing.Client, syncthingPeerSelection, error) {
-	if err := requireSyncthingConfig(config); err != nil {
-		return nil, syncthingPeerSelection{}, err
-	}
-
-	selection, err := resolveSyncthingPeer(config, peerName)
-	if err != nil {
-		return nil, syncthingPeerSelection{}, err
-	}
-
-	peer := selection.peer
-	client := syncthing.NewClient(peer.APIURL, peer.APIKey)
-	return client, selection, nil
 }
 
 func buildSyncthingFolder(projectName, projectPath string, localDeviceID, peerDeviceID string) syncthing.Folder {

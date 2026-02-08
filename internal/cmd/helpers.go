@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/PoeAudits/overlord/internal/gitops"
+	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/registry"
 	"golang.org/x/term"
 )
@@ -23,10 +24,43 @@ func loadRegistry() (*registry.Registry, error) {
 
 // saveRegistry saves the registry to the default path.
 func saveRegistry(reg *registry.Registry) error {
+	if err := enforceRegistryLockOwnership(); err != nil {
+		return err
+	}
+
 	if err := registry.Save(registry.DefaultRegistryPath, reg); err != nil {
 		return fmt.Errorf("failed to save registry: %w", err)
 	}
 	return nil
+}
+
+func enforceRegistryLockOwnership() error {
+	lock, err := machine.LoadLock(machine.DefaultRegistryLockPath)
+	if err != nil {
+		return fmt.Errorf("failed to load registry lock: %w", err)
+	}
+	if lock == nil {
+		return nil
+	}
+
+	machineConfig, err := machine.Load(machine.DefaultConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to load machine config for lock check: %w", err)
+	}
+
+	localMachine := machineConfig.Name
+	if lock.Owner == localMachine {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"registry lock is owned by '%s' and this machine is '%s'\n"+
+			"Run on owner machine: overlord sync lock transfer %s\n"+
+			"If owner is offline, run: overlord sync lock claim",
+		lock.Owner,
+		localMachine,
+		localMachine,
+	)
 }
 
 // commitAndPushRegistry stages, commits, and pushes registry.yaml changes.

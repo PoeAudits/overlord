@@ -3,45 +3,57 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/registry"
+	"github.com/PoeAudits/overlord/internal/syncthing"
 	"github.com/spf13/cobra"
 )
 
 // activateCmd represents the activate command
 var activateCmd = &cobra.Command{
-	Use:   "activate <name>",
+	Use:   "activate [name ...]",
 	Short: "Activate Syncthing sync for a project",
 	Long: `Activate Syncthing sync by registering the project as a shared folder
-on both the local and remote Syncthing instances. The project is also marked
-as sync-active in the registry, which is committed and pushed to git.
+on the local Syncthing instance and sharing it with a configured peer device.
+The project is also marked as sync-active in the registry.
 
-The name argument can be either a project name or alias.
+Arguments can be project names or aliases. Use --all to activate every project.
 
 Examples:
-  overlord activate myproject         # Activate sync for myproject
-  overlord activate myproject --peer vps
-  overlord activate mp                # Activate using alias`,
-	Args: cobra.ExactArgs(1),
+	 overlord activate myproject         # Activate sync for myproject
+	 overlord activate app api web       # Activate multiple projects
+	 overlord activate --all             # Activate all projects
+	 overlord activate myproject --peer vps
+	 overlord activate mp                # Activate using alias`,
+	Args: cobra.ArbitraryArgs,
 	RunE: runActivate,
 }
 
 type activateFlags struct {
 	peer string
+	all  bool
 }
 
 var activateOpts activateFlags
 
 func init() {
 	rootCmd.AddCommand(activateCmd)
-	activateCmd.Flags().StringVar(&activateOpts.peer, "peer", "", "Syncthing peer name from machine.yaml")
+	activateCmd.Flags().StringVar(&activateOpts.peer, "peer", "", "Syncthing peer name from peers.yaml")
+	activateCmd.Flags().BoolVar(&activateOpts.all, "all", false, "Activate sync for all projects")
 }
 
 // runActivate handles the activate command logic
 func runActivate(cmd *cobra.Command, args []string) error {
-	name := args[0]
 	s := NewStyles()
+
+	if activateOpts.all && len(args) > 0 {
+		return fmt.Errorf("--all cannot be combined with project names")
+	}
+	if !activateOpts.all && len(args) == 0 {
+		return fmt.Errorf("requires at least one project name or --all")
+	}
 
 	// Load registry
 	reg, err := loadRegistry()
@@ -49,15 +61,19 @@ func runActivate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Resolve project using fuzzy matching
-	projectName, project, err := resolveProject(reg, name)
+	targets, err := resolveActivateTargets(reg, args, activateOpts.all)
 	if err != nil {
 		return err
 	}
+	if len(targets) == 0 {
+		fmt.Printf("%s No projects selected for activation\n", s.Info.Render("Info:"))
+		return nil
+	}
 
-	// Check if project is archived
-	if project.Status.State == registry.StateArchived {
-		return fmt.Errorf("project '%s' is archived\nRun 'overlord unarchive %s' first to restore it", projectName, projectName)
+	if len(targets) > 1 {
+		if err := enforceRegistryLockOwnership(); err != nil {
+			return err
+		}
 	}
 
 	// Load machine config
@@ -71,71 +87,122 @@ func runActivate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	peerClient, peerSelection, err := peerSyncthingClient(machineConfig, activateOpts.peer)
+	peersConfig, err := machine.LoadPeers(machine.DefaultPeersPath)
+	if err != nil {
+		return fmt.Errorf("failed to load peers config: %w", err)
+	}
+
+	peerSelection, err := resolveSyncthingPeer(peersConfig, activateOpts.peer)
 	if err != nil {
 		return err
 	}
 
-	remoteBaseDir := peerSelection.peer.BaseDir
-	if remoteBaseDir == "" {
-		remoteBaseDir = reg.Settings.BaseDir
-	}
-
-	// Resolve project paths
 	baseDir, err := expandBaseDir(reg)
 	if err != nil {
 		return err
 	}
+	ctx := context.Background()
+
+	results := make([]string, 0, len(targets))
+	failures := make([]string, 0)
+	updated := false
+
+	for _, projectName := range targets {
+		project := reg.Projects[projectName]
+		peerProjectPath, activateErr := activateProjectSync(ctx, reg, baseDir, machineConfig, localClient, peerSelection, projectName, project)
+		if activateErr != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", projectName, activateErr))
+			results = append(results, fmt.Sprintf("%s %s - %v", s.Error.Render("✗"), projectName, activateErr))
+			continue
+		}
+
+		project.Sync.Status = registry.SyncActive
+		project.Sync.Method = registry.SyncMethodSyncthing
+		reg.Projects[projectName] = project
+		updated = true
+		results = append(results, fmt.Sprintf("%s %s (peer: %s, path: %s)", s.Success.Render("✓"), projectName, peerSelection.name, peerProjectPath))
+	}
+
+	for _, line := range results {
+		fmt.Println(line)
+	}
+
+	if updated {
+		if err := saveRegistry(reg); err != nil {
+			return err
+		}
+	}
+
+	if len(failures) > 0 {
+		return fmt.Errorf("activate completed with %d failure(s)", len(failures))
+	}
+
+	if len(targets) == 1 {
+		fmt.Printf("%s sync active\n", s.Label.Render("Status:"))
+	}
+
+	return nil
+}
+
+func resolveActivateTargets(reg *registry.Registry, args []string, all bool) ([]string, error) {
+	if all {
+		names := make([]string, 0, len(reg.Projects))
+		for name := range reg.Projects {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		return names, nil
+	}
+
+	seen := make(map[string]struct{}, len(args))
+	targets := make([]string, 0, len(args))
+	for _, arg := range args {
+		resolved, _, err := resolveProject(reg, arg)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := seen[resolved]; ok {
+			continue
+		}
+		seen[resolved] = struct{}{}
+		targets = append(targets, resolved)
+	}
+
+	return targets, nil
+}
+
+func activateProjectSync(
+	ctx context.Context,
+	reg *registry.Registry,
+	baseDir string,
+	machineConfig *machine.MachineConfig,
+	localClient *syncthing.Client,
+	peerSelection syncthingPeerSelection,
+	projectName string,
+	project registry.Project,
+) (string, error) {
+	if project.Status.State == registry.StateArchived {
+		return "", fmt.Errorf("archived (run 'overlord unarchive %s' first)", projectName)
+	}
+
 	projectPath := resolveProjectPath(project.Path, baseDir)
 	peerProjectPath, err := projectPathForPeer(project, reg.Settings.BaseDir, peerSelection.peer.BaseDir)
 	if err != nil {
-		return fmt.Errorf("failed to resolve peer project path: %w", err)
+		return "", fmt.Errorf("failed to resolve peer path: %w", err)
 	}
 
-	// Ensure ignore file exists locally
 	if err := ensureIgnoreFile(projectPath); err != nil {
-		return err
+		return "", err
 	}
 
-	// Ensure devices exist on both sides
-	ctx := context.Background()
-	if err := ensureSyncthingDevice(ctx, localClient, peerSelection.peer.DeviceID, peerSelection.name, peerSelection.peer.Address); err != nil {
-		return fmt.Errorf("failed to ensure peer device on local syncthing: %w", err)
-	}
-	if err := ensureSyncthingDevice(ctx, peerClient, machineConfig.Syncthing.DeviceID, machineConfig.Name, machineConfig.Syncthing.Address); err != nil {
-		return fmt.Errorf("failed to ensure local device on peer syncthing: %w", err)
+	if err := ensureSyncthingDevice(ctx, localClient, peerSelection.peer.Syncthing.DeviceID, peerSelection.name, peerSelection.peer.Syncthing.Address); err != nil {
+		return "", fmt.Errorf("failed to ensure peer device on local syncthing: %w", err)
 	}
 
-	// Ensure folders on both sides
-	localFolder := buildSyncthingFolder(projectName, projectPath, machineConfig.Syncthing.DeviceID, peerSelection.peer.DeviceID)
-	peerFolder := buildSyncthingFolder(projectName, peerProjectPath, machineConfig.Syncthing.DeviceID, peerSelection.peer.DeviceID)
-
+	localFolder := buildSyncthingFolder(projectName, projectPath, machineConfig.Syncthing.DeviceID, peerSelection.peer.Syncthing.DeviceID)
 	if _, err := localClient.EnsureFolder(ctx, localFolder); err != nil {
-		return fmt.Errorf("failed to configure local syncthing folder: %w", err)
-	}
-	if _, err := peerClient.EnsureFolder(ctx, peerFolder); err != nil {
-		return fmt.Errorf("failed to configure peer syncthing folder: %w", err)
+		return "", fmt.Errorf("failed to configure local syncthing folder: %w", err)
 	}
 
-	// Update sync status
-	project.Sync.Status = registry.SyncActive
-	project.Sync.Method = registry.SyncMethodSyncthing
-	reg.Projects[projectName] = project
-
-	// Save registry
-	if err := saveRegistry(reg); err != nil {
-		return err
-	}
-
-	// Commit and push registry changes
-	if err := commitAndPushRegistry(fmt.Sprintf("activate %s", projectName)); err != nil {
-		return err
-	}
-
-	// Print success message
-	fmt.Printf("%s '%s'\n", s.Success.Render("✓ Activated"), projectName)
-	fmt.Printf("  %s active\n", s.Label.Render("Sync status:"))
-	fmt.Printf("  %s syncthing\n", s.Label.Render("Sync method:"))
-	fmt.Printf("  %s %s\n", s.Label.Render("Peer:"), peerSelection.name)
-	return nil
+	return peerProjectPath, nil
 }

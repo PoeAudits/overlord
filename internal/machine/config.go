@@ -12,30 +12,48 @@ import (
 const (
 	// DefaultConfigPath is the default location for the machine config file
 	DefaultConfigPath = "~/.config/overlord/machine.yaml"
+	// DefaultPeersPath is the default location for shared peer configuration.
+	DefaultPeersPath = "~/.config/overlord/peers.yaml"
 )
+
+// Role represents a machine role in a multi-machine setup.
+type Role string
+
+const (
+	RoleMain   Role = "main"
+	RoleVPS    Role = "vps"
+	RoleRunner Role = "runner"
+	RoleAux    Role = "aux"
+)
+
+// ValidRoles returns all supported machine roles.
+func ValidRoles() []Role {
+	return []Role{RoleMain, RoleVPS, RoleRunner, RoleAux}
+}
+
+// IsValid checks whether the role is one of the supported values.
+func (r Role) IsValid() bool {
+	for _, valid := range ValidRoles() {
+		if r == valid {
+			return true
+		}
+	}
+	return false
+}
 
 // MachineConfig represents the machine-specific configuration
 type MachineConfig struct {
 	Name      string          `yaml:"name"`
+	Role      Role            `yaml:"role,omitempty"`
 	Syncthing SyncthingConfig `yaml:"syncthing,omitempty"`
 }
 
 // SyncthingConfig represents Syncthing API configuration for this machine.
 type SyncthingConfig struct {
-	DeviceID string                   `yaml:"device_id,omitempty"`
-	APIURL   string                   `yaml:"api_url,omitempty"`
-	APIKey   string                   `yaml:"api_key,omitempty"`
-	Address  string                   `yaml:"address,omitempty"`
-	Peers    map[string]SyncthingPeer `yaml:"peers,omitempty"`
-}
-
-// SyncthingPeer represents a remote Syncthing device and API endpoint.
-type SyncthingPeer struct {
 	DeviceID string `yaml:"device_id,omitempty"`
 	APIURL   string `yaml:"api_url,omitempty"`
 	APIKey   string `yaml:"api_key,omitempty"`
 	Address  string `yaml:"address,omitempty"`
-	BaseDir  string `yaml:"base_dir,omitempty"`
 }
 
 // Validate checks if the machine config is valid
@@ -46,6 +64,10 @@ func (m *MachineConfig) Validate() error {
 
 	if err := m.Syncthing.Validate(); err != nil {
 		return err
+	}
+
+	if m.Role != "" && !m.Role.IsValid() {
+		return fmt.Errorf("invalid machine role %q", m.Role)
 	}
 
 	return nil
@@ -66,31 +88,11 @@ func (c SyncthingConfig) Validate() error {
 		return fmt.Errorf("syncthing config requires address")
 	}
 
-	for name, peer := range c.Peers {
-		if err := peer.Validate(); err != nil {
-			return fmt.Errorf("syncthing peer %q: %w", name, err)
-		}
-	}
-
 	return nil
 }
 
 func (c SyncthingConfig) isZero() bool {
-	return c.DeviceID == "" && c.APIURL == "" && c.APIKey == "" && c.Address == "" && len(c.Peers) == 0
-}
-
-// Validate checks if the peer config is valid.
-func (p SyncthingPeer) Validate() error {
-	if p.DeviceID == "" || p.APIURL == "" || p.APIKey == "" {
-		return fmt.Errorf("device_id, api_url, and api_key are required")
-	}
-	if p.Address == "" {
-		return fmt.Errorf("address is required")
-	}
-	if p.BaseDir != "" && !filepath.IsAbs(p.BaseDir) {
-		return fmt.Errorf("base_dir must be an absolute path")
-	}
-	return nil
+	return c.DeviceID == "" && c.APIURL == "" && c.APIKey == "" && c.Address == ""
 }
 
 // Save writes the machine config to the specified path.

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -16,6 +17,8 @@ import (
 	"github.com/PoeAudits/overlord/internal/registry"
 	"github.com/PoeAudits/overlord/internal/syncthing"
 )
+
+const setupInitSeedTimeout = 60 * time.Second
 
 // DefaultConfigRepoURL is the default git remote for the registry config repository.
 const DefaultConfigRepoURL = "git@github.com:PoeAudits/overlord-config.git"
@@ -47,8 +50,15 @@ When called with a project name, it:
 	RunE: runSetup,
 }
 
+type setupFlags struct {
+	init bool
+}
+
+var setupOpts setupFlags
+
 func init() {
 	rootCmd.AddCommand(setupCmd)
+	setupCmd.Flags().BoolVar(&setupOpts.init, "init", false, "Initialize Syncthing-based overlord config sync")
 }
 
 func runSetup(cmd *cobra.Command, args []string) error {
@@ -121,8 +131,14 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Registry: %s\n", registry.DefaultRegistryPath)
 
 	// Set up machine config
-	if err := setupMachineConfig(configDir); err != nil {
+	if err := setupMachineConfig(configDir, setupOpts.init); err != nil {
 		return err
+	}
+
+	if setupOpts.init {
+		if err := runSetupInitFlow(); err != nil {
+			return err
+		}
 	}
 
 	fmt.Println("\nSetup complete!")
@@ -448,15 +464,151 @@ func setupGitIgnore(configDir string) error {
 	return nil
 }
 
-// setupMachineConfig creates machine.yaml if it doesn't exist.
-// It prompts the user interactively for the machine role.
-func setupMachineConfig(configDir string) error {
+// setupMachineConfig creates or updates machine.yaml.
+// In init mode, it ensures required bootstrap fields are present.
+func setupMachineConfig(configDir string, initMode bool) error {
 	machineConfigPath := filepath.Join(configDir, "machine.yaml")
+	interactive := term.IsTerminal(int(os.Stdin.Fd()))
+	reader := bufio.NewReader(os.Stdin)
+
+	promptRole := func(defaultRole machine.Role) (machine.Role, error) {
+		if !interactive {
+			if defaultRole != "" {
+				return defaultRole, nil
+			}
+			return "", fmt.Errorf("machine role is required for --init in non-interactive mode")
+		}
+
+		validRoles := machine.ValidRoles()
+		roleNames := make([]string, 0, len(validRoles))
+		for _, role := range validRoles {
+			roleNames = append(roleNames, string(role))
+		}
+		fmt.Printf("  Machine role [%s] (%s): ", string(defaultRole), strings.Join(roleNames, "/"))
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return "", fmt.Errorf("failed to read machine role: %w", err)
+		}
+		input = strings.TrimSpace(strings.ToLower(input))
+		if input == "" {
+			return defaultRole, nil
+		}
+		role := machine.Role(input)
+		if !role.IsValid() {
+			return "", fmt.Errorf("invalid machine role %q", input)
+		}
+		return role, nil
+	}
+
+	promptRequiredSyncthing := func(defaults machine.SyncthingConfig) (machine.SyncthingConfig, error) {
+		if !interactive {
+			if defaults.Validate() != nil {
+				return machine.SyncthingConfig{}, fmt.Errorf("syncthing configuration is required for --init in non-interactive mode")
+			}
+			return defaults, nil
+		}
+
+		fmt.Printf("  Syncthing API URL [%s]: ", defaults.APIURL)
+		apiURL, err := reader.ReadString('\n')
+		if err != nil {
+			return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing api url: %w", err)
+		}
+		apiURL = strings.TrimSpace(apiURL)
+		if apiURL == "" {
+			apiURL = defaults.APIURL
+		}
+
+		fmt.Printf("  Syncthing API key [%s]: ", nonEmptyMask(defaults.APIKey))
+		apiKey, err := reader.ReadString('\n')
+		if err != nil {
+			return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing api key: %w", err)
+		}
+		apiKey = strings.TrimSpace(apiKey)
+		if apiKey == "" {
+			apiKey = defaults.APIKey
+		}
+
+		fmt.Printf("  Syncthing device ID [%s]: ", defaults.DeviceID)
+		deviceID, err := reader.ReadString('\n')
+		if err != nil {
+			return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing device id: %w", err)
+		}
+		deviceID = strings.TrimSpace(deviceID)
+		if deviceID == "" {
+			deviceID = defaults.DeviceID
+		}
+
+		fmt.Printf("  Syncthing address [%s]: ", defaults.Address)
+		address, err := reader.ReadString('\n')
+		if err != nil {
+			return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing address: %w", err)
+		}
+		address = strings.TrimSpace(address)
+		if address == "" {
+			address = defaults.Address
+		}
+
+		syncCfg := machine.SyncthingConfig{
+			APIURL:   apiURL,
+			APIKey:   apiKey,
+			DeviceID: deviceID,
+			Address:  address,
+		}
+		if err := syncCfg.Validate(); err != nil {
+			return machine.SyncthingConfig{}, err
+		}
+		return syncCfg, nil
+	}
 
 	// Check if machine.yaml already exists
-	if _, err := os.Stat(machineConfigPath); err == nil {
-		fmt.Printf("  Exists:  %s\n", machineConfigPath)
+	if _, statErr := os.Stat(machineConfigPath); statErr == nil {
+		if !initMode {
+			fmt.Printf("  Exists:  %s\n", machineConfigPath)
+			return nil
+		}
+
+		current, loadErr := machine.Load(machineConfigPath)
+		if loadErr != nil {
+			return fmt.Errorf("failed to load machine config: %w", loadErr)
+		}
+
+		changed := false
+		if current.Role == "" {
+			role, roleErr := promptRole(machine.RoleMain)
+			if roleErr != nil {
+				return roleErr
+			}
+			current.Role = role
+			changed = true
+		}
+
+		if current.Syncthing.Validate() != nil {
+			defaults := current.Syncthing
+			if defaults.APIURL == "" {
+				defaults.APIURL = "http://127.0.0.1:8384"
+			}
+			syncCfg, syncErr := promptRequiredSyncthing(defaults)
+			if syncErr != nil {
+				return syncErr
+			}
+			current.Syncthing = syncCfg
+			changed = true
+		}
+
+		if changed {
+			if saveErr := machine.Save(machineConfigPath, current); saveErr != nil {
+				return fmt.Errorf("failed to update machine config: %w", saveErr)
+			}
+			fmt.Printf("  Updated: %s\n", machineConfigPath)
+		} else {
+			fmt.Printf("  Exists:  %s\n", machineConfigPath)
+		}
+
 		return nil
+	}
+
+	if _, statErr := os.Stat(machineConfigPath); statErr != nil && !os.IsNotExist(statErr) {
+		return fmt.Errorf("failed to check machine config: %w", statErr)
 	}
 
 	fmt.Println("\nSetting up machine configuration...")
@@ -467,8 +619,33 @@ func setupMachineConfig(configDir string) error {
 		return fmt.Errorf("failed to get hostname: %w", err)
 	}
 
-	config := &machine.MachineConfig{
-		Name: hostname,
+	name := hostname
+	if interactive {
+		fmt.Printf("  Machine name [%s]: ", hostname)
+		input, readErr := reader.ReadString('\n')
+		if readErr != nil {
+			return fmt.Errorf("failed to read machine name: %w", readErr)
+		}
+		input = strings.TrimSpace(input)
+		if input != "" {
+			name = input
+		}
+	}
+
+	config := &machine.MachineConfig{Name: name}
+
+	if initMode {
+		role, roleErr := promptRole(machine.RoleMain)
+		if roleErr != nil {
+			return roleErr
+		}
+		config.Role = role
+
+		syncCfg, syncErr := promptRequiredSyncthing(machine.SyncthingConfig{APIURL: "http://127.0.0.1:8384"})
+		if syncErr != nil {
+			return syncErr
+		}
+		config.Syncthing = syncCfg
 	}
 
 	// Save machine config
@@ -478,6 +655,9 @@ func setupMachineConfig(configDir string) error {
 
 	fmt.Printf("  Created: %s\n", machineConfigPath)
 	fmt.Printf("  Name:    %s\n", config.Name)
+	if config.Role != "" {
+		fmt.Printf("  Role:    %s\n", config.Role)
+	}
 	if config.Syncthing.DeviceID != "" {
 		fmt.Printf("  Syncthing: configured\n")
 	} else {
@@ -499,5 +679,189 @@ func createDir(path, name string) error {
 	} else {
 		fmt.Printf("  Exists:  %s\n", path)
 	}
+	return nil
+}
+
+func runSetupInitFlow() error {
+	machineView, err := machine.LoadWithPeers(machine.DefaultConfigPath, machine.DefaultPeersPath)
+	if err != nil {
+		return fmt.Errorf("failed to load machine/peer config: %w", err)
+	}
+
+	if machineView.Peers == nil {
+		machineView.Peers = &machine.PeersConfig{Peers: map[string]machine.Peer{}}
+	}
+	if machineView.Peers.Peers == nil {
+		machineView.Peers.Peers = map[string]machine.Peer{}
+	}
+
+	if err := machine.SavePeers(machine.DefaultPeersPath, machineView.Peers); err != nil {
+		return fmt.Errorf("failed to initialize peers config: %w", err)
+	}
+
+	client, err := localSyncthingClient(machineView.Machine)
+	if err != nil {
+		return err
+	}
+
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Printf("  Optional peer device ID (blank to skip): ")
+		peerDeviceID, readErr := reader.ReadString('\n')
+		if readErr != nil {
+			return fmt.Errorf("failed to read peer device id: %w", readErr)
+		}
+		peerDeviceID = strings.TrimSpace(peerDeviceID)
+		if peerDeviceID != "" {
+			if ensureErr := ensureSyncthingDevice(context.Background(), client, peerDeviceID, "bootstrap-peer", "dynamic"); ensureErr != nil {
+				return fmt.Errorf("failed to ensure bootstrap peer device: %w", ensureErr)
+			}
+			fmt.Printf("  Syncthing: pre-authorized peer device %s\n", peerDeviceID)
+		}
+	}
+
+	if err := ensureOverlordConfigSyncthingFolder(context.Background(), machineView.Machine, machineView.Peers); err != nil {
+		return err
+	}
+	fmt.Printf("  Syncthing: configured overlord config folder '%s'\n", overlordConfigFolderID)
+
+	lock, err := machine.LoadLock(machine.DefaultRegistryLockPath)
+	if err != nil {
+		return fmt.Errorf("failed to load registry lock: %w", err)
+	}
+	if lock == nil {
+		seed := machine.NewRegistryLock(machineView.Machine.Name, "initial lock owner")
+		if err := machine.SaveLock(machine.DefaultRegistryLockPath, seed); err != nil {
+			return fmt.Errorf("failed to initialize registry lock: %w", err)
+		}
+		fmt.Printf("  Lock:     initialized with owner '%s'\n", machineView.Machine.Name)
+	}
+
+	if err := waitForSyncedArtifacts(setupInitSeedTimeout); err != nil {
+		return err
+	}
+	fmt.Printf("  Sync:     seed artifacts available\n")
+
+	latestRegistry, err := loadRegistry()
+	if err != nil {
+		return err
+	}
+
+	latestPeers, err := machine.LoadPeers(machine.DefaultPeersPath)
+	if err != nil {
+		return fmt.Errorf("failed to load peers config after sync: %w", err)
+	}
+
+	if err := reconcileActiveProjects(context.Background(), latestRegistry, machineView.Machine, latestPeers); err != nil {
+		return err
+	}
+
+	activeProjects := len(getSyncActiveProjects(latestRegistry))
+	fmt.Printf("  Reconcile: completed for %d sync-active project(s)\n", activeProjects)
+
+	return nil
+}
+
+func nonEmptyMask(value string) string {
+	if value == "" {
+		return ""
+	}
+	return "*****"
+}
+
+func waitForSyncedArtifacts(timeout time.Duration) error {
+	registryPath, err := registry.ExpandPath(registry.DefaultRegistryPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve registry path: %w", err)
+	}
+	peersPath, err := registry.ExpandPath(machine.DefaultPeersPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve peers path: %w", err)
+	}
+	lockPath, err := registry.ExpandPath(machine.DefaultRegistryLockPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve lock path: %w", err)
+	}
+
+	deadline := time.Now().Add(timeout)
+	for {
+		if fileExists(registryPath) && fileExists(peersPath) && fileExists(lockPath) {
+			if _, regErr := registry.Load(registry.DefaultRegistryPath); regErr == nil {
+				if _, peersErr := machine.LoadPeers(machine.DefaultPeersPath); peersErr == nil {
+					if lock, lockErr := machine.LoadLock(machine.DefaultRegistryLockPath); lockErr == nil && lock != nil {
+						return nil
+					}
+				}
+			}
+		}
+
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timed out waiting for synced artifacts (registry.yaml, peers.yaml, registry.lock.yaml)")
+		}
+
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func reconcileActiveProjects(ctx context.Context, reg *registry.Registry, machineConfig *machine.MachineConfig, peersConfig *machine.PeersConfig) error {
+	baseDir, err := expandBaseDir(reg)
+	if err != nil {
+		return err
+	}
+
+	client, err := localSyncthingClient(machineConfig)
+	if err != nil {
+		return err
+	}
+
+	peerDevices := make([]syncthing.FolderDevice, 0, len(peersConfig.Peers))
+	for name, peer := range peersConfig.Peers {
+		if peer.Syncthing.DeviceID == "" {
+			continue
+		}
+		if err := ensureSyncthingDevice(ctx, client, peer.Syncthing.DeviceID, name, peer.Syncthing.Address); err != nil {
+			return fmt.Errorf("failed to ensure syncthing peer device %q: %w", name, err)
+		}
+		peerDevices = append(peerDevices, syncthing.FolderDevice{DeviceID: peer.Syncthing.DeviceID})
+	}
+
+	active := getSyncActiveProjects(reg)
+	for _, projectName := range sortedProjectNames(active) {
+		project := reg.Projects[projectName]
+		if project.Status.State == registry.StateArchived {
+			continue
+		}
+
+		projectPath := resolveProjectPath(project.Path, baseDir)
+		if err := os.MkdirAll(projectPath, 0755); err != nil {
+			return fmt.Errorf("failed to create local project directory for %q: %w", projectName, err)
+		}
+		if err := ensureIgnoreFile(projectPath); err != nil {
+			return fmt.Errorf("failed to ensure .stignore for %q: %w", projectName, err)
+		}
+
+		devices := []syncthing.FolderDevice{{DeviceID: machineConfig.Syncthing.DeviceID}}
+		devices = append(devices, peerDevices...)
+		folder := syncthing.Folder{
+			ID:               projectName,
+			Label:            projectName,
+			Path:             projectPath,
+			Type:             "sendreceive",
+			Devices:          devices,
+			FSWatcherEnabled: true,
+			Copiers:          1,
+			Hashers:          1,
+			CaseSensitiveFS:  true,
+		}
+		if _, err := client.EnsureFolder(ctx, folder); err != nil {
+			return fmt.Errorf("failed to reconcile syncthing folder for %q: %w", projectName, err)
+		}
+	}
+
 	return nil
 }

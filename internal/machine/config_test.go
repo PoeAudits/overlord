@@ -26,23 +26,24 @@ func TestMachineConfigValidate(t *testing.T) {
 			name: "valid syncthing config",
 			config: MachineConfig{
 				Name: "vps",
+				Role: RoleVPS,
 				Syncthing: SyncthingConfig{
 					DeviceID: "XXXX-XXXX-XXXX-XXXX",
 					APIURL:   "http://localhost:8384",
 					APIKey:   "key",
 					Address:  "tcp://100.100.100.100:22000",
-					Peers: map[string]SyncthingPeer{
-						"desktop": {
-							DeviceID: "YYYY-YYYY-YYYY-YYYY",
-							APIURL:   "http://100.100.100.1:8384",
-							APIKey:   "peer-key",
-							Address:  "tcp://100.100.100.1:22000",
-							BaseDir:  "/home/thomas/Overlord",
-						},
-					},
 				},
 			},
 			wantErr: false,
+		},
+		{
+			name: "invalid role",
+			config: MachineConfig{
+				Name: "desktop",
+				Role: Role("bad-role"),
+			},
+			wantErr: true,
+			errMsg:  "invalid machine role",
 		},
 		{
 			name: "empty name",

@@ -69,6 +69,16 @@ type FolderStatus struct {
 	PullErrors  int    `json:"pullErrors"`
 }
 
+// ConnectionsResponse represents /rest/system/connections payload.
+type ConnectionsResponse struct {
+	Connections map[string]Connection `json:"connections"`
+}
+
+// Connection represents peer connectivity information.
+type Connection struct {
+	Connected bool `json:"connected"`
+}
+
 // GetDevices returns configured devices.
 func (c *Client) GetDevices(ctx context.Context) ([]Device, error) {
 	var devices []Device
@@ -191,6 +201,18 @@ func (c *Client) GetFolderStatus(ctx context.Context, id string) (*FolderStatus,
 		return nil, err
 	}
 	return &status, nil
+}
+
+// GetConnections returns Syncthing device connection status.
+func (c *Client) GetConnections(ctx context.Context) (*ConnectionsResponse, error) {
+	var connections ConnectionsResponse
+	if err := c.getJSON(ctx, "/rest/system/connections", &connections); err != nil {
+		return nil, err
+	}
+	if connections.Connections == nil {
+		connections.Connections = map[string]Connection{}
+	}
+	return &connections, nil
 }
 
 func (c *Client) getJSON(ctx context.Context, endpoint string, out any) error {

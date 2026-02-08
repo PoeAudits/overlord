@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/registry"
@@ -14,45 +15,52 @@ import (
 type deactivateFlags struct {
 	peer         string
 	removeRemote bool
+	all          bool
 }
 
 var deactivateOpts deactivateFlags
 
 // deactivateCmd represents the deactivate command
 var deactivateCmd = &cobra.Command{
-	Use:   "deactivate <name>",
+	Use:   "deactivate [name ...]",
 	Short: "Deactivate Syncthing sync for a project",
 	Long: `Deactivate a project by removing its Syncthing folder and updating
 the registry sync status to 'inactive'. Optionally remove the folder on the
-remote peer as well.
+remote peer manually as well.
 
-The registry change is automatically committed and pushed to git.
-
-The name argument can be either a project name or alias.
+Arguments can be project names or aliases. Use --all to deactivate every project.
 
 Flags:
-  --peer          Syncthing peer name from machine.yaml
-  --remove-remote Also remove the folder from the peer's Syncthing instance
+  --peer          Syncthing peer name from peers.yaml
+  --remove-remote Print reminder to remove the folder on the peer machine
+  --all           Deactivate sync for all projects
 
 Examples:
   overlord deactivate myproject
+  overlord deactivate app api
+  overlord deactivate --all
   overlord deactivate myproject --peer vps --remove-remote`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.ArbitraryArgs,
 	RunE: runDeactivate,
 }
 
 func init() {
 	rootCmd.AddCommand(deactivateCmd)
-	deactivateCmd.Flags().StringVar(&deactivateOpts.peer, "peer", "", "Syncthing peer name from machine.yaml")
-	deactivateCmd.Flags().BoolVar(&deactivateOpts.removeRemote, "remove-remote", false, "Remove folder from the peer Syncthing instance")
+	deactivateCmd.Flags().StringVar(&deactivateOpts.peer, "peer", "", "Syncthing peer name from peers.yaml")
+	deactivateCmd.Flags().BoolVar(&deactivateOpts.removeRemote, "remove-remote", false, "Print reminder to remove folder on peer machine")
+	deactivateCmd.Flags().BoolVar(&deactivateOpts.all, "all", false, "Deactivate sync for all projects")
 }
 
 // runDeactivate handles the deactivate command logic
 func runDeactivate(cmd *cobra.Command, args []string) error {
-	name := args[0]
-
-	// Define styles for output
 	s := NewStyles()
+
+	if deactivateOpts.all && len(args) > 0 {
+		return fmt.Errorf("--all cannot be combined with project names")
+	}
+	if !deactivateOpts.all && len(args) == 0 {
+		return fmt.Errorf("requires at least one project name or --all")
+	}
 
 	// 1. Load machine config
 	machineConfig, err := machine.Load(machine.DefaultConfigPath)
@@ -65,9 +73,12 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var peerClient *syncthing.Client
 	if deactivateOpts.removeRemote {
-		peerClient, _, err = peerSyncthingClient(machineConfig, deactivateOpts.peer)
+		peersConfig, loadErr := machine.LoadPeers(machine.DefaultPeersPath)
+		if loadErr != nil {
+			return fmt.Errorf("failed to load peers config: %w", loadErr)
+		}
+		_, err = resolveSyncthingPeer(peersConfig, deactivateOpts.peer)
 		if err != nil {
 			return err
 		}
@@ -79,57 +90,110 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// 3. Resolve project using fuzzy matching
-	projectName, project, err := resolveProject(reg, name)
+	targets, err := resolveDeactivateTargets(reg, args, deactivateOpts.all)
 	if err != nil {
 		return err
 	}
-
-	// 4. Check if project is archived
-	if project.Status.State == registry.StateArchived {
-		return fmt.Errorf("project '%s' is archived\nArchived projects cannot be deactivated from sync", projectName)
-	}
-
-	// 5. Check if already inactive
-	if project.Sync.Status != registry.SyncActive {
-		fmt.Printf("%s Project '%s' is not active for sync (nothing to deactivate)\n",
-			s.Info.Render("Info:"), projectName)
+	if len(targets) == 0 {
+		fmt.Printf("%s No projects selected for deactivation\n", s.Info.Render("Info:"))
 		return nil
 	}
 
-	// 6. Remove local folder from Syncthing
-	if err := localClient.DeleteFolder(context.Background(), projectName); err != nil && !syncthing.IsNotFound(err) {
-		return fmt.Errorf("failed to remove local syncthing folder: %w", err)
-	}
-
-	// 7. Remove remote folder if requested
-	if deactivateOpts.removeRemote {
-		if err := peerClient.DeleteFolder(context.Background(), projectName); err != nil && !syncthing.IsNotFound(err) {
-			return fmt.Errorf("failed to remove peer syncthing folder: %w", err)
+	if len(targets) > 1 {
+		if err := enforceRegistryLockOwnership(); err != nil {
+			return err
 		}
 	}
 
-	// 8. Update sync status
-	project.Sync.Status = registry.SyncInactive
-	project.Sync.Method = registry.SyncMethodSyncthing
-	reg.Projects[projectName] = project
+	results := make([]string, 0, len(targets))
+	failures := 0
+	updated := false
 
-	// 9. Save registry
-	if err := saveRegistry(reg); err != nil {
-		return err
+	for _, projectName := range targets {
+		project := reg.Projects[projectName]
+		changed, deactivateErr := deactivateProjectSync(context.Background(), localClient, projectName, project)
+		if deactivateErr != nil {
+			failures++
+			results = append(results, fmt.Sprintf("%s %s - %v", s.Error.Render("✗"), projectName, deactivateErr))
+			continue
+		}
+
+		if changed {
+			project.Sync.Status = registry.SyncInactive
+			project.Sync.Method = registry.SyncMethodSyncthing
+			reg.Projects[projectName] = project
+			updated = true
+			results = append(results, fmt.Sprintf("%s %s", s.Success.Render("✓"), projectName))
+		} else {
+			results = append(results, fmt.Sprintf("%s %s (already inactive)", s.Info.Render("i"), projectName))
+		}
 	}
 
-	// 10. Commit and push registry changes
-	if err := commitAndPushRegistry(fmt.Sprintf("deactivate %s", projectName)); err != nil {
-		return err
+	for _, line := range results {
+		fmt.Println(line)
 	}
 
-	// 11. Print success message
-	fmt.Printf("%s '%s'\n", s.Success.Render("✓ Deactivated"), projectName)
-	fmt.Printf("  %s inactive\n", s.Label.Render("Sync status:"))
+	if updated {
+		if err := saveRegistry(reg); err != nil {
+			return err
+		}
+	}
+
 	if deactivateOpts.removeRemote {
-		fmt.Printf("  %s removed from peer\n", s.Label.Render("Remote:"))
+		fmt.Printf("%s Remote folder removal is no longer automatic. Run this command on the peer machine for the same project names to remove remote folders.\n",
+			s.Warn.Render("Warning:"))
+	}
+
+	if failures > 0 {
+		return fmt.Errorf("deactivate completed with %d failure(s)", failures)
+	}
+
+	if len(targets) == 1 {
+		fmt.Printf("%s inactive\n", s.Label.Render("Sync status:"))
 	}
 
 	return nil
+}
+
+func resolveDeactivateTargets(reg *registry.Registry, args []string, all bool) ([]string, error) {
+	if all {
+		names := make([]string, 0, len(reg.Projects))
+		for name := range reg.Projects {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		return names, nil
+	}
+
+	seen := make(map[string]struct{}, len(args))
+	targets := make([]string, 0, len(args))
+	for _, arg := range args {
+		resolved, _, err := resolveProject(reg, arg)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := seen[resolved]; ok {
+			continue
+		}
+		seen[resolved] = struct{}{}
+		targets = append(targets, resolved)
+	}
+
+	return targets, nil
+}
+
+func deactivateProjectSync(ctx context.Context, localClient *syncthing.Client, projectName string, project registry.Project) (bool, error) {
+	if project.Status.State == registry.StateArchived {
+		return false, fmt.Errorf("archived projects cannot be deactivated from sync")
+	}
+
+	if project.Sync.Status != registry.SyncActive {
+		return false, nil
+	}
+
+	if err := localClient.DeleteFolder(ctx, projectName); err != nil && !syncthing.IsNotFound(err) {
+		return false, fmt.Errorf("failed to remove local syncthing folder: %w", err)
+	}
+
+	return true, nil
 }

@@ -3,8 +3,8 @@
 # ==============================================================================
 
 .PHONY: help deps build install deploy run test bench fmt vet clean \
-        setup config init list info detect new add rm clear archive unarchive open \
-        activate deactivate sync env-pull env-generate \
+		 setup config init list info detect new add rm clear archive unarchive open \
+		 activate deactivate sync doctor backup sync-lock-show sync-lock-transfer sync-lock-claim env-pull env-generate \
         wt-new wt-list wt-attach wt-remove \
         tmux-send tmux-read tmux-list
 
@@ -263,6 +263,30 @@ endif
 # Usage: make sync [NAME=<name>]
 sync:
 	./overlord sync $(NAME)
+
+# Run sync and config health checks
+doctor:
+	./overlord doctor
+
+# Create one-way registry artifact backup
+backup:
+	./overlord backup
+
+# Show current registry lock owner
+sync-lock-show:
+	./overlord sync lock show
+
+# Transfer registry lock to another machine
+# Usage: make sync-lock-transfer MACHINE=<name>
+sync-lock-transfer:
+ifndef MACHINE
+	$(error MACHINE is required. Usage: make sync-lock-transfer MACHINE=<name>)
+endif
+	./overlord sync lock transfer $(MACHINE)
+
+# Force-claim registry lock for local machine
+sync-lock-claim:
+	./overlord sync lock claim
 
 # Pull .env file from pass for a project
 # Usage: make env-pull [NAME=<name>]
