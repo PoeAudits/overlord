@@ -454,8 +454,8 @@ func TestRegistryGetProjectByAlias(t *testing.T) {
 func TestFindProjectByPath(t *testing.T) {
 	reg := Registry{
 		Projects: map[string]Project{
-			"overlord-v2": {
-				Path: "core/tools/overlord-v2",
+			"overlord": {
+				Path: "core/tools/overlord",
 			},
 			"myapp": {
 				Path: "projects/web/myapp",
@@ -491,8 +491,8 @@ func TestFindProjectByPath(t *testing.T) {
 		},
 		{
 			name:      "deeply nested subdirectory",
-			absPath:   "/home/user/Overlord/core/tools/overlord-v2/internal/cmd",
-			wantName:  "overlord-v2",
+			absPath:   "/home/user/Overlord/core/tools/overlord/internal/cmd",
+			wantName:  "overlord",
 			wantFound: true,
 		},
 		{

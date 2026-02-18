@@ -85,9 +85,9 @@ func TestResolveProjectPath_EnvScenarios(t *testing.T) {
 		},
 		{
 			name:        "nested relative path",
-			projectPath: "core/tools/overlord-v2",
+			projectPath: "core/tools/overlord",
 			baseDir:     "/home/user/Overlord",
-			want:        "/home/user/Overlord/core/tools/overlord-v2",
+			want:        "/home/user/Overlord/core/tools/overlord",
 		},
 	}
 

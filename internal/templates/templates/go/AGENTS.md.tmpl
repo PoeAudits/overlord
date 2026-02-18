@@ -17,9 +17,18 @@ Run `make help` to see all available commands.
 | `make fmt` | Format code |
 | `make clean` | Clean build artifacts |
 
-## Conventions
+## Rules and Conventions
 
-- **Formatting**: `go fmt` (tabs, no line limit)
-- **Linting**: `go vet` for static analysis
-- **Testing**: Table-driven tests, co-located `*_test.go` files
-- **Errors**: Return errors with context (`fmt.Errorf("...: %w", err)`)
+- Keep Go code idiomatic and simple; prefer stdlib patterns before new abstractions.
+- Use table-driven tests for branching logic and keep tests near the code they verify.
+- Wrap errors with context (`fmt.Errorf("...: %w", err)`) and handle once at the right layer.
+
+## Post-incident Notes
+
+Append dated notes here after incidents or debugging sessions:
+
+- Date:
+- Issue encountered:
+- What fixed it:
+- What to do next time:
+- Reusable code pointers:

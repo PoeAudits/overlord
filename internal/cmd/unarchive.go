@@ -104,6 +104,12 @@ The project will be moved from ~/Overlord/archive/{name}/ to the appropriate
 category directory (e.g., ~/Overlord/projects/web/{name}/), and its registry
 status will be updated to 'active'.
 
+Thoughts directories are restored alongside the project:
+  From: ~/thoughts/archive/{name}/{briefs,research,plans,logs,docs}/
+  To:   ~/thoughts/projects/{name}/{briefs,research,plans,logs,docs}/
+
+Symlinks in docs/ and project-root thoughts symlink are updated.
+
 If --category is not provided, an interactive picker will be shown.
 
 Examples:
@@ -205,6 +211,11 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 
 	// Restore thoughts directories from archive (secondary operation - warn on failure, don't fail unarchive)
 	thoughtsDir := reg.Settings.ThoughtsDir
+	expandedThoughtsDir, expandErr := registry.ExpandPath(thoughtsDir)
+	if expandErr != nil {
+		fmt.Printf("%s Failed to expand thoughts directory: %v\n", s.StrongWarn.Render("Warning:"), expandErr)
+		expandedThoughtsDir = thoughtsDir
+	}
 	var thoughtsWarnings []string
 	var thoughtsRestored bool
 
@@ -225,7 +236,6 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 	}
 
 	// Update symlinks in the restored thoughts projects directory
-	expandedThoughtsDir, expandErr := registry.ExpandPath(thoughtsDir)
 	if expandErr == nil {
 		thoughtsPaths := GetThoughtsPaths(expandedThoughtsDir, resolvedName)
 		// Check if thoughts projects directory exists (either restored or pre-existing)
@@ -236,7 +246,15 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 			}
 		}
 	} else {
-		thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to expand thoughts directory: %v", expandErr))
+		thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to update docs symlinks: %v", expandErr))
+	}
+
+	if expandErr == nil {
+		if warning, err := EnsureProjectThoughtsSymlink(expandedThoughtsDir, resolvedName, targetPath, false); err != nil {
+			thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to update project thoughts symlink: %v", err))
+		} else if warning != "" {
+			thoughtsWarnings = append(thoughtsWarnings, warning)
+		}
 	}
 
 	// Update registry

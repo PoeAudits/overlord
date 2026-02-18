@@ -150,7 +150,7 @@ func TestUnarchiveRestoresThoughts(t *testing.T) {
 		tmpDir := t.TempDir()
 		projectName := "partial-archive-project"
 
-		// Create only plans and logs in archive (not all 8 subdirectories)
+		// Create only plans and logs in archive
 		thoughtsDir := filepath.Join(tmpDir, "thoughts")
 		archivePaths := GetArchiveThoughtsPaths(thoughtsDir, projectName)
 		if err := os.MkdirAll(archivePaths.Plans, 0755); err != nil {
@@ -166,9 +166,9 @@ func TestUnarchiveRestoresThoughts(t *testing.T) {
 			t.Fatalf("MoveThoughtsFromArchive failed: %v", err)
 		}
 
-		// Should have 6 warnings (8 total - 2 created = 6 missing)
-		if len(warnings) != 6 {
-			t.Errorf("expected 6 warnings, got %d: %v", len(warnings), warnings)
+		// Should have 5 warnings (7 total - 2 created = 5 missing)
+		if len(warnings) != 5 {
+			t.Errorf("expected 5 warnings, got %d: %v", len(warnings), warnings)
 		}
 
 		// Verify plans and logs were restored

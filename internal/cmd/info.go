@@ -85,7 +85,13 @@ func outputInfoHuman(name string, project registry.Project, settings registry.Se
 	}
 
 	// Get thoughts paths
-	thoughtsPaths := getThoughtsPaths(name, settings.ThoughtsDir)
+	thoughtsPaths := getThoughtsPaths(name, project.Status.State, project.Path, settings.ThoughtsDir)
+
+	projectPath, projectPathErr := expandProjectPath(project.Path, settings.BaseDir)
+	projectThoughtsSymlink := "-"
+	if projectPathErr == nil {
+		projectThoughtsSymlink = formatPathWithTilde(filepath.Join(projectPath, "thoughts"))
+	}
 
 	// Determine status style
 	statusStyle := statusActiveStyle
@@ -105,15 +111,24 @@ func outputInfoHuman(name string, project registry.Project, settings registry.Se
 	fmt.Printf("%s %s\n", labelStyle.Render("Aliases:"), valueStyle.Render(aliasesStr))
 	fmt.Println()
 	fmt.Printf("%s\n", sectionStyle.Render("Thoughts:"))
+	fmt.Printf("  %s %s\n", labelStyle.Render("Briefs:"), pathStyle.Render(thoughtsPaths.Briefs))
+	fmt.Printf("  %s %s\n", labelStyle.Render("Research:"), pathStyle.Render(thoughtsPaths.Research))
 	fmt.Printf("  %s %s\n", labelStyle.Render("Plans:"), pathStyle.Render(thoughtsPaths.Plans))
 	fmt.Printf("  %s %s\n", labelStyle.Render("Logs:"), pathStyle.Render(thoughtsPaths.Logs))
-	fmt.Printf("  %s %s\n", labelStyle.Render("Sessions:"), pathStyle.Render(thoughtsPaths.Sessions))
+	fmt.Printf("  %s %s\n", labelStyle.Render("Docs:"), pathStyle.Render(thoughtsPaths.Docs))
+	fmt.Printf("  %s %s\n", labelStyle.Render("Project link:"), pathStyle.Render(projectThoughtsSymlink))
 
 	return nil
 }
 
 func outputInfoJSON(name string, project registry.Project, settings registry.Settings) error {
-	thoughtsPaths := getThoughtsPaths(name, settings.ThoughtsDir)
+	thoughtsPaths := getThoughtsPaths(name, project.Status.State, project.Path, settings.ThoughtsDir)
+
+	projectPath, projectPathErr := expandProjectPath(project.Path, settings.BaseDir)
+	projectThoughtsSymlink := ""
+	if projectPathErr == nil {
+		projectThoughtsSymlink = formatPathWithTilde(filepath.Join(projectPath, "thoughts"))
+	}
 
 	output := map[string]interface{}{
 		"name":        name,
@@ -126,9 +141,12 @@ func outputInfoJSON(name string, project registry.Project, settings registry.Set
 		"status":      project.Status.State,
 		"created":     project.Created,
 		"thoughts": map[string]string{
+			"briefs":   thoughtsPaths.Briefs,
+			"research": thoughtsPaths.Research,
 			"plans":    thoughtsPaths.Plans,
 			"logs":     thoughtsPaths.Logs,
-			"sessions": thoughtsPaths.Sessions,
+			"docs":     thoughtsPaths.Docs,
+			"symlink":  projectThoughtsSymlink,
 		},
 	}
 
@@ -142,12 +160,14 @@ func outputInfoJSON(name string, project registry.Project, settings registry.Set
 }
 
 type thoughtsPaths struct {
+	Briefs   string
+	Research string
 	Plans    string
 	Logs     string
-	Sessions string
+	Docs     string
 }
 
-func getThoughtsPaths(projectName, thoughtsDir string) thoughtsPaths {
+func getThoughtsPaths(projectName string, state registry.State, projectPath, thoughtsDir string) thoughtsPaths {
 	// Expand thoughts dir if it starts with ~
 	expandedThoughtsDir := thoughtsDir
 	homeDir, err := os.UserHomeDir()
@@ -155,13 +175,22 @@ func getThoughtsPaths(projectName, thoughtsDir string) thoughtsPaths {
 		expandedThoughtsDir = filepath.Join(homeDir, strings.TrimPrefix(thoughtsDir, "~"))
 	}
 
-	plansPath := filepath.Join(expandedThoughtsDir, "plans", projectName) + "/"
-	logsPath := filepath.Join(expandedThoughtsDir, "logs", projectName) + "/"
-	sessionsPath := filepath.Join(expandedThoughtsDir, "sessions", projectName) + "/"
+	base := "projects"
+	if state == registry.StateArchived || strings.HasPrefix(projectPath, "archive/") {
+		base = "archive"
+	}
+
+	briefsPath := filepath.Join(expandedThoughtsDir, base, projectName, "briefs") + "/"
+	researchPath := filepath.Join(expandedThoughtsDir, base, projectName, "research") + "/"
+	plansPath := filepath.Join(expandedThoughtsDir, base, projectName, "plans") + "/"
+	logsPath := filepath.Join(expandedThoughtsDir, base, projectName, "logs") + "/"
+	docsPath := filepath.Join(expandedThoughtsDir, base, projectName, "docs") + "/"
 
 	return thoughtsPaths{
+		Briefs:   formatPathWithTilde(briefsPath),
+		Research: formatPathWithTilde(researchPath),
 		Plans:    formatPathWithTilde(plansPath),
 		Logs:     formatPathWithTilde(logsPath),
-		Sessions: formatPathWithTilde(sessionsPath),
+		Docs:     formatPathWithTilde(docsPath),
 	}
 }

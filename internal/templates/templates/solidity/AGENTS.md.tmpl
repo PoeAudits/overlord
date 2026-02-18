@@ -19,10 +19,18 @@ Run `make help` to see all available commands.
 | `make fmt` | Format contracts |
 | `make clean` | Clean build artifacts |
 
-## Conventions
+## Rules and Conventions
 
-- **Framework**: Foundry (forge, cast, anvil)
-- **Formatting**: `forge fmt` (Solidity style guide)
-- **Testing**: Foundry tests in `test/` with `.t.sol` suffix
-- **Scripts**: Deploy scripts in `script/` with `.s.sol` suffix
-- **Docs**: NatSpec comments for all public functions
+- Use Foundry conventions for layout (`src/`, `test/`, `script/`) and command flow.
+- Keep tests deterministic and include edge-case coverage for state-changing paths.
+- Add NatSpec on public/external functions and security-sensitive logic.
+
+## Post-incident Notes
+
+Append dated notes here after incidents or debugging sessions:
+
+- Date:
+- Issue encountered:
+- What fixed it:
+- What to do next time:
+- Reusable code pointers:

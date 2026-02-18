@@ -23,10 +23,10 @@ updating their status to 'archived' in the registry.
 Name arguments can be project names or aliases.
 
 Thoughts directories are also moved to archive:
-  From: ~/thoughts/projects/<project>/{plans,logs,docs,research,sessions,handoffs,reviews,briefs}/
-  To:   ~/thoughts/archive/<project>/{plans,logs,docs,research,sessions,handoffs,reviews,briefs}/
+  From: ~/thoughts/projects/<project>/{briefs,research,plans,logs,docs}/
+  To:   ~/thoughts/archive/<project>/{briefs,research,plans,logs,docs}/
 
-Symlinks in the docs directory are updated to point to the new archive location.
+Symlinks in docs/ and project-root thoughts symlink are updated.
 
 Examples:
   overlord archive myproject              # Archive a single project
@@ -184,6 +184,11 @@ func archiveOneProject(reg *registry.Registry, rp resolvedProject) error {
 
 	// Move thoughts directories to archive (secondary operation - warn on failure, don't fail archive)
 	thoughtsDir := reg.Settings.ThoughtsDir
+	expandedThoughtsDir, expandErr := registry.ExpandPath(thoughtsDir)
+	if expandErr != nil {
+		fmt.Printf("%s Failed to expand thoughts directory for '%s': %v\n", s.StrongWarn.Render("Warning:"), rp.name, expandErr)
+		expandedThoughtsDir = thoughtsDir
+	}
 	var thoughtsWarnings []string
 	var thoughtsMoved bool
 
@@ -195,7 +200,6 @@ func archiveOneProject(reg *registry.Registry, rp resolvedProject) error {
 		thoughtsMoved = true
 
 		// Update symlinks in the archived thoughts docs directory
-		expandedThoughtsDir, expandErr := registry.ExpandPath(thoughtsDir)
 		if expandErr == nil {
 			archiveThoughtsPaths := GetArchiveThoughtsPaths(expandedThoughtsDir, rp.name)
 			if symlinkErr := UpdateProjectSymlinks(archiveThoughtsPaths.Docs, rp.destPath); symlinkErr != nil {
@@ -203,7 +207,15 @@ func archiveOneProject(reg *registry.Registry, rp resolvedProject) error {
 				thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to update symlinks: %v", symlinkErr))
 			}
 		} else {
-			thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to expand thoughts directory: %v", expandErr))
+			thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to update docs symlinks: %v", expandErr))
+		}
+	}
+
+	if expandErr == nil {
+		if warning, err := EnsureProjectThoughtsSymlink(expandedThoughtsDir, rp.name, rp.destPath, true); err != nil {
+			thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to update project thoughts symlink: %v", err))
+		} else if warning != "" {
+			thoughtsWarnings = append(thoughtsWarnings, warning)
 		}
 	}
 

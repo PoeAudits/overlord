@@ -351,6 +351,11 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	if err := CreateThoughtsStructure(thoughtsDir, name, expandedPath); err != nil {
 		return err
 	}
+	if warning, err := EnsureProjectThoughtsSymlink(thoughtsDir, name, expandedPath, false); err != nil {
+		return err
+	} else if warning != "" {
+		fmt.Printf("\n  %s %s", warnStyle.Render("Warning:"), warning)
+	}
 	fmt.Println(" done")
 
 	// Calculate relative path from base_dir (or use absolute if not under base_dir)

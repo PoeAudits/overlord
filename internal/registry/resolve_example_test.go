@@ -14,43 +14,13 @@ func ExampleRegistry_Resolve_exactName() {
 			ThoughtsDir: "/home/user/thoughts",
 		},
 		Projects: map[string]registry.Project{
-			"overlord-v2": {
-				Path:        "core/tools/overlord-v2",
+			"overlord": {
+				Path:        "core/tools/overlord",
 				Category:    registry.CategoryCoreTools,
 				Lang:        registry.LanguageGo,
 				Created:     "2024-01-15",
 				Description: "Project management CLI tool",
-				Aliases:     []string{"overlord", "ol"},
-				Status:      registry.Status{State: registry.StateActive},
-			},
-		},
-	}
-
-	results := reg.Resolve("overlord-v2")
-	if len(results) > 0 {
-		fmt.Printf("Found: %s (score: %d, matched on: %s)\n",
-			results[0].Name, results[0].Score, results[0].MatchedOn)
-	}
-
-	// Output:
-	// Found: overlord-v2 (score: 1000, matched on: name)
-}
-
-func ExampleRegistry_Resolve_exactAlias() {
-	reg := &registry.Registry{
-		Version: 2,
-		Settings: registry.Settings{
-			BaseDir:     "/home/user/projects",
-			ThoughtsDir: "/home/user/thoughts",
-		},
-		Projects: map[string]registry.Project{
-			"overlord-v2": {
-				Path:        "core/tools/overlord-v2",
-				Category:    registry.CategoryCoreTools,
-				Lang:        registry.LanguageGo,
-				Created:     "2024-01-15",
-				Description: "Project management CLI tool",
-				Aliases:     []string{"overlord", "ol"},
+				Aliases:     []string{"ov", "ol"},
 				Status:      registry.Status{State: registry.StateActive},
 			},
 		},
@@ -63,7 +33,37 @@ func ExampleRegistry_Resolve_exactAlias() {
 	}
 
 	// Output:
-	// Found: overlord-v2 (score: 900, matched on: alias:overlord)
+	// Found: overlord (score: 1000, matched on: name)
+}
+
+func ExampleRegistry_Resolve_exactAlias() {
+	reg := &registry.Registry{
+		Version: 2,
+		Settings: registry.Settings{
+			BaseDir:     "/home/user/projects",
+			ThoughtsDir: "/home/user/thoughts",
+		},
+		Projects: map[string]registry.Project{
+			"overlord": {
+				Path:        "core/tools/overlord",
+				Category:    registry.CategoryCoreTools,
+				Lang:        registry.LanguageGo,
+				Created:     "2024-01-15",
+				Description: "Project management CLI tool",
+				Aliases:     []string{"ov", "ol"},
+				Status:      registry.Status{State: registry.StateActive},
+			},
+		},
+	}
+
+	results := reg.Resolve("overlord")
+	if len(results) > 0 {
+		fmt.Printf("Found: %s (score: %d, matched on: %s)\n",
+			results[0].Name, results[0].Score, results[0].MatchedOn)
+	}
+
+	// Output:
+	// Found: overlord (score: 900, matched on: alias:overlord)
 }
 
 func ExampleRegistry_Resolve_fuzzy() {
@@ -74,13 +74,13 @@ func ExampleRegistry_Resolve_fuzzy() {
 			ThoughtsDir: "/home/user/thoughts",
 		},
 		Projects: map[string]registry.Project{
-			"overlord-v2": {
-				Path:        "core/tools/overlord-v2",
+			"overlord": {
+				Path:        "core/tools/overlord",
 				Category:    registry.CategoryCoreTools,
 				Lang:        registry.LanguageGo,
 				Created:     "2024-01-15",
 				Description: "Project management CLI tool",
-				Aliases:     []string{"overlord", "ol"},
+				Aliases:     []string{"ov", "ol"},
 				Status:      registry.Status{State: registry.StateActive},
 			},
 			"web-dashboard": {
@@ -104,7 +104,7 @@ func ExampleRegistry_Resolve_fuzzy() {
 
 	// Output:
 	// Found 1 match(es)
-	// Best match: overlord-v2
+	// Best match: overlord
 }
 
 func ExampleRegistry_ResolveOne_success() {
@@ -115,13 +115,13 @@ func ExampleRegistry_ResolveOne_success() {
 			ThoughtsDir: "/home/user/thoughts",
 		},
 		Projects: map[string]registry.Project{
-			"overlord-v2": {
-				Path:        "core/tools/overlord-v2",
+			"overlord": {
+				Path:        "core/tools/overlord",
 				Category:    registry.CategoryCoreTools,
 				Lang:        registry.LanguageGo,
 				Created:     "2024-01-15",
 				Description: "Project management CLI tool",
-				Aliases:     []string{"overlord", "ol"},
+				Aliases:     []string{"ov", "ol"},
 				Status:      registry.Status{State: registry.StateActive},
 			},
 		},
@@ -137,7 +137,7 @@ func ExampleRegistry_ResolveOne_success() {
 	fmt.Printf("Description: %s\n", result.Project.Description)
 
 	// Output:
-	// Resolved to: overlord-v2
+	// Resolved to: overlord
 	// Description: Project management CLI tool
 }
 

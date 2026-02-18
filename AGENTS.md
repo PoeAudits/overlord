@@ -1,4 +1,4 @@
-# overlord-v2 - Project Management System
+# overlord - Project Management System
 
 A Go-based CLI tool for managing Git worktrees, tmux sessions, and project registries.
 
@@ -19,7 +19,7 @@ Layered CLI application: Cobra commands → Registry operations (fuzzy matching,
 
 | Repository | Purpose | Location |
 |------------|---------|----------|
-| `PoeAudits/overlord` | Source code (this Go project) | `~/Overlord/core/tools/overlord-v2` |
+| `PoeAudits/overlord` | Source code (this Go project) | `~/Overlord/core/tools/overlord` |
 | `~/.config/overlord/` Syncthing folder | Runtime registry artifacts (`registry.yaml`, `peers.yaml`, `registry.lock.yaml`) | `~/.config/overlord/` |
 | `~/.local/share/overlord/backup` git repo | Optional disaster-recovery snapshots (`overlord backup`) | local repo with GitHub remote |
 
@@ -28,7 +28,7 @@ Layered CLI application: Cobra commands → Registry operations (fuzzy matching,
 ## Directory Structure
 
 ```
-overlord-v2/
+overlord/
 ├── cmd/overlord/main.go           # Entry point (only calls cmd.Execute())
 ├── internal/
 │   ├── cmd/                       # Cobra command definitions

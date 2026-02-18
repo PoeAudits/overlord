@@ -46,8 +46,9 @@ The project will be created at ~/Overlord/{category-path}/{name}/ with:
   - .opencode/opencode.jsonc (editor configuration)
 
 Thoughts directories will be created at:
-  - ~/thoughts/projects/{name}/{plans,logs,docs,research,sessions,handoffs,reviews,briefs}/
+  - ~/thoughts/projects/{name}/{briefs,research,audits,plans,logs,reviews,docs}/
   - Symlinks to README.md and AGENTS.md placed in docs/ subdirectory
+  - Project root thoughts symlink -> ~/thoughts/projects/{name}
 
 Examples:
   overlord new my-api --category=services --go
@@ -315,13 +316,19 @@ func runNew(cmd *cobra.Command, args []string) error {
 		fmt.Printf(" done (%d entries)\n", envCount)
 	}
 
-	// 3. Create thoughts directories (all 8 subdirectories under ~/thoughts/projects/{name}/)
+	// 3. Create thoughts directories and project-root thoughts symlink
 	fmt.Printf("  Creating thoughts structure...")
 	thoughtsProjectBase := filepath.Join(thoughtsDir, "projects", name)
 	c.add(thoughtsProjectBase) // Track for cleanup on failure
 
 	if err := CreateThoughtsStructure(thoughtsDir, name, projectPath); err != nil {
 		return err
+	}
+
+	if warning, err := EnsureProjectThoughtsSymlink(thoughtsDir, name, projectPath, false); err != nil {
+		return err
+	} else if warning != "" {
+		fmt.Printf("\n  %s %s", warnStyle.Render("Warning:"), warning)
 	}
 	fmt.Println(" done")
 

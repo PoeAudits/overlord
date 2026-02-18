@@ -13,13 +13,13 @@ func createTestRegistry() *Registry {
 			ThoughtsDir: "/home/user/thoughts",
 		},
 		Projects: map[string]Project{
-			"overlord-v2": {
-				Path:        "core/tools/overlord-v2",
+			"overlord": {
+				Path:        "core/tools/overlord",
 				Category:    CategoryCoreTools,
 				Lang:        LanguageGo,
 				Created:     "2024-01-15",
 				Description: "Project management CLI tool",
-				Aliases:     []string{"overlord", "ol"},
+				Aliases:     []string{"ov", "ol"},
 				Tags:        []string{"cli", "productivity"},
 				Status:      Status{State: StateActive},
 			},
@@ -60,15 +60,15 @@ func createTestRegistry() *Registry {
 func TestResolve_ExactNameMatch(t *testing.T) {
 	reg := createTestRegistry()
 
-	results := reg.Resolve("overlord-v2")
+	results := reg.Resolve("overlord")
 
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
 	}
 
 	result := results[0]
-	if result.Name != "overlord-v2" {
-		t.Errorf("expected name 'overlord-v2', got '%s'", result.Name)
+	if result.Name != "overlord" {
+		t.Errorf("expected name 'overlord', got '%s'", result.Name)
 	}
 	if result.Score != scoreExactName {
 		t.Errorf("expected score %d, got %d", scoreExactName, result.Score)
@@ -86,8 +86,8 @@ func TestResolve_ExactAliasMatch(t *testing.T) {
 		expectedName  string
 		expectedAlias string
 	}{
-		{"overlord", "overlord-v2", "overlord"},
-		{"ol", "overlord-v2", "ol"},
+		{"overlord", "overlord", "overlord"},
+		{"ol", "overlord", "ol"},
 		{"dashboard", "web-dashboard", "dashboard"},
 		{"admin", "web-dashboard", "admin"},
 		{"gateway", "api-gateway", "gateway"},
@@ -125,10 +125,10 @@ func TestResolve_FuzzyMatch(t *testing.T) {
 		expectedName string
 		description  string
 	}{
-		{"overlrd", "overlord-v2", "typo in overlord"},
+		{"overlrd", "overlord", "typo in overlord"},
 		{"trainr", "ml-trainer", "typo in trainer"},
 		{"gatway", "api-gateway", "typo in gateway"},
-		{"over", "overlord-v2", "partial match"},
+		{"over", "overlord", "partial match"},
 		{"mltrain", "ml-trainer", "partial match"},
 	}
 
@@ -269,13 +269,13 @@ func TestResolve_SortedByScore(t *testing.T) {
 func TestResolveOne_ExactMatch(t *testing.T) {
 	reg := createTestRegistry()
 
-	result, err := reg.ResolveOne("overlord-v2")
+	result, err := reg.ResolveOne("overlord")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result.Name != "overlord-v2" {
-		t.Errorf("expected name 'overlord-v2', got '%s'", result.Name)
+	if result.Name != "overlord" {
+		t.Errorf("expected name 'overlord', got '%s'", result.Name)
 	}
 	if result.Score != scoreExactName {
 		t.Errorf("expected score %d, got %d", scoreExactName, result.Score)
@@ -290,8 +290,8 @@ func TestResolveOne_AliasMatch(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result.Name != "overlord-v2" {
-		t.Errorf("expected name 'overlord-v2', got '%s'", result.Name)
+	if result.Name != "overlord" {
+		t.Errorf("expected name 'overlord', got '%s'", result.Name)
 	}
 	if result.Score != scoreExactAlias {
 		t.Errorf("expected score %d, got %d", scoreExactAlias, result.Score)
@@ -306,8 +306,8 @@ func TestResolveOne_FuzzyMatch(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result.Name != "overlord-v2" {
-		t.Errorf("expected name 'overlord-v2', got '%s'", result.Name)
+	if result.Name != "overlord" {
+		t.Errorf("expected name 'overlord', got '%s'", result.Name)
 	}
 	if result.Score >= scoreExactAlias {
 		t.Errorf("fuzzy match should have score < %d, got %d", scoreExactAlias, result.Score)

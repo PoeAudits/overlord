@@ -126,7 +126,7 @@ func TestArchiveMovesThoughts(t *testing.T) {
 		tmpDir := t.TempDir()
 		projectName := "partial-thoughts-project"
 
-		// Create only plans and logs (not sessions or projects)
+		// Create only plans and logs
 		thoughtsDir := filepath.Join(tmpDir, "thoughts")
 		srcPaths := GetThoughtsPaths(thoughtsDir, projectName)
 		if err := os.MkdirAll(srcPaths.Plans, 0755); err != nil {
@@ -142,9 +142,9 @@ func TestArchiveMovesThoughts(t *testing.T) {
 			t.Fatalf("MoveThoughtsToArchive failed: %v", err)
 		}
 
-		// Should have 6 warnings for missing subdirectories (docs, research, sessions, handoffs, reviews, briefs)
-		if len(warnings) != 6 {
-			t.Errorf("expected 6 warnings, got %d: %v", len(warnings), warnings)
+		// Should have 5 warnings for missing subdirectories (briefs, research, audits, reviews, docs)
+		if len(warnings) != 5 {
+			t.Errorf("expected 5 warnings, got %d: %v", len(warnings), warnings)
 		}
 
 		// Verify plans and logs were moved
@@ -170,9 +170,9 @@ func TestArchiveMovesThoughts(t *testing.T) {
 			t.Fatalf("MoveThoughtsToArchive failed: %v", err)
 		}
 
-		// Should have 8 warnings for missing directories, plus 1 for failed cleanup
-		if len(warnings) < 8 {
-			t.Errorf("expected at least 8 warnings, got %d: %v", len(warnings), warnings)
+		// Should have 5 warnings for missing directories, plus 1 for failed cleanup
+		if len(warnings) < 5 {
+			t.Errorf("expected at least 5 warnings, got %d: %v", len(warnings), warnings)
 		}
 	})
 }

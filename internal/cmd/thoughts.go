@@ -8,69 +8,65 @@ import (
 	"github.com/PoeAudits/overlord/internal/registry"
 )
 
-// thoughtsSubdirs defines the 8 thoughts subdirectories per project
-var thoughtsSubdirs = []string{"plans", "logs", "docs", "research", "sessions", "handoffs", "reviews", "briefs"}
+// thoughtsSubdirs defines the thoughts subdirectories per project.
+var thoughtsSubdirs = []string{"briefs", "research", "audits", "plans", "logs", "reviews", "docs"}
 
-// ThoughtsPaths holds paths for the 8 thoughts subdirectories per project
+// ThoughtsPaths holds paths for the thoughts subdirectories per project.
 type ThoughtsPaths struct {
+	Briefs   string
+	Research string
+	Audits   string
 	Plans    string
 	Logs     string
-	Docs     string
-	Research string
-	Sessions string
-	Handoffs string
 	Reviews  string
-	Briefs   string
+	Docs     string
 }
 
-// GetThoughtsPaths returns paths for the 8 thoughts subdirectories in the main location.
-// Structure: ~/thoughts/projects/{name}/{plans,logs,docs,research,sessions,handoffs,reviews,briefs}/
+// GetThoughtsPaths returns paths for the thoughts subdirectories in the main location.
+// Structure: ~/thoughts/projects/{name}/{briefs,research,audits,plans,logs,reviews,docs}/
 func GetThoughtsPaths(thoughtsDir, projectName string) ThoughtsPaths {
 	projectBase := filepath.Join(thoughtsDir, "projects", projectName)
 	return ThoughtsPaths{
+		Briefs:   filepath.Join(projectBase, "briefs"),
+		Research: filepath.Join(projectBase, "research"),
+		Audits:   filepath.Join(projectBase, "audits"),
 		Plans:    filepath.Join(projectBase, "plans"),
 		Logs:     filepath.Join(projectBase, "logs"),
-		Docs:     filepath.Join(projectBase, "docs"),
-		Research: filepath.Join(projectBase, "research"),
-		Sessions: filepath.Join(projectBase, "sessions"),
-		Handoffs: filepath.Join(projectBase, "handoffs"),
 		Reviews:  filepath.Join(projectBase, "reviews"),
-		Briefs:   filepath.Join(projectBase, "briefs"),
+		Docs:     filepath.Join(projectBase, "docs"),
 	}
 }
 
 // GetArchiveThoughtsPaths returns paths for the archived thoughts structure.
-// Structure: ~/thoughts/archive/{name}/{plans,logs,docs,research,sessions,handoffs,reviews,briefs}/
+// Structure: ~/thoughts/archive/{name}/{briefs,research,audits,plans,logs,reviews,docs}/
 func GetArchiveThoughtsPaths(thoughtsDir, projectName string) ThoughtsPaths {
 	archiveBase := filepath.Join(thoughtsDir, "archive", projectName)
 	return ThoughtsPaths{
+		Briefs:   filepath.Join(archiveBase, "briefs"),
+		Research: filepath.Join(archiveBase, "research"),
+		Audits:   filepath.Join(archiveBase, "audits"),
 		Plans:    filepath.Join(archiveBase, "plans"),
 		Logs:     filepath.Join(archiveBase, "logs"),
-		Docs:     filepath.Join(archiveBase, "docs"),
-		Research: filepath.Join(archiveBase, "research"),
-		Sessions: filepath.Join(archiveBase, "sessions"),
-		Handoffs: filepath.Join(archiveBase, "handoffs"),
 		Reviews:  filepath.Join(archiveBase, "reviews"),
-		Briefs:   filepath.Join(archiveBase, "briefs"),
+		Docs:     filepath.Join(archiveBase, "docs"),
 	}
 }
 
-// toSlice returns the paths as a slice in consistent order: plans, logs, docs, research, sessions, handoffs, reviews, briefs
+// toSlice returns the paths as a slice in consistent order.
 func (p ThoughtsPaths) toSlice() []string {
-	return []string{p.Plans, p.Logs, p.Docs, p.Research, p.Sessions, p.Handoffs, p.Reviews, p.Briefs}
+	return []string{p.Briefs, p.Research, p.Audits, p.Plans, p.Logs, p.Reviews, p.Docs}
 }
 
 // toMap returns the paths as a map with subdirectory names as keys
 func (p ThoughtsPaths) toMap() map[string]string {
 	return map[string]string{
+		"briefs":   p.Briefs,
+		"research": p.Research,
+		"audits":   p.Audits,
 		"plans":    p.Plans,
 		"logs":     p.Logs,
-		"docs":     p.Docs,
-		"research": p.Research,
-		"sessions": p.Sessions,
-		"handoffs": p.Handoffs,
 		"reviews":  p.Reviews,
-		"briefs":   p.Briefs,
+		"docs":     p.Docs,
 	}
 }
 
@@ -91,7 +87,7 @@ func ThoughtsExist(paths ThoughtsPaths) (exists bool, missing []string) {
 	return exists, missing
 }
 
-// MoveThoughtsToArchive moves all 8 thoughts directories to archive location.
+// MoveThoughtsToArchive moves thoughts directories to archive location.
 // Returns warnings for missing directories (not errors).
 // Uses rename first, fallback to copy+delete for cross-filesystem moves.
 func MoveThoughtsToArchive(thoughtsDir, projectName string) (warnings []string, err error) {
@@ -196,7 +192,7 @@ func MoveThoughtsFromArchive(thoughtsDir, projectName string) (warnings []string
 }
 
 // CreateThoughtsStructure creates thoughts directories and symlinks for a project.
-// Creates all 8 subdirectories under ~/thoughts/projects/{name}/ and symlinks in docs/.
+// Creates all subdirectories under ~/thoughts/projects/{name}/ and symlinks in docs/.
 // The projectPath should be an absolute path to the project directory.
 func CreateThoughtsStructure(thoughtsDir, projectName, projectPath string) error {
 	// Ensure project path is absolute
@@ -205,10 +201,10 @@ func CreateThoughtsStructure(thoughtsDir, projectName, projectPath string) error
 		return fmt.Errorf("failed to get absolute path: %w", err)
 	}
 
-	// Get all 8 thoughts subdirectory paths
+	// Get all thoughts subdirectory paths
 	paths := GetThoughtsPaths(thoughtsDir, projectName)
 
-	// Create all 8 subdirectories
+	// Create all subdirectories
 	for _, dir := range paths.toSlice() {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create thoughts directory %s: %w", dir, err)
@@ -221,6 +217,61 @@ func CreateThoughtsStructure(thoughtsDir, projectName, projectPath string) error
 	}
 
 	return nil
+}
+
+// EnsureProjectThoughtsSymlink ensures ./thoughts points to the correct thoughts path.
+// If a non-symlink exists at ./thoughts, it warns and skips.
+func EnsureProjectThoughtsSymlink(thoughtsDir, projectName, projectPath string, archived bool) (string, error) {
+	absProjectPath, err := filepath.Abs(projectPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute project path: %w", err)
+	}
+
+	thoughtsBase := "projects"
+	if archived {
+		thoughtsBase = "archive"
+	}
+
+	targetPath := filepath.Join(thoughtsDir, thoughtsBase, projectName)
+	linkPath := filepath.Join(absProjectPath, "thoughts")
+
+	info, err := os.Lstat(linkPath)
+	if err == nil {
+		if info.Mode()&os.ModeSymlink == 0 {
+			return "warning: 'thoughts' exists and is not a symlink, skipping", nil
+		}
+
+		currentTarget, readErr := os.Readlink(linkPath)
+		if readErr != nil {
+			return "", fmt.Errorf("failed to read existing thoughts symlink: %w", readErr)
+		}
+
+		resolvedCurrentTarget := currentTarget
+		if !filepath.IsAbs(currentTarget) {
+			resolvedCurrentTarget = filepath.Join(absProjectPath, currentTarget)
+		}
+
+		if filepath.Clean(resolvedCurrentTarget) == filepath.Clean(targetPath) {
+			return "", nil
+		}
+
+		if err := os.Remove(linkPath); err != nil {
+			return "", fmt.Errorf("failed to remove existing thoughts symlink: %w", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("failed to check thoughts symlink: %w", err)
+	}
+
+	relTarget, err := filepath.Rel(absProjectPath, targetPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to calculate thoughts symlink target: %w", err)
+	}
+
+	if err := os.Symlink(relTarget, linkPath); err != nil {
+		return "", fmt.Errorf("failed to create thoughts symlink: %w", err)
+	}
+
+	return "", nil
 }
 
 // UpdateProjectSymlinks updates symlinks in the thoughts project directory to point to the actual project location.

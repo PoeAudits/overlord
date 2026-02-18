@@ -17,10 +17,18 @@ Run `make help` to see all available commands.
 | `make typecheck` | TypeScript type checking |
 | `make clean` | Clean build artifacts |
 
-## Conventions
+## Rules and Conventions
 
-- **Package Manager**: pnpm (or bun if `bun.lockb` exists)
-- **Linting**: ESLint with TypeScript rules
-- **Formatting**: Prettier
-- **Testing**: Vitest or Jest
-- **TypeScript**: Strict mode enabled, avoid `any`
+- Keep TypeScript strict; avoid `any` unless there is a documented boundary reason.
+- Use the project package manager consistently (`pnpm` by default).
+- Keep lint, format, and tests green before handoff.
+
+## Post-incident Notes
+
+Append dated notes here after incidents or debugging sessions:
+
+- Date:
+- Issue encountered:
+- What fixed it:
+- What to do next time:
+- Reusable code pointers:

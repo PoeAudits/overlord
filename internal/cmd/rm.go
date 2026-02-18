@@ -23,9 +23,8 @@ Use --force to also delete project directories from disk (requires confirmation)
 Name arguments can be project names or aliases.
 
 Note: Thoughts directories are never deleted and remain at:
-  ~/thoughts/plans/<project>/
-  ~/thoughts/logs/<project>/
-  ~/thoughts/sessions/<project>/
+  ~/thoughts/projects/<project>/
+  ~/thoughts/archive/<project>/
 
 Examples:
   overlord rm myproject              # Remove one project from registry
@@ -131,7 +130,7 @@ func runRm(cmd *cobra.Command, args []string) error {
 	// Print thoughts note
 	thoughtsDir := reg.Settings.ThoughtsDir
 	if len(resolved) == 1 {
-		fmt.Printf("\n%s Thoughts at %s/{plans,logs,sessions}/%s/ remain intact\n",
+		fmt.Printf("\n%s Thoughts at %s/{projects,archive}/%s/ remain intact\n",
 			labelStyle.Render("Note:"), thoughtsDir, resolved[0].name)
 	} else {
 		fmt.Printf("\n%s Thoughts directories remain intact at %s/\n",

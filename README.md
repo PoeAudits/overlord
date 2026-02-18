@@ -1,4 +1,4 @@
-# overlord-v2
+# overlord
 
 A Go-based project management CLI for organizing development projects with category-based structure, tmux workspace integration, and AI-first registry design.
 
@@ -84,7 +84,7 @@ Overlord uses two separate repositories:
 
 | Repository | Purpose | Location |
 |------------|---------|----------|
-| [`PoeAudits/overlord`](https://github.com/PoeAudits/overlord) | Source code (Go project) | `~/Overlord/core/tools/overlord-v2` |
+| [`PoeAudits/overlord`](https://github.com/PoeAudits/overlord) | Source code (Go project) | `~/Overlord/core/tools/overlord` |
 | [`PoeAudits/overlord-config`](https://github.com/PoeAudits/overlord-config) | Optional disaster-recovery backup target | `~/.local/share/overlord/backup` |
 
 Operational multi-machine sync is Syncthing-first (not git-based).
@@ -432,7 +432,7 @@ Overlord uses smart resolution to find projects:
 
 ```bash
 # All of these can work:
-overlord open overlord-v2           # Exact name
+overlord open overlord              # Exact name
 overlord open ov2                   # Alias
 overlord open ovlrd                 # Fuzzy match
 ```
@@ -535,7 +535,7 @@ See `make help` for the complete list of worktree commands.
 ### Project Structure
 
 ```
-overlord-v2/
+overlord/
 ├── cmd/overlord/              # Application entry point
 │   └── main.go                # Calls cmd.Execute()
 ├── internal/                  # Private application code
