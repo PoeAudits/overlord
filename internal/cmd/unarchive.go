@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +12,8 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/PoeAudits/overlord/internal/fileutil"
+	"github.com/PoeAudits/overlord/internal/lifecycle"
 	"github.com/PoeAudits/overlord/internal/registry"
 )
 
@@ -137,12 +141,12 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 
 	// Resolve project name (support aliases)
 	resolvedName := projectName
-	project, ok := reg.GetProject(projectName)
+	project, ok := reg.ProjectByName(projectName)
 	if !ok {
 		// Try alias
-		name, proj, found := reg.GetProjectByAlias(projectName)
+		name, proj, found := reg.ProjectByAlias(projectName)
 		if !found {
-			return fmt.Errorf("Error: project '%s' not found\nRun 'overlord list --all' to see all projects", projectName)
+			return fmt.Errorf("project '%s' not found\nRun 'overlord list --all' to see all projects", projectName)
 		}
 		resolvedName = name
 		project = proj
@@ -150,7 +154,7 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 
 	// Check if project is archived
 	if project.Status.State != registry.StateArchived {
-		return fmt.Errorf("Error: project '%s' is not archived\nCurrent state: %s", resolvedName, project.Status.State)
+		return fmt.Errorf("project '%s' is not archived\nCurrent state: %s", resolvedName, project.Status.State)
 	}
 
 	// Get or prompt for category
@@ -175,82 +179,67 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 	}
 
 	// Calculate paths
-	sourcePath, err := expandProjectPath(filepath.Join("archive", resolvedName), reg.Settings.BaseDir)
+	sourcePath, err := fileutil.ExpandProjectPath(filepath.Join("archive", resolvedName), reg.Settings.BaseDir)
 	if err != nil {
 		return fmt.Errorf("failed to expand source path: %w", err)
 	}
 
-	targetPath, err := expandProjectPath(filepath.Join(targetCategory.Path(), resolvedName), reg.Settings.BaseDir)
+	targetPath, err := fileutil.ExpandProjectPath(filepath.Join(targetCategory.Path(), resolvedName), reg.Settings.BaseDir)
 	if err != nil {
 		return fmt.Errorf("failed to expand target path: %w", err)
 	}
 
 	// Check if source exists
-	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
-		return fmt.Errorf("Error: project directory not found\nExpected location: %s", sourcePath)
+	if _, err := os.Stat(sourcePath); errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("project directory not found\nExpected location: %s", sourcePath)
 	}
 
 	// Check if target already exists
 	if _, err := os.Stat(targetPath); err == nil {
-		return fmt.Errorf("Error: target directory already exists\nLocation: %s\nRemove it first or choose a different category", targetPath)
+		return fmt.Errorf("target directory already exists\nLocation: %s\nRemove it first or choose a different category", targetPath)
 	}
 
 	// Create target parent directory if needed
 	targetParent := filepath.Dir(targetPath)
-	if err := os.MkdirAll(targetParent, 0755); err != nil {
+	if err := os.MkdirAll(targetParent, 0o755); err != nil {
 		return fmt.Errorf("failed to create target directory: %w", err)
-	}
-
-	// Move directory
-	if err := moveDirectory(sourcePath, targetPath); err != nil {
-		return fmt.Errorf("failed to move directory: %w", err)
 	}
 
 	// Define styles for output
 	s := NewStyles()
 
-	// Restore thoughts directories from archive (secondary operation - warn on failure, don't fail unarchive)
 	thoughtsDir := reg.Settings.ThoughtsDir
-	expandedThoughtsDir, expandErr := registry.ExpandPath(thoughtsDir)
-	if expandErr != nil {
-		fmt.Printf("%s Failed to expand thoughts directory: %v\n", s.StrongWarn.Render("Warning:"), expandErr)
-		expandedThoughtsDir = thoughtsDir
+	settings := map[string]string{}
+	thoughtsRestored := false
+	if expandedThoughtsDir, err := registry.ExpandPath(thoughtsDir); err != nil {
+		fmt.Printf("%s Failed to expand thoughts directory: %v\n", s.StrongWarn.Render("Warning:"), err)
+	} else {
+		settings["thoughts_dir"] = expandedThoughtsDir
+		archiveThoughtsBase := filepath.Join(expandedThoughtsDir, "archive", resolvedName)
+		if _, err := os.Stat(archiveThoughtsBase); err == nil {
+			thoughtsRestored = true
+		}
+	}
+
+	preUnarchiveResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
+		Type:        lifecycle.ProjectUnarchiving,
+		ProjectName: resolvedName,
+		ProjectPath: sourcePath,
+		DestPath:    targetPath,
+		Settings:    settings,
+	})
+	if preUnarchiveResult.Err != nil {
+		return fmt.Errorf("pre-unarchive hook failed: %w", preUnarchiveResult.Err)
+	}
+
+	// Move directory
+	if err := fileutil.MoveDirectory(sourcePath, targetPath); err != nil {
+		return fmt.Errorf("failed to move directory: %w", err)
 	}
 	var thoughtsWarnings []string
-	var thoughtsRestored bool
 
-	thoughtsWarnings, err = MoveThoughtsFromArchive(thoughtsDir, resolvedName)
-	if err != nil {
-		// Thoughts restore failed - warn but continue (project unarchive succeeded)
-		fmt.Printf("%s Failed to restore thoughts directories: %v\n", s.StrongWarn.Render("Warning:"), err)
-	} else {
-		// Check if any thoughts were actually restored (not just warnings about missing archive)
-		// If archive didn't exist, we still need to update symlinks if thoughts exist in main location
-		thoughtsRestored = true
-		for _, w := range thoughtsWarnings {
-			if strings.Contains(w, "no archived thoughts found") {
-				thoughtsRestored = false
-				break
-			}
-		}
-	}
-
-	// Update symlinks in the restored thoughts projects directory
-	if expandErr == nil {
-		thoughtsPaths := GetThoughtsPaths(expandedThoughtsDir, resolvedName)
-		// Check if thoughts projects directory exists (either restored or pre-existing)
-		if _, statErr := os.Stat(thoughtsPaths.Docs); statErr == nil {
-			if symlinkErr := UpdateProjectSymlinks(thoughtsPaths.Docs, targetPath); symlinkErr != nil {
-				// Symlink update failed - warn but continue
-				thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to update symlinks: %v", symlinkErr))
-			}
-		}
-	} else {
-		thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to update docs symlinks: %v", expandErr))
-	}
-
-	if expandErr == nil {
-		if warning, err := EnsureProjectThoughtsSymlink(expandedThoughtsDir, resolvedName, targetPath, false); err != nil {
+	if thoughtsSetting, ok := settings["thoughts_dir"]; ok {
+		if warning, err := EnsureProjectThoughtsSymlink(thoughtsSetting, resolvedName, targetPath, false); err != nil {
 			thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to update project thoughts symlink: %v", err))
 		} else if warning != "" {
 			thoughtsWarnings = append(thoughtsWarnings, warning)
@@ -265,8 +254,19 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 
 	// Save registry
 	if err := saveRegistry(reg); err != nil {
+		fmt.Printf("%s Registry save failed after directory move; filesystem and registry may be out of sync: %v\n",
+			s.StrongWarn.Render("Warning:"), err)
 		return err
 	}
+
+	postUnarchiveResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
+		Type:        lifecycle.ProjectUnarchived,
+		ProjectName: resolvedName,
+		ProjectPath: targetPath,
+		DestPath:    targetPath,
+		Settings:    settings,
+	})
+	thoughtsWarnings = append(thoughtsWarnings, postUnarchiveResult.Warnings...)
 
 	labelStyle := s.Label
 	successStyle := s.Success
@@ -277,8 +277,8 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 		successStyle.Render("Unarchived"),
 		resolvedName,
 		targetCategory)
-	fmt.Printf("  %s %s\n", labelStyle.Render("From:"), pathStyle.Render(formatPathWithTilde(sourcePath)))
-	fmt.Printf("  %s %s\n", labelStyle.Render("To:"), pathStyle.Render(formatPathWithTilde(targetPath)))
+	fmt.Printf("  %s %s\n", labelStyle.Render("From:"), pathStyle.Render(fileutil.FormatPathWithTilde(sourcePath)))
+	fmt.Printf("  %s %s\n", labelStyle.Render("To:"), pathStyle.Render(fileutil.FormatPathWithTilde(targetPath)))
 
 	// Print thoughts status
 	if thoughtsRestored {

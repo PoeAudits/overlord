@@ -440,12 +440,12 @@ func TestRegistryGetProjectByAlias(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.alias, func(t *testing.T) {
-			name, _, found := registry.GetProjectByAlias(tt.alias)
+			name, _, found := registry.ProjectByAlias(tt.alias)
 			if found != tt.wantFound {
-				t.Errorf("GetProjectByAlias() found = %v, want %v", found, tt.wantFound)
+				t.Errorf("ProjectByAlias() found = %v, want %v", found, tt.wantFound)
 			}
 			if name != tt.wantName {
-				t.Errorf("GetProjectByAlias() name = %v, want %v", name, tt.wantName)
+				t.Errorf("ProjectByAlias() name = %v, want %v", name, tt.wantName)
 			}
 		})
 	}
@@ -625,6 +625,266 @@ func TestRegistryYAMLMarshaling(t *testing.T) {
 
 	if project.Category != CategoryWeb {
 		t.Errorf("Category mismatch: got %s, want %s", project.Category, CategoryWeb)
+	}
+}
+
+func TestSyncMethodIsValid(t *testing.T) {
+	tests := []struct {
+		name   string
+		method SyncMethod
+		valid  bool
+	}{
+		{"syncthing", SyncMethodSyncthing, true},
+		{"empty (backward compat)", SyncMethod(""), true},
+		{"invalid", SyncMethod("invalid"), false},
+		{"rsync", SyncMethod("rsync"), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.method.IsValid(); got != tt.valid {
+				t.Errorf("SyncMethod.IsValid() = %v, want %v", got, tt.valid)
+			}
+		})
+	}
+}
+
+func TestRegistry_ProjectByName(t *testing.T) {
+	reg := Registry{
+		Projects: map[string]Project{
+			"alpha": {
+				Path:        "/home/user/alpha",
+				Category:    CategoryCLI,
+				Lang:        LanguageGo,
+				Created:     "2026-01-01",
+				Description: "Alpha project",
+				Status:      Status{State: StateActive},
+			},
+			"beta": {
+				Path:        "/home/user/beta",
+				Category:    CategoryWeb,
+				Lang:        LanguageTypeScript,
+				Created:     "2026-01-02",
+				Description: "Beta project",
+				Status:      Status{State: StateArchived},
+			},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		query     string
+		wantFound bool
+		wantPath  string
+	}{
+		{
+			name:      "exact name match returns project",
+			query:     "alpha",
+			wantFound: true,
+			wantPath:  "/home/user/alpha",
+		},
+		{
+			name:      "second exact name match",
+			query:     "beta",
+			wantFound: true,
+			wantPath:  "/home/user/beta",
+		},
+		{
+			name:      "name not found returns not ok",
+			query:     "nonexistent",
+			wantFound: false,
+		},
+		{
+			name:      "case sensitive - uppercase not found",
+			query:     "Alpha",
+			wantFound: false,
+		},
+		{
+			name:      "empty string not found",
+			query:     "",
+			wantFound: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			project, ok := reg.ProjectByName(tt.query)
+			if ok != tt.wantFound {
+				t.Errorf("ProjectByName(%q) found = %v, want %v", tt.query, ok, tt.wantFound)
+			}
+			if tt.wantFound && project.Path != tt.wantPath {
+				t.Errorf("ProjectByName(%q) path = %q, want %q", tt.query, project.Path, tt.wantPath)
+			}
+		})
+	}
+}
+
+func TestRegistry_ProjectByName_EmptyRegistry(t *testing.T) {
+	reg := Registry{
+		Projects: map[string]Project{},
+	}
+
+	_, ok := reg.ProjectByName("anything")
+	if ok {
+		t.Error("ProjectByName() on empty registry returned ok=true, want false")
+	}
+}
+
+func TestRegistry_ActiveProjects(t *testing.T) {
+	active := Project{
+		Path:        "/home/user/active",
+		Category:    CategoryCLI,
+		Lang:        LanguageGo,
+		Created:     "2026-01-01",
+		Description: "Active project",
+		Status:      Status{State: StateActive},
+	}
+	archived := Project{
+		Path:        "/home/user/archived",
+		Category:    CategoryWeb,
+		Lang:        LanguageTypeScript,
+		Created:     "2026-01-02",
+		Description: "Archived project",
+		Status:      Status{State: StateArchived},
+	}
+
+	tests := []struct {
+		name         string
+		projects     map[string]Project
+		wantNames    []string
+		wantNotNames []string
+	}{
+		{
+			name:      "empty registry returns empty map",
+			projects:  map[string]Project{},
+			wantNames: []string{},
+		},
+		{
+			name: "all active projects returned",
+			projects: map[string]Project{
+				"proj-a": active,
+				"proj-b": active,
+			},
+			wantNames: []string{"proj-a", "proj-b"},
+		},
+		{
+			name: "archived projects excluded",
+			projects: map[string]Project{
+				"proj-archived": archived,
+			},
+			wantNames:    []string{},
+			wantNotNames: []string{"proj-archived"},
+		},
+		{
+			name: "mixed returns only active",
+			projects: map[string]Project{
+				"proj-active":   active,
+				"proj-archived": archived,
+			},
+			wantNames:    []string{"proj-active"},
+			wantNotNames: []string{"proj-archived"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := Registry{Projects: tt.projects}
+			got := reg.ActiveProjects()
+
+			for _, name := range tt.wantNames {
+				if _, ok := got[name]; !ok {
+					t.Errorf("ActiveProjects() missing expected project %q", name)
+				}
+			}
+			for _, name := range tt.wantNotNames {
+				if _, ok := got[name]; ok {
+					t.Errorf("ActiveProjects() contains unexpected project %q", name)
+				}
+			}
+			// Verify count for empty-expected cases
+			if len(tt.wantNames) == 0 && len(got) != 0 {
+				t.Errorf("ActiveProjects() returned %d projects, want 0", len(got))
+			}
+		})
+	}
+}
+
+func TestRegistry_ArchivedProjects(t *testing.T) {
+	active := Project{
+		Path:        "/home/user/active",
+		Category:    CategoryCLI,
+		Lang:        LanguageGo,
+		Created:     "2026-01-01",
+		Description: "Active project",
+		Status:      Status{State: StateActive},
+	}
+	archived := Project{
+		Path:        "/home/user/archived",
+		Category:    CategoryWeb,
+		Lang:        LanguageTypeScript,
+		Created:     "2026-01-02",
+		Description: "Archived project",
+		Status:      Status{State: StateArchived},
+	}
+
+	tests := []struct {
+		name         string
+		projects     map[string]Project
+		wantNames    []string
+		wantNotNames []string
+	}{
+		{
+			name:      "empty registry returns empty map",
+			projects:  map[string]Project{},
+			wantNames: []string{},
+		},
+		{
+			name: "all archived projects returned",
+			projects: map[string]Project{
+				"proj-a": archived,
+				"proj-b": archived,
+			},
+			wantNames: []string{"proj-a", "proj-b"},
+		},
+		{
+			name: "active projects excluded",
+			projects: map[string]Project{
+				"proj-active": active,
+			},
+			wantNames:    []string{},
+			wantNotNames: []string{"proj-active"},
+		},
+		{
+			name: "mixed returns only archived",
+			projects: map[string]Project{
+				"proj-active":   active,
+				"proj-archived": archived,
+			},
+			wantNames:    []string{"proj-archived"},
+			wantNotNames: []string{"proj-active"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := Registry{Projects: tt.projects}
+			got := reg.ArchivedProjects()
+
+			for _, name := range tt.wantNames {
+				if _, ok := got[name]; !ok {
+					t.Errorf("ArchivedProjects() missing expected project %q", name)
+				}
+			}
+			for _, name := range tt.wantNotNames {
+				if _, ok := got[name]; ok {
+					t.Errorf("ArchivedProjects() contains unexpected project %q", name)
+				}
+			}
+			// Verify count for empty-expected cases
+			if len(tt.wantNames) == 0 && len(got) != 0 {
+				t.Errorf("ArchivedProjects() returned %d projects, want 0", len(got))
+			}
+		})
 	}
 }
 

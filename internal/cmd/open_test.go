@@ -4,55 +4,6 @@ import (
 	"testing"
 )
 
-func TestPadRight(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		width    int
-		expected string
-	}{
-		{
-			name:     "shorter than width",
-			input:    "hello",
-			width:    10,
-			expected: "hello     ",
-		},
-		{
-			name:     "equal to width",
-			input:    "hello",
-			width:    5,
-			expected: "hello",
-		},
-		{
-			name:     "longer than width",
-			input:    "hello world",
-			width:    5,
-			expected: "hello world",
-		},
-		{
-			name:     "empty string",
-			input:    "",
-			width:    5,
-			expected: "     ",
-		},
-		{
-			name:     "zero width",
-			input:    "hello",
-			width:    0,
-			expected: "hello",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := padRight(tt.input, tt.width)
-			if result != tt.expected {
-				t.Errorf("padRight(%q, %d) = %q, want %q", tt.input, tt.width, result, tt.expected)
-			}
-		})
-	}
-}
-
 func TestPickerModelFilterProjects(t *testing.T) {
 	items := []projectItem{
 		{name: "overlord", category: "core-tools", description: "Project management"},

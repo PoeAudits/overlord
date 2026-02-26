@@ -33,7 +33,7 @@ syncthing:
   api_key: "example-key"
   address: "tcp://100.100.100.100:22000"
 `
-	_ = os.WriteFile(configPath, []byte(content), 0644)
+	_ = os.WriteFile(configPath, []byte(content), 0o644)
 
 	// Load the config
 	config, err := machine.Load(configPath)

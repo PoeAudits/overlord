@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/registry"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -62,6 +62,7 @@ func runClear(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve all projects upfront
+	s := NewStyles()
 	var targets []clearTarget
 	var resolveErrors []string
 
@@ -78,7 +79,7 @@ func runClear(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		projectPath, err := expandProjectPath(result.Project.Path, reg.Settings.BaseDir)
+		projectPath, err := fileutil.ExpandProjectPath(result.Project.Path, reg.Settings.BaseDir)
 		if err != nil {
 			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': failed to expand path: %v", result.Name, err))
 			continue
@@ -108,12 +109,12 @@ func runClear(cmd *cobra.Command, args []string) error {
 		targets = append(targets, target)
 	}
 
-	// If any names failed to resolve, report and abort
+	// Print resolution errors and continue with valid targets
 	if len(resolveErrors) > 0 {
 		for _, e := range resolveErrors {
-			fmt.Fprintf(os.Stderr, "Error: %s\n", e)
+			fmt.Printf("%s %s\n", s.StrongWarn.Render("Skipping"), e)
 		}
-		return fmt.Errorf("failed to resolve %d project(s). Run 'overlord list --all' to see all projects", len(resolveErrors))
+		fmt.Println()
 	}
 
 	if len(targets) == 0 {
@@ -146,7 +147,7 @@ func runClear(cmd *cobra.Command, args []string) error {
 
 	// Print any errors
 	if len(clearErrors) > 0 {
-		errStyle := NewStyles().Error
+		errStyle := s.Error
 		fmt.Println()
 		for _, e := range clearErrors {
 			fmt.Printf("%s %s\n", errStyle.Render("Failed"), e)
@@ -165,7 +166,7 @@ func clearOneProject(reg *registry.Registry, t clearTarget) error {
 	// Define styles (red success style intentional - destructive operation)
 	s := NewStyles()
 	labelStyle := s.Label
-	successStyle := lipgloss.NewStyle().Foreground(ColorRed).Bold(true)
+	successStyle := s.Destructive
 	pathStyle := s.Path
 
 	// Delete project directory
@@ -197,56 +198,15 @@ func clearOneProject(reg *registry.Registry, t clearTarget) error {
 	// Print success
 	fmt.Printf("%s '%s'\n", successStyle.Render("Cleared"), t.name)
 	if t.projectExists {
-		fmt.Printf("  %s %s\n", labelStyle.Render("Project:"), pathStyle.Render(formatPathWithTilde(t.projectPath)))
+		fmt.Printf("  %s %s\n", labelStyle.Render("Project:"), pathStyle.Render(fileutil.FormatPathWithTilde(t.projectPath)))
 	}
 	if t.thoughtsExists {
-		fmt.Printf("  %s %s\n", labelStyle.Render("Thoughts:"), pathStyle.Render(formatPathWithTilde(t.thoughtsDir)))
+		fmt.Printf("  %s %s\n", labelStyle.Render("Thoughts:"), pathStyle.Render(fileutil.FormatPathWithTilde(t.thoughtsDir)))
 	}
 	if t.archiveExists {
-		fmt.Printf("  %s %s\n", labelStyle.Render("Archived:"), pathStyle.Render(formatPathWithTilde(t.archiveDir)))
+		fmt.Printf("  %s %s\n", labelStyle.Render("Archived:"), pathStyle.Render(fileutil.FormatPathWithTilde(t.archiveDir)))
 	}
 	fmt.Println()
 
 	return nil
-}
-
-// confirmClear displays everything that will be removed and prompts for confirmation.
-func confirmClear(targets []clearTarget) (bool, error) {
-	// Styles for the warning
-	s := NewStyles()
-	warnStyle := s.Error
-	nameStyle := s.Label
-	pathStyle := s.Path
-	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-
-	fmt.Println()
-	fmt.Printf("%s This will permanently delete the following:\n\n", warnStyle.Render("WARNING:"))
-
-	for _, t := range targets {
-		fmt.Printf("  %s\n", nameStyle.Render(t.name))
-		fmt.Printf("    %s\n", dimStyle.Render("Registry entry"))
-
-		if t.projectExists {
-			fmt.Printf("    %s\n", pathStyle.Render(formatPathWithTilde(t.projectPath)))
-		} else {
-			fmt.Printf("    %s %s\n", pathStyle.Render(formatPathWithTilde(t.projectPath)), dimStyle.Render("(not found)"))
-		}
-
-		if t.thoughtsExists {
-			fmt.Printf("    %s\n", pathStyle.Render(formatPathWithTilde(t.thoughtsDir)))
-		}
-
-		if t.archiveExists {
-			fmt.Printf("    %s\n", pathStyle.Render(formatPathWithTilde(t.archiveDir)))
-		}
-
-		if !t.thoughtsExists && !t.archiveExists {
-			fmt.Printf("    %s\n", dimStyle.Render("No thoughts directories found"))
-		}
-
-		fmt.Println()
-	}
-
-	fmt.Printf("%s This cannot be undone.\n", warnStyle.Render("CAUTION:"))
-	return confirmStrict("")
 }

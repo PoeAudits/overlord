@@ -37,7 +37,7 @@ func (r *Registry) Resolve(query string) []ResolveResult {
 		return nil
 	}
 
-	if r.Projects == nil || len(r.Projects) == 0 {
+	if len(r.Projects) == 0 {
 		return nil
 	}
 
@@ -100,7 +100,7 @@ func (r *Registry) Resolve(query string) []ResolveResult {
 	matches := fuzzy.Find(query, targetStrings)
 
 	// Convert fuzzy matches to ResolveResults
-	seenProjects := make(map[string]bool) // Track projects we've already added
+	seenProjects := make(map[string]struct{}) // Track projects we've already added
 	for _, match := range matches {
 		if match.Score < scoreFuzzyMin {
 			continue // Skip low-quality matches
@@ -109,10 +109,10 @@ func (r *Registry) Resolve(query string) []ResolveResult {
 		target := targets[match.Index]
 
 		// Skip if we've already added this project (prefer first/best match)
-		if seenProjects[target.projectKey] {
+		if _, ok := seenProjects[target.projectKey]; ok {
 			continue
 		}
-		seenProjects[target.projectKey] = true
+		seenProjects[target.projectKey] = struct{}{}
 
 		project := r.Projects[target.projectKey]
 		results = append(results, ResolveResult{

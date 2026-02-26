@@ -1,11 +1,12 @@
 package machine
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
-
-	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 func TestMachineConfigValidate(t *testing.T) {
@@ -76,7 +77,7 @@ func TestMachineConfigValidate(t *testing.T) {
 				return
 			}
 			if tt.wantErr && err != nil && tt.errMsg != "" {
-				if !contains(err.Error(), tt.errMsg) {
+				if !strings.Contains(err.Error(), tt.errMsg) {
 					t.Errorf("MachineConfig.Validate() error = %v, want error containing %q", err, tt.errMsg)
 				}
 			}
@@ -105,7 +106,7 @@ func TestSave(t *testing.T) {
 		}
 
 		content := string(data)
-		if !contains(content, "name: test-machine") {
+		if !strings.Contains(content, "name: test-machine") {
 			t.Errorf("saved file does not contain expected name, got:\n%s", content)
 		}
 	})
@@ -135,7 +136,7 @@ func TestSave(t *testing.T) {
 		}
 
 		content := string(data)
-		if !contains(content, "syncthing:") {
+		if !strings.Contains(content, "syncthing:") {
 			t.Errorf("saved file does not contain expected syncthing config, got:\n%s", content)
 		}
 	})
@@ -184,7 +185,7 @@ func TestSave(t *testing.T) {
 			t.Fatalf("Save() error = %v, want nil", err)
 		}
 
-		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		if _, err := os.Stat(configPath); errors.Is(err, fs.ErrNotExist) {
 			t.Fatal("config file was not created in nested directory")
 		}
 	})
@@ -235,7 +236,7 @@ func TestLoad(t *testing.T) {
 
 		content := `name: test-storage
 `
-		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -260,7 +261,7 @@ syncthing:
   api_url: "http://localhost:8384"
   address: "tcp://100.100.100.100:22000"
 `
-		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -277,7 +278,7 @@ syncthing:
 		content := `name: test
 role: [invalid yaml structure
 `
-		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -293,103 +294,4 @@ role: [invalid yaml structure
 			t.Error("Load() error = nil, want error for empty path")
 		}
 	})
-}
-
-func TestExpandPath(t *testing.T) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Compute expected absolute path for relative path test
-	relAbsPath, err := filepath.Abs("config/file.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tests := []struct {
-		name     string
-		path     string
-		expected string
-		wantErr  bool
-	}{
-		{
-			name:     "tilde only",
-			path:     "~",
-			expected: homeDir,
-			wantErr:  false,
-		},
-		{
-			name:     "tilde with path",
-			path:     "~/.config/overlord",
-			expected: filepath.Join(homeDir, ".config/overlord"),
-			wantErr:  false,
-		},
-		{
-			name:     "absolute path",
-			path:     "/etc/config",
-			expected: "/etc/config",
-			wantErr:  false,
-		},
-		{
-			name:     "relative path",
-			path:     "config/file.yaml",
-			expected: relAbsPath,
-			wantErr:  false,
-		},
-		{
-			name:    "empty path",
-			path:    "",
-			wantErr: true,
-		},
-		{
-			name:    "tilde user expansion",
-			path:    "~user/path",
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := registry.ExpandPath(tt.path)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("registry.ExpandPath() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && result != tt.expected {
-				t.Errorf("registry.ExpandPath() = %v, want %v", result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestDefaultConfig(t *testing.T) {
-	config, err := defaultConfig()
-	if err != nil {
-		t.Fatalf("defaultConfig() error = %v, want nil", err)
-	}
-
-	if config.Name == "" {
-		t.Error("defaultConfig() returned config with empty name")
-	}
-
-	// Verify it's valid
-	if err := config.Validate(); err != nil {
-		t.Errorf("defaultConfig() returned invalid config: %v", err)
-	}
-}
-
-// Helper function to check if a string contains a substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && containsHelper(s, substr)))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

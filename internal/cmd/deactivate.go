@@ -7,6 +7,7 @@ import (
 
 	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/registry"
+	syncpkg "github.com/PoeAudits/overlord/internal/sync"
 	"github.com/PoeAudits/overlord/internal/syncthing"
 	"github.com/spf13/cobra"
 )
@@ -68,7 +69,7 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load machine config: %w", err)
 	}
 
-	localClient, err := localSyncthingClient(machineConfig)
+	localClient, err := syncpkg.LocalClient(machineConfig)
 	if err != nil {
 		return err
 	}
@@ -78,7 +79,7 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 		if loadErr != nil {
 			return fmt.Errorf("failed to load peers config: %w", loadErr)
 		}
-		_, err = resolveSyncthingPeer(peersConfig, deactivateOpts.peer)
+		_, err = syncpkg.ResolvePeer(peersConfig, deactivateOpts.peer)
 		if err != nil {
 			return err
 		}

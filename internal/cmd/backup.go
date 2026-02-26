@@ -11,10 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/PoeAudits/overlord/internal/machine"
-	"github.com/PoeAudits/overlord/internal/registry"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
+
+	"github.com/PoeAudits/overlord/internal/fileutil"
+	"github.com/PoeAudits/overlord/internal/machine"
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 const defaultBackupRepoPath = "~/.local/share/overlord/backup"
@@ -43,7 +45,7 @@ func runBackup(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to resolve backup repo path: %w", err)
 	}
-	if err := os.MkdirAll(repoPath, 0755); err != nil {
+	if err := os.MkdirAll(repoPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create backup repo directory: %w", err)
 	}
 
@@ -60,10 +62,10 @@ func runBackup(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err := copyFileWithMode(registryPath, filepath.Join(repoPath, "registry.yaml")); err != nil {
+	if err := fileutil.CopyFileWithMode(registryPath, filepath.Join(repoPath, "registry.yaml")); err != nil {
 		return fmt.Errorf("failed to copy registry.yaml to backup repo: %w", err)
 	}
-	if err := copyFileWithMode(peersPath, filepath.Join(repoPath, "peers.yaml")); err != nil {
+	if err := fileutil.CopyFileWithMode(peersPath, filepath.Join(repoPath, "peers.yaml")); err != nil {
 		return fmt.Errorf("failed to copy peers.yaml to backup repo: %w", err)
 	}
 
@@ -90,7 +92,7 @@ func runBackup(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("%s pushed backup to origin/main\n", s.Success.Render("✓"))
-	fmt.Printf("%s %s\n", s.Label.Render("Backup repo:"), formatPathWithTilde(repoPath))
+	fmt.Printf("%s %s\n", s.Label.Render("Backup repo:"), fileutil.FormatPathWithTilde(repoPath))
 	return nil
 }
 

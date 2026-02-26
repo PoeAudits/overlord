@@ -91,7 +91,7 @@ func TestLoadLockMalformedYAML(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "registry.lock.yaml")
 
-	if err := os.WriteFile(path, []byte("owner: [bad"), 0644); err != nil {
+	if err := os.WriteFile(path, []byte("owner: [bad"), 0o644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 

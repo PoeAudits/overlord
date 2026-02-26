@@ -326,7 +326,7 @@ func TestTemplateTypeOutputPath(t *testing.T) {
 		{TemplateMakefile, "Makefile"},
 		{TemplateREADME, "README.md"},
 		{TemplateAGENTS, "AGENTS.md"},
-		{TemplateOpenCode, ".opencode/opencode.jsonc"},
+		{TemplateOpenCode, "opencode.jsonc"},
 		{TemplateTmuxLocal, ".tmux.local"},
 	}
 
@@ -334,27 +334,6 @@ func TestTemplateTypeOutputPath(t *testing.T) {
 		t.Run(string(tt.templateType), func(t *testing.T) {
 			if got := tt.templateType.OutputPath(); got != tt.want {
 				t.Errorf("OutputPath() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestTemplateTypeNeedsRendering(t *testing.T) {
-	tests := []struct {
-		templateType TemplateType
-		want         bool
-	}{
-		{TemplateMakefile, false},
-		{TemplateREADME, true},
-		{TemplateAGENTS, true},
-		{TemplateOpenCode, true},
-		{TemplateTmuxLocal, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(string(tt.templateType), func(t *testing.T) {
-			if got := tt.templateType.NeedsRendering(); got != tt.want {
-				t.Errorf("NeedsRendering() = %v, want %v", got, tt.want)
 			}
 		})
 	}

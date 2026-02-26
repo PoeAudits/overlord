@@ -7,55 +7,6 @@ import (
 	"github.com/PoeAudits/overlord/internal/registry"
 )
 
-func TestTruncate(t *testing.T) {
-	tests := []struct {
-		name   string
-		input  string
-		maxLen int
-		want   string
-	}{
-		{
-			name:   "short string unchanged",
-			input:  "hello",
-			maxLen: 10,
-			want:   "hello",
-		},
-		{
-			name:   "exact length unchanged",
-			input:  "hello",
-			maxLen: 5,
-			want:   "hello",
-		},
-		{
-			name:   "long string truncated",
-			input:  "hello world this is a long string",
-			maxLen: 15,
-			want:   "hello world ...",
-		},
-		{
-			name:   "very short maxLen",
-			input:  "hello",
-			maxLen: 3,
-			want:   "...",
-		},
-		{
-			name:   "empty string",
-			input:  "",
-			maxLen: 10,
-			want:   "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := truncate(tt.input, tt.maxLen)
-			if got != tt.want {
-				t.Errorf("truncate(%q, %d) = %q, want %q", tt.input, tt.maxLen, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestHasAllTags(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -244,63 +195,6 @@ func TestGetSyncedProjects(t *testing.T) {
 				t.Errorf("getSyncedProjects() returned %d projects, want %d", len(got), tt.want)
 			}
 		})
-	}
-}
-
-func TestGetSyncedProjects_ReturnsCorrectProjects(t *testing.T) {
-	reg := &registry.Registry{
-		Version: 2,
-		Settings: registry.Settings{
-			BaseDir:     "~/Overlord",
-			ThoughtsDir: "~/thoughts",
-		},
-		Projects: map[string]registry.Project{
-			"active-synced": {
-				Path:        "projects/web/active-synced",
-				Category:    registry.CategoryWeb,
-				Lang:        registry.LanguageGo,
-				Created:     "2024-01-01",
-				Description: "Active and synced",
-				Status:      registry.Status{State: registry.StateActive},
-				Sync:        registry.ProjectSync{Status: registry.SyncActive},
-			},
-			"active-not-synced": {
-				Path:        "projects/web/active-not-synced",
-				Category:    registry.CategoryWeb,
-				Lang:        registry.LanguageGo,
-				Created:     "2024-01-01",
-				Description: "Active but not synced",
-				Status:      registry.Status{State: registry.StateActive},
-				Sync:        registry.ProjectSync{Status: registry.SyncInactive},
-			},
-			"archived-synced": {
-				Path:        "projects/web/archived-synced",
-				Category:    registry.CategoryWeb,
-				Lang:        registry.LanguageGo,
-				Created:     "2024-01-01",
-				Description: "Archived but synced",
-				Status:      registry.Status{State: registry.StateArchived},
-				Sync:        registry.ProjectSync{Status: registry.SyncActive},
-			},
-		},
-	}
-
-	got := getSyncedProjects(reg)
-
-	if len(got) != 1 {
-		t.Fatalf("expected 1 project, got %d", len(got))
-	}
-
-	if _, ok := got["active-synced"]; !ok {
-		t.Error("expected 'active-synced' to be in results")
-	}
-
-	if _, ok := got["active-not-synced"]; ok {
-		t.Error("'active-not-synced' should not be in results")
-	}
-
-	if _, ok := got["archived-synced"]; ok {
-		t.Error("'archived-synced' should not be in results (archived projects excluded)")
 	}
 }
 

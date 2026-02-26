@@ -1,6 +1,8 @@
 package registry
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -65,7 +67,7 @@ projects:
       state: active
 `
 
-	if err := os.WriteFile(registryPath, []byte(validYAML), 0644); err != nil {
+	if err := os.WriteFile(registryPath, []byte(validYAML), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -109,7 +111,7 @@ settings:
   invalid yaml here [[[
 `
 
-	if err := os.WriteFile(registryPath, []byte(invalidYAML), 0644); err != nil {
+	if err := os.WriteFile(registryPath, []byte(invalidYAML), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -133,7 +135,7 @@ settings:
 projects: {}
 `
 
-	if err := os.WriteFile(registryPath, []byte(invalidRegistry), 0644); err != nil {
+	if err := os.WriteFile(registryPath, []byte(invalidRegistry), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -164,7 +166,7 @@ func TestSave_NewFile(t *testing.T) {
 	}
 
 	// Verify file exists
-	if _, err := os.Stat(registryPath); os.IsNotExist(err) {
+	if _, err := os.Stat(registryPath); errors.Is(err, fs.ErrNotExist) {
 		t.Fatal("registry file was not created")
 	}
 
@@ -201,7 +203,7 @@ func TestSave_CreatesParentDirectories(t *testing.T) {
 	}
 
 	// Verify file exists
-	if _, err := os.Stat(registryPath); os.IsNotExist(err) {
+	if _, err := os.Stat(registryPath); errors.Is(err, fs.ErrNotExist) {
 		t.Fatal("registry file was not created in nested directory")
 	}
 }
@@ -305,38 +307,75 @@ func TestExpandPath(t *testing.T) {
 	}
 }
 
-func TestDefaultRegistry(t *testing.T) {
+func TestSave_BackupCreated(t *testing.T) {
 	t.Parallel()
 
-	registry := defaultRegistry()
+	tempDir := t.TempDir()
+	registryPath := filepath.Join(tempDir, "registry.yaml")
 
-	if registry == nil {
-		t.Fatal("defaultRegistry() returned nil")
+	// First save — creates the registry file
+	first := defaultRegistry()
+	first.Projects["original"] = Project{
+		Path:        "~/Overlord/original",
+		Category:    CategoryCLI,
+		Lang:        LanguageGo,
+		Created:     "2024-01-15",
+		Description: "Original project",
+		Status:      Status{State: StateActive},
 	}
 
-	if registry.Version != 2 {
-		t.Errorf("registry.Version = %d, want 2", registry.Version)
+	if err := Save(registryPath, first); err != nil {
+		t.Fatalf("first Save() error = %v, want nil", err)
 	}
 
-	if registry.Settings.BaseDir != "~/Overlord" {
-		t.Errorf("registry.Settings.BaseDir = %s, want ~/Overlord", registry.Settings.BaseDir)
+	// Read the original file contents for later comparison
+	originalData, err := os.ReadFile(registryPath)
+	if err != nil {
+		t.Fatalf("failed to read first-save file: %v", err)
 	}
 
-	if registry.Settings.ThoughtsDir != "~/thoughts" {
-		t.Errorf("registry.Settings.ThoughtsDir = %s, want ~/thoughts", registry.Settings.ThoughtsDir)
+	// Second save — overwrites the file and should create a .bak backup
+	second := defaultRegistry()
+	second.Projects["modified"] = Project{
+		Path:        "~/Overlord/modified",
+		Category:    CategoryWeb,
+		Lang:        LanguageTypeScript,
+		Created:     "2024-02-01",
+		Description: "Modified project",
+		Status:      Status{State: StateActive},
 	}
 
-	if registry.Projects == nil {
-		t.Error("registry.Projects is nil, want empty map")
+	if err := Save(registryPath, second); err != nil {
+		t.Fatalf("second Save() error = %v, want nil", err)
 	}
 
-	if len(registry.Projects) != 0 {
-		t.Errorf("len(registry.Projects) = %d, want 0", len(registry.Projects))
+	// Assert that a .bak file was created
+	backupPath := registryPath + ".bak"
+	if _, err := os.Stat(backupPath); errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("backup file %q was not created after overwrite", backupPath)
 	}
 
-	// Verify default registry is valid
-	if err := registry.Validate(); err != nil {
-		t.Errorf("defaultRegistry() validation error = %v, want nil", err)
+	// Load the .bak file and verify it matches the first save
+	backupData, err := os.ReadFile(backupPath)
+	if err != nil {
+		t.Fatalf("failed to read backup file: %v", err)
+	}
+
+	if string(backupData) != string(originalData) {
+		t.Errorf("backup file contents do not match original save:\ngot:  %s\nwant: %s", backupData, originalData)
+	}
+
+	// Verify the backup loads correctly as the first registry
+	backupReg, err := Load(backupPath)
+	if err != nil {
+		t.Fatalf("failed to load backup registry: %v", err)
+	}
+
+	if _, ok := backupReg.Projects["original"]; !ok {
+		t.Error("backup registry missing 'original' project from first save")
+	}
+	if _, ok := backupReg.Projects["modified"]; ok {
+		t.Error("backup registry unexpectedly contains 'modified' project from second save")
 	}
 }
 

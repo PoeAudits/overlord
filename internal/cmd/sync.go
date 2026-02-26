@@ -3,11 +3,11 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"math"
 	"sort"
 
 	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/registry"
+	syncpkg "github.com/PoeAudits/overlord/internal/sync"
 	"github.com/PoeAudits/overlord/internal/syncthing"
 	"github.com/spf13/cobra"
 )
@@ -49,7 +49,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load machine config: %w", err)
 	}
 
-	client, err := localSyncthingClient(machineConfig)
+	client, err := syncpkg.LocalClient(machineConfig)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	for _, name := range sortedProjectNames(projectsToSync) {
 		result := syncResult{name: name}
-		status, err := client.GetFolderStatus(ctx, name)
+		status, err := client.FolderStatus(ctx, name)
 		if err != nil {
 			result.err = err
 		} else {
@@ -105,8 +105,8 @@ func runSync(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// getSyncActiveProjects returns all projects with sync status 'active'
-func getSyncActiveProjects(reg *registry.Registry) map[string]registry.Project {
+// syncActiveProjects returns all projects with sync status 'active'
+func syncActiveProjects(reg *registry.Registry) map[string]registry.Project {
 	result := make(map[string]registry.Project)
 	for name, project := range reg.Projects {
 		if project.Sync.Status == registry.SyncActive {
@@ -120,7 +120,7 @@ func getSyncActiveProjects(reg *registry.Registry) map[string]registry.Project {
 // If args is empty, returns all sync-active projects.
 // If args has a project name, resolves it and verifies it's sync-active.
 // Returns nil map (not error) if no projects to sync, with a message printed.
-func resolveSyncProjects(args []string, reg *registry.Registry, s Styles) (map[string]registry.Project, error) {
+func resolveSyncProjects(args []string, reg *registry.Registry, s styles) (map[string]registry.Project, error) {
 	var projectsToSync map[string]registry.Project
 
 	if len(args) > 0 {
@@ -140,7 +140,7 @@ func resolveSyncProjects(args []string, reg *registry.Registry, s Styles) (map[s
 		}
 	} else {
 		// Get all sync-active projects
-		projectsToSync = getSyncActiveProjects(reg)
+		projectsToSync = syncActiveProjects(reg)
 	}
 
 	if len(projectsToSync) == 0 {
@@ -160,15 +160,4 @@ func sortedProjectNames(projects map[string]registry.Project) []string {
 	}
 	sort.Strings(names)
 	return names
-}
-
-func formatBytes(value int64) string {
-	if value <= 0 {
-		return "0 B"
-	}
-	units := []string{"B", "KB", "MB", "GB", "TB"}
-	base := float64(value)
-	exp := int(math.Min(float64(len(units)-1), math.Floor(math.Log(base)/math.Log(1024))))
-	formatted := base / math.Pow(1024, float64(exp))
-	return fmt.Sprintf("%.1f %s", formatted, units[exp])
 }

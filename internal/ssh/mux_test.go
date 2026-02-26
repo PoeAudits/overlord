@@ -2,6 +2,8 @@ package ssh
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -151,40 +153,24 @@ func TestMux_Close(t *testing.T) {
 	}
 
 	// Directory should be removed
-	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+	if _, err := os.Stat(dir); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("Close() did not remove controlDir, err = %v", err)
 	}
-}
 
-func TestMux_Close_TracksHosts(t *testing.T) {
-	t.Parallel()
+	t.Run("with tracked hosts", func(t *testing.T) {
+		mux, err := NewMux()
+		if err != nil {
+			t.Fatalf("NewMux() error = %v", err)
+		}
 
-	mux, err := NewMux()
-	if err != nil {
-		t.Fatalf("NewMux() error = %v", err)
-	}
+		// Manually add hosts (without actually connecting - we don't have SSH targets in tests)
+		mux.hosts = append(mux.hosts, "test-host-1", "test-host-2")
 
-	// Manually add hosts (without actually connecting - we don't have SSH targets in tests)
-	mux.hosts = append(mux.hosts, "test-host-1", "test-host-2")
-
-	// Close should not panic even with tracked hosts that have no actual connections
-	if err := mux.Close(context.Background()); err != nil {
-		t.Fatalf("Close() error = %v", err)
-	}
-}
-
-func TestMux_Close_EmptyHosts(t *testing.T) {
-	t.Parallel()
-
-	mux, err := NewMux()
-	if err != nil {
-		t.Fatalf("NewMux() error = %v", err)
-	}
-
-	// No hosts tracked - Close should still work
-	if err := mux.Close(context.Background()); err != nil {
-		t.Fatalf("Close() error = %v", err)
-	}
+		// Close should not panic even with tracked hosts that have no actual connections
+		if err := mux.Close(context.Background()); err != nil {
+			t.Fatalf("Close() error = %v", err)
+		}
+	})
 }
 
 func TestMux_ControlDir_HasCorrectPrefix(t *testing.T) {

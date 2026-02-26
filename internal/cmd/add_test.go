@@ -106,7 +106,7 @@ func TestResolveAddArgs(t *testing.T) {
 func TestDetectLanguage(t *testing.T) {
 	t.Run("detects Go", func(t *testing.T) {
 		dir := t.TempDir()
-		os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module test"), 0644)
+		os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module test"), 0o644)
 
 		lang, err := detectLanguage(dir)
 		if err != nil {
@@ -119,7 +119,7 @@ func TestDetectLanguage(t *testing.T) {
 
 	t.Run("detects Python from pyproject.toml", func(t *testing.T) {
 		dir := t.TempDir()
-		os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]"), 0644)
+		os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]"), 0o644)
 
 		lang, err := detectLanguage(dir)
 		if err != nil {
@@ -132,7 +132,7 @@ func TestDetectLanguage(t *testing.T) {
 
 	t.Run("detects Python from requirements.txt", func(t *testing.T) {
 		dir := t.TempDir()
-		os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte("flask"), 0644)
+		os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte("flask"), 0o644)
 
 		lang, err := detectLanguage(dir)
 		if err != nil {
@@ -145,7 +145,7 @@ func TestDetectLanguage(t *testing.T) {
 
 	t.Run("detects TypeScript", func(t *testing.T) {
 		dir := t.TempDir()
-		os.WriteFile(filepath.Join(dir, "package.json"), []byte("{}"), 0644)
+		os.WriteFile(filepath.Join(dir, "package.json"), []byte("{}"), 0o644)
 
 		lang, err := detectLanguage(dir)
 		if err != nil {
@@ -158,7 +158,7 @@ func TestDetectLanguage(t *testing.T) {
 
 	t.Run("detects Solidity from foundry.toml", func(t *testing.T) {
 		dir := t.TempDir()
-		os.WriteFile(filepath.Join(dir, "foundry.toml"), []byte("[profile]"), 0644)
+		os.WriteFile(filepath.Join(dir, "foundry.toml"), []byte("[profile]"), 0o644)
 
 		lang, err := detectLanguage(dir)
 		if err != nil {
@@ -210,7 +210,7 @@ func TestDetectCategory(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				baseDir := t.TempDir()
 				projectPath := filepath.Join(baseDir, tt.relPath)
-				os.MkdirAll(projectPath, 0755)
+				os.MkdirAll(projectPath, 0o755)
 
 				cat, err := detectCategory(projectPath, baseDir)
 				if err != nil {
@@ -247,7 +247,7 @@ func TestDetectCategory(t *testing.T) {
 	t.Run("error when under base dir but no category match", func(t *testing.T) {
 		baseDir := t.TempDir()
 		unknownPath := filepath.Join(baseDir, "unknown", "my-project")
-		os.MkdirAll(unknownPath, 0755)
+		os.MkdirAll(unknownPath, 0o755)
 
 		_, err := detectCategory(unknownPath, baseDir)
 		if err == nil {

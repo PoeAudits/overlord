@@ -36,19 +36,33 @@ overlord/
 │   │   ├── constants.go           # Named constants (max lengths, picker sizes)
 │   │   ├── styles.go              # Shared terminal styles (NewStyles())
 │   │   ├── helpers.go             # Shared helpers (loadRegistry, saveRegistry, countTrue, etc.)
-│   │   ├── fileutil.go            # File operations helpers
-│   │   ├── tmux.go                # Tmux session management (tmuxSession struct)
 │   │   ├── list.go                # List projects with filtering
 │   │   ├── info.go, new.go, add.go, rm.go
 │   │   ├── open.go                # Open workspace (with TUI picker)
-│   │   ├── worktree.go            # Git worktree + tmux management
-│   │   ├── archive.go, unarchive.go, clear.go, thoughts.go
+│   │   ├── worktree.go            # Cobra surface for internal/worktree helpers
+│   │   ├── archive.go, unarchive.go, clear.go
 │   │   ├── init.go, setup.go, config.go
 │   │   ├── activate.go, sync.go, deactivate.go
 │   │   ├── sync_lock.go            # Registry lock commands (show/transfer/claim)
 │   │   ├── doctor.go, backup.go
 │   │   ├── syncthing_config_folder.go
 │   │   └── env.go, detect.go
+│   ├── lifecycle/                 # Event bus for lifecycle hooks
+│   │   ├── bus.go                 # Bus, Subscribe, Fire
+│   │   └── events.go              # Event types, Handler, HandlerResult
+│   ├── fileutil/                  # File operations (extracted from cmd/)
+│   │   └── fileutil.go            # FormatPathWithTilde, MoveDirectory, CopyFile, etc.
+│   ├── tmux/                      # Tmux session management (extracted from cmd/)
+│   │   └── tmux.go                # Session, CommandExecutor, NewSession
+│   ├── thoughts/                  # Thoughts directory management + lifecycle addon
+│   │   ├── thoughts.go            # Paths, GetPaths, CreateStructure, etc.
+│   │   └── addon.go               # Register(bus), lifecycle event handlers
+│   ├── worktree/                  # Worktree business logic (extracted from cmd/)
+│   │   └── worktree.go            # DetectProject, ParseWorktreeList, etc.
+│   ├── sync/                      # Syncthing sync orchestration (extracted from cmd/)
+│   │   ├── sync.go                # ResolvePeer, RequireConfig, LocalClient
+│   │   ├── helpers.go             # BuildFolder, EnsureIgnoreFile, EnsureDevice
+│   │   └── config_folder.go       # EnsureConfigFolder, ConfigDir
 │   ├── registry/                  # Registry types and operations
 │   │   ├── types.go               # Registry, Project, Category, Language types
 │   │   ├── store.go               # Load/Save with atomic writes
@@ -82,7 +96,6 @@ Command files use shared utilities to reduce duplication:
 - `minPickerVisibleItems` (5) — minimum visible items in TUI picker
 - `pickerHeaderFooterLines` (5) — lines reserved for picker header/footer
 - `defaultWorktreeBaseDir` — base directory for worktrees (`~/Overlord/worktrees`)
-- `worktreeAdjectives`, `worktreeNouns` — word lists for auto-generated branch names
 
 **Styles** (`styles.go`): Centralized terminal styling via `NewStyles()`. Returns a `Styles` struct with pre-configured lipgloss styles for success, error, warning, info, dim, bold, and color constants. All command files call `NewStyles()` instead of defining inline styles.
 
@@ -93,19 +106,31 @@ Command files use shared utilities to reduce duplication:
 - `expandBaseDir()` — expands base_dir from registry settings
 - `countTrue()` — variadic helper to count true boolean flags (used for validation)
 
-**File Utilities** (`fileutil.go`): File system operations:
+**File Utilities** (`internal/fileutil/`): File system operations shared by commands and lifecycle addons. The functions implement:
 - `formatPathWithTilde()` — replaces home dir with `~` for display
 - `moveDirectory()` — cross-device safe directory move (copy + remove)
 - `expandProjectPath()` — resolves project path from registry
 - `copyFileWithMode()` — copies file with mode preservation, cleans up partial files on failure
 
-**Tmux Session Management** (`tmux.go`): Encapsulates tmux session operations via `tmuxSession` struct:
+Commands directly import from `internal/fileutil` to access these utilities.
+
+**Tmux Session Management** (`internal/tmux/`): Encapsulates tmux session operations via `tmux.Session`:
 - `exists()` — checks if session exists
 - `create()` — creates new detached session with "base" window
 - `sourceLocal()` — sources `.tmux.local` file with environment variables
 - `attachOrSwitch()` — attaches to session or switches if already in tmux
 
-**Pattern:** Command files import these utilities and call them instead of duplicating logic. Path expansion uses `registry.ExpandPath()` (canonical implementation). Commands that manage tmux sessions (new.go, open.go) use the `tmuxSession` struct instead of inline exec.Command calls.
+Commands directly import from `internal/tmux` to access these utilities.
+
+**Pattern:** Command files import these utilities and call them instead of duplicating logic. Path expansion uses `registry.ExpandPath()` (canonical implementation). Commands that manage tmux sessions (new.go, open.go) use `tmux.Session` instead of inline exec.Command calls.
+
+### Lifecycle Event System
+
+`internal/lifecycle/` defines a lightweight event bus that decouples lifecycle hooks from command files. `Bus.Subscribe()` registers `Handler` callbacks against `EventType` values, while `Bus.Fire()` fans events out to every subscriber. Event names use `project.<verb>` with `ing` suffixes to signal pre-operation hooks and `ed` suffixes for post-operation hooks; `EventType.IsPre()` / `IsPost()` derive those semantics. `HandlerResult` aggregates warnings and fatal errors: pre-event handler failures abort the operation, whereas post-event failures are downgraded to warnings so primary flows still succeed. `lifecycle.DefaultBus` is constructed at package init and shared across the CLI.
+
+### Add-on Registration Pattern
+
+Add-ons expose a `Register(bus *lifecycle.Bus)` function and call it from `init()` so simply blank-importing the package wires it into the global bus. `internal/cmd/addons.go` imports `_ "github.com/PoeAudits/overlord/internal/thoughts"`, which ensures the thoughts addon hooks into events without command files knowing the details. To add another addon, create a package that subscribes to the desired `EventType` values inside `Register`, then add a blank import to `cmd/addons.go` so it loads side effects at startup.
 
 ### Registry & Store
 
@@ -161,6 +186,18 @@ When a function requires many parameters (>5), use a context struct to bundle re
 
 **When to use:** Functions with >5 parameters, especially when parameters fall into logical groups (config, options, paths, etc.).
 
+## Package DAG
+
+```
+internal/cmd/ (orchestration + Cobra definitions)
+├── internal/lifecycle/   (no internal deps)
+├── internal/fileutil/    (deps: registry)
+├── internal/tmux/        (no internal deps)
+├── internal/thoughts/    → lifecycle, fileutil
+├── internal/worktree/    (no internal deps)
+├── internal/sync/        → syncthing, machine, registry
+```
+
 ## Multi-Machine Sync
 
 ### Machine Config
@@ -188,6 +225,8 @@ All commands that mutate `registry.yaml` are guarded via `saveRegistry()` lock c
 If the file doesn't exist, Overlord creates one with the hostname only. Sync commands require Syncthing config to be filled in.
 
 ### Sync Infrastructure
+
+**Sync orchestrator** (`internal/sync/`): consolidates peer resolution, machine config validation, Syncthing client helpers, Syncthing folder builders, and ignore-file utilities. Commands call `ResolvePeer`, `RequireConfig`, `LocalClient`, `EnsureDevice`, `EnsureConfigFolder`, and `.stignore` helpers from this package instead of rolling their own logic.
 
 **Syncthing REST client** (`internal/syncthing/`): manages devices and folders via the Syncthing REST API.
 
@@ -227,18 +266,18 @@ Sync ignores are managed via `.stignore` with a shared `.stglobalignore` include
 
 ## Thoughts Management
 
-`internal/cmd/thoughts.go` — automatic thoughts directory management during archive/unarchive.
+`internal/thoughts/` centralizes thoughts directory structure helpers plus lifecycle hooks. Core helpers provide reusable path builders, archive moves, symlink management, and structure creation. `internal/thoughts/addon.go` registers handlers with `lifecycle.DefaultBus` (via the blank import in `internal/cmd/addons.go`) so thoughts automation runs automatically during project creation, initialization, archiving, and unarchiving based on the `thoughts_dir` registry setting.
 
 **Structure:** `~/thoughts/projects/{project-name}/` with subdirs: plans, logs, docs (symlinks to project), research, sessions, handoffs, reviews, briefs. Archive location: `~/thoughts/archive/{project-name}/`.
 
 **Archive flow:** Move project dir → move thoughts to archive → update symlinks to archived location.
 **Unarchive flow:** Move project from archive → restore thoughts → update symlinks. Handles legacy archives.
 
-**Rules:** Thoughts operations are secondary (warn on failure, don't fail archive/unarchive). Always update symlinks after moving. Clean up empty archive dirs.
+**Lifecycle rules:** Pre-event failures (e.g., `ProjectArchiving`) abort the parent command; post-event issues (e.g., `ProjectArchived`) are converted into warnings by the lifecycle bus so the primary operation still succeeds. Command-level helpers continue to call `EnsureProjectThoughtsSymlink` so each project maintains a `thoughts` symlink pointing to the right state.
 
 ## Worktree Management
 
-`internal/cmd/worktree.go` — git worktree management with tmux session integration.
+`internal/worktree/` — git worktree management primitives with tmux session integration helpers. `internal/cmd/worktree.go` wires these into the CLI.
 
 **Commands:**
 - **`overlord worktree new [branch]`** — Create worktree + tmux session. Auto-generates adjective-noun branch names if not provided.
@@ -335,6 +374,12 @@ Sync ignores are managed via `.stignore` with a shared `.stglobalignore` include
 2. Define `cobra.Command`, add to root in `init()`
 3. Implement logic
 4. Update Makefile if needed
+
+### Adding a New Lifecycle Subscriber
+1. Create a package (or file) that exposes `Register(bus *lifecycle.Bus)` and subscribes to the desired `EventType` values (ing/ed naming) using `bus.Subscribe`.
+2. Call `Register(lifecycle.DefaultBus)` from the package's `init()` so it wires itself in when blank-imported.
+3. Add a blank import to `internal/cmd/addons.go` so the addon loads with the CLI.
+4. Keep handlers side-effect free and return errors for fatal conditions; `lifecycle.Bus` will downgrade post-event errors to warnings automatically.
 
 ## Dependencies
 

@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -86,7 +87,7 @@ func TestResolve_ExactAliasMatch(t *testing.T) {
 		expectedName  string
 		expectedAlias string
 	}{
-		{"overlord", "overlord", "overlord"},
+		{"ov", "overlord", "ov"},
 		{"ol", "overlord", "ol"},
 		{"dashboard", "web-dashboard", "dashboard"},
 		{"admin", "web-dashboard", "admin"},
@@ -170,47 +171,50 @@ func TestResolve_NoMatch(t *testing.T) {
 	}
 }
 
-func TestResolve_EmptyQuery(t *testing.T) {
-	reg := createTestRegistry()
-
-	results := reg.Resolve("")
-
-	if results != nil {
-		t.Errorf("expected nil results for empty query, got %v", results)
-	}
-}
-
-func TestResolve_EmptyRegistry(t *testing.T) {
-	reg := &Registry{
-		Version: 2,
-		Settings: Settings{
-			BaseDir:     "/home/user/projects",
-			ThoughtsDir: "/home/user/thoughts",
+func TestResolve_NilOrEmptyInputs(t *testing.T) {
+	tests := []struct {
+		name  string
+		reg   *Registry
+		query string
+	}{
+		{
+			name:  "TestResolve_EmptyQuery",
+			reg:   createTestRegistry(),
+			query: "",
 		},
-		Projects: map[string]Project{},
-	}
-
-	results := reg.Resolve("anything")
-
-	if results != nil {
-		t.Errorf("expected nil results for empty registry, got %v", results)
-	}
-}
-
-func TestResolve_NilProjects(t *testing.T) {
-	reg := &Registry{
-		Version: 2,
-		Settings: Settings{
-			BaseDir:     "/home/user/projects",
-			ThoughtsDir: "/home/user/thoughts",
+		{
+			name: "TestResolve_EmptyRegistry",
+			reg: &Registry{
+				Version: 2,
+				Settings: Settings{
+					BaseDir:     "/home/user/projects",
+					ThoughtsDir: "/home/user/thoughts",
+				},
+				Projects: map[string]Project{},
+			},
+			query: "anything",
 		},
-		Projects: nil,
+		{
+			name: "TestResolve_NilProjects",
+			reg: &Registry{
+				Version: 2,
+				Settings: Settings{
+					BaseDir:     "/home/user/projects",
+					ThoughtsDir: "/home/user/thoughts",
+				},
+				Projects: nil,
+			},
+			query: "anything",
+		},
 	}
 
-	results := reg.Resolve("anything")
-
-	if results != nil {
-		t.Errorf("expected nil results for nil projects map, got %v", results)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results := tt.reg.Resolve(tt.query)
+			if results != nil {
+				t.Errorf("expected nil results, got %v", results)
+			}
+		})
 	}
 }
 
@@ -285,13 +289,13 @@ func TestResolveOne_ExactMatch(t *testing.T) {
 func TestResolveOne_AliasMatch(t *testing.T) {
 	reg := createTestRegistry()
 
-	result, err := reg.ResolveOne("overlord")
+	result, err := reg.ResolveOne("dashboard")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result.Name != "overlord" {
-		t.Errorf("expected name 'overlord', got '%s'", result.Name)
+	if result.Name != "web-dashboard" {
+		t.Errorf("expected name 'web-dashboard', got '%s'", result.Name)
 	}
 	if result.Score != scoreExactAlias {
 		t.Errorf("expected score %d, got %d", scoreExactAlias, result.Score)
@@ -381,9 +385,65 @@ func TestResolveOne_AmbiguousMatch(t *testing.T) {
 			t.Fatal("expected error for ambiguous match, got nil")
 		}
 		// Error message should mention ambiguity
-		if !contains(err.Error(), "ambiguous") {
+		if !strings.Contains(err.Error(), "ambiguous") {
 			t.Errorf("expected error message to mention 'ambiguous', got '%s'", err.Error())
 		}
+	}
+}
+
+func TestResolveOne_AmbiguousMultiMatch(t *testing.T) {
+	// Deterministic ambiguity test using structurally identical project names
+	// so the fuzzy library assigns equal scores.
+	reg := &Registry{
+		Version: 2,
+		Settings: Settings{
+			BaseDir:     "/home/user/projects",
+			ThoughtsDir: "/home/user/thoughts",
+		},
+		Projects: map[string]Project{
+			"svc-alpha": {
+				Path:        "projects/svc-alpha",
+				Category:    CategoryServices,
+				Lang:        LanguageGo,
+				Created:     "2024-01-01",
+				Description: "Alpha service",
+				Status:      Status{State: StateActive},
+			},
+			"svc-bravo": {
+				Path:        "projects/svc-bravo",
+				Category:    CategoryServices,
+				Lang:        LanguageGo,
+				Created:     "2024-01-02",
+				Description: "Bravo service",
+				Status:      Status{State: StateActive},
+			},
+		},
+	}
+
+	// "svc" is a prefix of both project names — fuzzy matching should return
+	// equal scores for names with the same structure and prefix length.
+	results := reg.Resolve("svc")
+	if len(results) < 2 {
+		t.Skipf("fuzzy engine did not return 2+ matches for 'svc', got %d — skipping ambiguity assertion", len(results))
+	}
+
+	if results[0].Score != results[1].Score {
+		t.Skipf("fuzzy scores differ (%d vs %d) — library assigned unequal scores, skipping ambiguity assertion",
+			results[0].Score, results[1].Score)
+	}
+
+	_, err := reg.ResolveOne("svc")
+	if err == nil {
+		t.Fatal("expected ambiguous-match error, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("expected error message to contain 'ambiguous', got '%s'", err.Error())
+	}
+
+	// Verify the error mentions both project names
+	if !strings.Contains(err.Error(), "svc-alpha") || !strings.Contains(err.Error(), "svc-bravo") {
+		t.Errorf("expected error to mention both 'svc-alpha' and 'svc-bravo', got '%s'", err.Error())
 	}
 }
 
@@ -405,18 +465,4 @@ func TestResolve_NoDuplicateProjects(t *testing.T) {
 			t.Errorf("project '%s' appears %d times in results, expected 1", name, count)
 		}
 	}
-}
-
-// Helper function to check if string contains substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && containsHelper(s, substr))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

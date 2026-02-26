@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/spf13/cobra"
 
+	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/registry"
 )
 
@@ -71,11 +72,6 @@ func init() {
 	listCmd.Flags().BoolVar(&listOpts.synced, "synced", false, "Show synced projects with disk usage")
 }
 
-// RunList is exported so it can be called from root command handler
-func RunList(cmd *cobra.Command, args []string) error {
-	return runList(cmd, args)
-}
-
 // projectOutput represents a project for JSON output
 type projectOutput struct {
 	Name        string   `json:"name"`
@@ -119,9 +115,8 @@ func runList(cmd *cobra.Command, args []string) error {
 	return outputListTable(projects)
 }
 
-// filterProjects applies all filters and returns matching projects as a sorted slice
+// filterProjects applies all filters and returns matching projects as a sorted slice.
 func filterProjects(reg *registry.Registry) []projectOutput {
-	// Start with all projects or filtered by state
 	var candidates map[string]registry.Project
 
 	switch {
@@ -130,58 +125,80 @@ func filterProjects(reg *registry.Registry) []projectOutput {
 	case listOpts.all:
 		candidates = reg.Projects
 	case listOpts.archived:
-		// Only show archived projects when --archived is set
-		candidates = reg.GetArchivedProjects()
+		candidates = reg.ArchivedProjects()
 	default:
-		// Default: only active projects
-		candidates = reg.GetActiveProjects()
+		candidates = reg.ActiveProjects()
 	}
 
-	// Apply category filter
-	if listOpts.category != "" {
-		filtered := make(map[string]registry.Project)
-		cat := registry.Category(listOpts.category)
-		for name, proj := range candidates {
-			if proj.Category == cat {
-				filtered[name] = proj
-			}
-		}
-		candidates = filtered
-	}
+	candidates = filterProjectsByCategory(candidates, listOpts.category)
+	candidates = filterProjectsByTags(candidates, listOpts.tags)
+	candidates = filterProjectsByRecent(candidates, listOpts.recent)
 
-	// Apply tag filters (all tags must match)
-	if len(listOpts.tags) > 0 {
-		filtered := make(map[string]registry.Project)
-		for name, proj := range candidates {
-			if hasAllTags(proj.Tags, listOpts.tags) {
-				filtered[name] = proj
-			}
-		}
-		candidates = filtered
-	}
+	result := filterProjectsToOutput(candidates, reg)
+	sortProjectOutput(result, listOpts.recent)
 
-	// Apply recent filter if set
-	if listOpts.recent != "" {
-		cutoff, err := recentCutoff(listOpts.recent)
-		if err == nil {
-			filtered := make(map[string]registry.Project)
-			for name, proj := range candidates {
-				if proj.LastOpened == "" {
-					continue
-				}
-				opened, parseErr := time.Parse(time.RFC3339, proj.LastOpened)
-				if parseErr != nil {
-					continue
-				}
-				if opened.After(cutoff) {
-					filtered[name] = proj
-				}
-			}
-			candidates = filtered
+	return result
+}
+
+// filterProjectsByCategory returns only projects matching the given category.
+// Returns candidates unchanged if category is empty.
+func filterProjectsByCategory(candidates map[string]registry.Project, category string) map[string]registry.Project {
+	if category == "" {
+		return candidates
+	}
+	filtered := make(map[string]registry.Project)
+	cat := registry.Category(category)
+	for name, proj := range candidates {
+		if proj.Category == cat {
+			filtered[name] = proj
 		}
 	}
+	return filtered
+}
 
-	// Convert to output format and sort
+// filterProjectsByTags returns only projects that have all required tags.
+// Returns candidates unchanged if tags is empty.
+func filterProjectsByTags(candidates map[string]registry.Project, tags []string) map[string]registry.Project {
+	if len(tags) == 0 {
+		return candidates
+	}
+	filtered := make(map[string]registry.Project)
+	for name, proj := range candidates {
+		if hasAllTags(proj.Tags, tags) {
+			filtered[name] = proj
+		}
+	}
+	return filtered
+}
+
+// filterProjectsByRecent returns only projects opened after the cutoff derived from recentStr.
+// Returns candidates unchanged if recentStr is empty or unparseable.
+func filterProjectsByRecent(candidates map[string]registry.Project, recentStr string) map[string]registry.Project {
+	if recentStr == "" {
+		return candidates
+	}
+	cutoff, err := recentCutoff(recentStr)
+	if err != nil {
+		return candidates
+	}
+	filtered := make(map[string]registry.Project)
+	for name, proj := range candidates {
+		if proj.LastOpened == "" {
+			continue
+		}
+		opened, parseErr := time.Parse(time.RFC3339, proj.LastOpened)
+		if parseErr != nil {
+			continue
+		}
+		if opened.After(cutoff) {
+			filtered[name] = proj
+		}
+	}
+	return filtered
+}
+
+// filterProjectsToOutput converts filtered project candidates to output format.
+func filterProjectsToOutput(candidates map[string]registry.Project, reg *registry.Registry) []projectOutput {
 	result := make([]projectOutput, 0, len(candidates))
 	baseDir := ""
 	if listOpts.synced {
@@ -195,7 +212,6 @@ func filterProjects(reg *registry.Registry) []projectOutput {
 		syncStatus := string(proj.Sync.Status)
 		diskUsage := ""
 
-		// Display "synced" for active projects with sync enabled
 		if proj.Status.State == registry.StateActive && proj.Sync.Status == registry.SyncActive {
 			status = "synced"
 		}
@@ -222,35 +238,31 @@ func filterProjects(reg *registry.Registry) []projectOutput {
 			LastOpened:  proj.LastOpened,
 		})
 	}
+	return result
+}
 
-	// Sort: when --recent is set, sort by last_opened descending; otherwise default sort
-	if listOpts.recent != "" {
+// sortProjectOutput sorts projects in place: by last_opened descending when
+// recent is set, otherwise by status rank, category, language, then name.
+func sortProjectOutput(result []projectOutput, recent string) {
+	if recent != "" {
 		sort.Slice(result, func(i, j int) bool {
-			// Most recently opened first (reverse chronological)
 			return result[i].LastOpened > result[j].LastOpened
 		})
-	} else {
-		// Sort by: status (synced first, then active, then archived), category, language, name
-		sort.Slice(result, func(i, j int) bool {
-			// 1. Status priority: synced > active > archived
-			ri, rj := statusRank(result[i].Status), statusRank(result[j].Status)
-			if ri != rj {
-				return ri < rj
-			}
-			// 2. Category
-			if result[i].Category != result[j].Category {
-				return result[i].Category < result[j].Category
-			}
-			// 3. Language
-			if result[i].Lang != result[j].Lang {
-				return result[i].Lang < result[j].Lang
-			}
-			// 4. Name
-			return result[i].Name < result[j].Name
-		})
+		return
 	}
-
-	return result
+	sort.Slice(result, func(i, j int) bool {
+		ri, rj := statusRank(result[i].Status), statusRank(result[j].Status)
+		if ri != rj {
+			return ri < rj
+		}
+		if result[i].Category != result[j].Category {
+			return result[i].Category < result[j].Category
+		}
+		if result[i].Lang != result[j].Lang {
+			return result[i].Lang < result[j].Lang
+		}
+		return result[i].Name < result[j].Name
+	})
 }
 
 // statusRank returns a sort rank for status (lower = sorted first)
@@ -269,7 +281,7 @@ func statusRank(status string) int {
 
 // getSyncedProjects returns active projects that have sync status 'active'.
 func getSyncedProjects(reg *registry.Registry) map[string]registry.Project {
-	result := make(map[string]registry.Project)
+	result := make(map[string]registry.Project, len(reg.Projects))
 	for name, project := range reg.Projects {
 		if project.Status.State == registry.StateActive && project.Sync.Status == registry.SyncActive {
 			result[name] = project
@@ -303,47 +315,58 @@ func outputListJSON(projects []projectOutput) error {
 // Category colors - grouped by type with distinct colors per category
 var categoryColors = map[string]lipgloss.Color{
 	// Core group - blue shades
-	"core-agents": lipgloss.Color("75"), // Blue
-	"core-tools":  lipgloss.Color("39"), // Light Blue
+	"core-agents": colorBlue,
+	"core-tools":  colorLightBlue,
 	// Blockchain - pink/magenta
-	"contracts": lipgloss.Color("201"), // Magenta
+	"contracts": colorMagenta,
 	// Web/Services group - green shades
-	"web":      lipgloss.Color("82"),  // Green
-	"services": lipgloss.Color("156"), // Light Green
+	"web":      colorGreen,
+	"services": colorLime,
 	// Standalone categories
-	"ml":      lipgloss.Color("208"), // Orange
-	"libs":    lipgloss.Color("87"),  // Cyan
-	"cli":     lipgloss.Color("220"), // Yellow
-	"sandbox": lipgloss.Color("245"), // Gray
+	"ml":      colorAmber,
+	"libs":    colorCyan,
+	"cli":     colorYellow,
+	"sandbox": colorGray,
 }
 
 // Language colors - distinct colors per language
 var languageColors = map[string]lipgloss.Color{
-	"go":         lipgloss.Color("37"),  // Cyan/Teal
-	"python":     lipgloss.Color("141"), // Purple/Lavender
-	"typescript": lipgloss.Color("220"), // Yellow
-	"solidity":   lipgloss.Color("213"), // Pink
-	"base":       lipgloss.Color("245"), // Gray
+	"go":         colorTeal,
+	"python":     colorLavender,
+	"typescript": colorYellow,
+	"solidity":   colorPink,
+	"base":       colorGray,
 }
 
-// outputListTable outputs projects as a formatted table
+// outputListTable outputs projects as a formatted table.
 func outputListTable(projects []projectOutput) error {
-	// Define colors
-	syncedColor := lipgloss.Color("213") // Pink/Magenta for synced
-
-	// Define styles (headerStyle has padding - list-specific)
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(ColorCyan).
-		Padding(0, 1)
-
 	showRecent := listOpts.recent != ""
 	showDisk := listOpts.synced
 
-	// Build rows
+	rows := outputListTableRows(projects, showRecent, showDisk)
+
+	lastCol := 4
+	if showDisk {
+		lastCol = 5
+	}
+
+	styles := NewStyles()
+	styleFn := listTableStyleFunc(rows, lastCol, showRecent, styles)
+
+	t := table.New().
+		Border(lipgloss.HiddenBorder()).
+		StyleFunc(styleFn)
+
+	t = t.Headers(listTableHeaders(showRecent, showDisk)...)
+	t = t.Rows(rows...)
+	fmt.Println(t)
+	return nil
+}
+
+// outputListTableRows builds the string rows for the list table.
+func outputListTableRows(projects []projectOutput, showRecent, showDisk bool) [][]string {
 	rows := make([][]string, 0, len(projects))
 	for _, proj := range projects {
-		// Truncate description
 		desc := truncate(proj.Description, maxDescDisplayLen)
 
 		row := []string{
@@ -364,80 +387,70 @@ func outputListTable(projects []projectOutput) error {
 
 		rows = append(rows, row)
 	}
+	return rows
+}
 
-	// Determine last column index for styling
-	lastCol := 4
-	if showDisk {
-		lastCol = 5
-	}
+// listTableStyleFunc returns the style function for the list table.
+func listTableStyleFunc(rows [][]string, lastCol int, showRecent bool, styles styles) func(row, col int) lipgloss.Style {
+	return func(row, col int) lipgloss.Style {
+		if row == table.HeaderRow {
+			return styles.TableHeader
+		}
 
-	// Create table
-	t := table.New().
-		Border(lipgloss.HiddenBorder()).
-		StyleFunc(func(row, col int) lipgloss.Style {
-			if row == table.HeaderRow {
-				return headerStyle
-			}
+		style := styles.TableCell
 
-			style := lipgloss.NewStyle().Padding(0, 1)
-
-			// Bounds check for row access
-			if row < 0 || row >= len(rows) {
-				return style
-			}
-
-			switch col {
-			case 0: // Name
-				return style.Foreground(lipgloss.Color("255")).Bold(true)
-			case 1: // Category
-				category := rows[row][1]
-				if color, ok := categoryColors[category]; ok {
-					return style.Foreground(color)
-				}
-				return style.Foreground(ColorGray)
-			case 2: // Lang
-				lang := rows[row][2]
-				if color, ok := languageColors[lang]; ok {
-					return style.Foreground(color)
-				}
-				return style.Foreground(ColorGray)
-			case 3: // Description
-				return style.Foreground(ColorGray)
-			}
-			if col == lastCol {
-				if showRecent {
-					return style.Foreground(ColorCyan)
-				}
-				status := rows[row][lastCol]
-				switch status {
-				case "synced":
-					return style.Foreground(syncedColor)
-				case "active":
-					return style.Foreground(ColorGreen)
-				default:
-					return style.Foreground(ColorGray)
-				}
-			}
+		if row < 0 || row >= len(rows) {
 			return style
-		})
+		}
 
-	if showRecent {
-		if showDisk {
-			t = t.Headers("NAME", "CATEGORY", "LANG", "DESCRIPTION", "OPENED", "DISK")
-		} else {
-			t = t.Headers("NAME", "CATEGORY", "LANG", "DESCRIPTION", "OPENED")
+		switch col {
+		case 0:
+			return styles.TableName
+		case 1:
+			category := rows[row][1]
+			if color, ok := categoryColors[category]; ok {
+				return style.Foreground(color)
+			}
+			return styles.TableMuted
+		case 2:
+			lang := rows[row][2]
+			if color, ok := languageColors[lang]; ok {
+				return style.Foreground(color)
+			}
+			return styles.TableMuted
+		case 3:
+			return styles.TableMuted
 		}
-	} else {
-		if showDisk {
-			t = t.Headers("NAME", "CATEGORY", "LANG", "DESCRIPTION", "STATUS", "DISK")
-		} else {
-			t = t.Headers("NAME", "CATEGORY", "LANG", "DESCRIPTION", "STATUS")
+		if col == lastCol {
+			if showRecent {
+				return styles.TableRecent
+			}
+			status := rows[row][lastCol]
+			switch status {
+			case "synced":
+				return styles.TableStatusSynced
+			case "active":
+				return styles.TableStatusActive
+			default:
+				return styles.TableStatusDefault
+			}
 		}
+		return style
 	}
+}
 
-	t = t.Rows(rows...)
-	fmt.Println(t)
-	return nil
+// listTableHeaders returns the header strings for the list table.
+func listTableHeaders(showRecent, showDisk bool) []string {
+	headers := []string{"NAME", "CATEGORY", "LANG", "DESCRIPTION"}
+	if showRecent {
+		headers = append(headers, "OPENED")
+	} else {
+		headers = append(headers, "STATUS")
+	}
+	if showDisk {
+		headers = append(headers, "DISK")
+	}
+	return headers
 }
 
 // recentCutoff parses a recent duration string and returns the cutoff time.
@@ -520,7 +533,7 @@ func truncate(s string, maxLen int) string {
 }
 
 func projectDiskUsage(project registry.Project, baseDir string) (string, error) {
-	projectPath := resolveProjectPath(project.Path, baseDir)
+	projectPath := fileutil.ResolveProjectPath(project.Path, baseDir)
 	size, err := dirSize(projectPath)
 	if err != nil {
 		return "", err

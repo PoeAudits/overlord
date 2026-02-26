@@ -1,12 +1,15 @@
 package machine
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
-	"github.com/PoeAudits/overlord/internal/registry"
 	"gopkg.in/yaml.v3"
+
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 // PeersConfig represents shared peer metadata synced between machines.
@@ -87,7 +90,7 @@ func LoadPeers(path string) (*PeersConfig, error) {
 		return nil, fmt.Errorf("failed to expand path: %w", err)
 	}
 
-	if _, err := os.Stat(expandedPath); os.IsNotExist(err) {
+	if _, err := os.Stat(expandedPath); errors.Is(err, fs.ErrNotExist) {
 		return &PeersConfig{Peers: map[string]Peer{}}, nil
 	}
 
@@ -127,7 +130,7 @@ func SavePeers(path string, config *PeersConfig) error {
 	}
 
 	dir := filepath.Dir(expandedPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
@@ -136,8 +139,16 @@ func SavePeers(path string, config *PeersConfig) error {
 		return fmt.Errorf("failed to marshal peers config to YAML: %w", err)
 	}
 
+	// Backup existing file to .bak before overwriting
+	backupPath := expandedPath + ".bak"
+	if existing, err := os.ReadFile(expandedPath); err == nil {
+		if err := os.WriteFile(backupPath, existing, 0o644); err != nil {
+			return fmt.Errorf("failed to create backup file: %w", err)
+		}
+	}
+
 	tempPath := expandedPath + ".tmp"
-	if err := os.WriteFile(tempPath, data, 0644); err != nil {
+	if err := os.WriteFile(tempPath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write temp file: %w", err)
 	}
 

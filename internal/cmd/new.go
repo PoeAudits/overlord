@@ -11,8 +11,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/PoeAudits/overlord/internal/lifecycle"
 	"github.com/PoeAudits/overlord/internal/registry"
 	"github.com/PoeAudits/overlord/internal/templates"
+	"github.com/PoeAudits/overlord/internal/tmux"
 )
 
 // newFlags holds the flags for the new command
@@ -43,7 +45,7 @@ The project will be created at ~/Overlord/{category-path}/{name}/ with:
   - Makefile (language-specific build commands)
   - README.md (project documentation)
   - AGENTS.md (AI agent instructions)
-  - .opencode/opencode.jsonc (editor configuration)
+  - opencode.jsonc (editor configuration)
 
 Thoughts directories will be created at:
   - ~/thoughts/projects/{name}/{briefs,research,audits,plans,logs,reviews,docs}/
@@ -156,8 +158,8 @@ func validateName(name string) error {
 	return nil
 }
 
-// getLanguage determines the language from flags
-func getLanguage() registry.Language {
+// selectedLanguage determines the language from flags.
+func selectedLanguage() registry.Language {
 	lang, set := languageFromFlags(newOpts.langPy, newOpts.langTs, newOpts.langGo, newOpts.langSol, false)
 	if !set {
 		return registry.LanguageBase
@@ -182,275 +184,342 @@ func (c *cleanup) run() {
 
 	// Remove in reverse order (deepest first)
 	for i := len(c.paths) - 1; i >= 0; i-- {
-		os.RemoveAll(c.paths[i])
+		if err := os.RemoveAll(c.paths[i]); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to clean up %s: %v\n", c.paths[i], err)
+		}
 	}
 }
 
+// newProjectContext bundles resolved parameters for the new project workflow.
+type newProjectContext struct {
+	name         string
+	category     registry.Category
+	categoryPath string
+	lang         registry.Language
+	description  string
+	projectPath  string
+	thoughtsDir  string
+	reg          *registry.Registry
+}
+
 func runNew(cmd *cobra.Command, args []string) error {
-	name := args[0]
-
-	// Define styles for output
 	s := NewStyles()
-	labelStyle := s.Label
-	successStyle := s.Success
-	warnStyle := s.Warn
-	pathStyle := s.Path
 
-	// Validate name
-	if err := validateName(name); err != nil {
-		return err
-	}
-
-	// Category already validated in PreRunE
-	category := registry.Category(newOpts.category)
-
-	// Get language
-	lang := getLanguage()
-
-	// Load registry
-	reg, err := loadRegistry()
+	// Validate inputs and resolve paths
+	ctx, err := runNewValidate(args[0])
 	if err != nil {
 		return err
-	}
-
-	// Check if project already exists
-	if _, exists := reg.GetProject(name); exists {
-		return fmt.Errorf("Error: project '%s' already exists\nUse 'overlord info %s' to see details", name, name)
-	}
-
-	// Expand base directory
-	baseDir, err := expandBaseDir(reg)
-	if err != nil {
-		return err
-	}
-
-	// Expand thoughts directory
-	thoughtsDir, err := registry.ExpandPath(reg.Settings.ThoughtsDir)
-	if err != nil {
-		return fmt.Errorf("failed to expand thoughts directory: %w", err)
-	}
-
-	// Build project path
-	categoryPath := category.Path()
-	projectPath := filepath.Join(baseDir, categoryPath, name)
-
-	// Check if directory already exists
-	if _, err := os.Stat(projectPath); err == nil {
-		return fmt.Errorf("Error: directory already exists\nLocation: %s\nUse 'overlord add' to register an existing project", projectPath)
 	}
 
 	// Setup cleanup on failure
 	c := &cleanup{}
 	defer c.run()
 
-	fmt.Printf("%s %s\n", labelStyle.Render("Creating project:"), name)
-	fmt.Printf("%s %s\n", labelStyle.Render("Category:"), string(category))
-	fmt.Printf("%s %s\n", labelStyle.Render("Language:"), string(lang))
-	fmt.Printf("%s %s\n", labelStyle.Render("Path:"), pathStyle.Render(projectPath))
+	fmt.Printf("%s %s\n", s.Label.Render("Creating project:"), ctx.name)
+	fmt.Printf("%s %s\n", s.Label.Render("Category:"), string(ctx.category))
+	fmt.Printf("%s %s\n", s.Label.Render("Language:"), string(ctx.lang))
+	fmt.Printf("%s %s\n", s.Label.Render("Path:"), s.Path.Render(ctx.projectPath))
 	fmt.Println()
 
-	// 1. Create project directory
-	fmt.Printf("  Creating directory structure...")
-	if err := os.MkdirAll(projectPath, 0755); err != nil {
-		return fmt.Errorf("failed to create project directory: %w", err)
+	// Create project directory structure
+	if err := runNewDirectories(ctx.projectPath, c); err != nil {
+		return err
 	}
-	c.add(projectPath)
 
-	// Create .opencode directory
-	opencodePath := filepath.Join(projectPath, ".opencode")
-	if err := os.MkdirAll(opencodePath, 0755); err != nil {
-		return fmt.Errorf("failed to create .opencode directory: %w", err)
+	// Render and write templates + .env.pass
+	if err := runNewTemplates(ctx, s); err != nil {
+		return err
 	}
-	fmt.Println(" done")
 
-	// 2. Render and write templates
-	fmt.Printf("  Writing templates...")
+	// Create thoughts directories and symlink
+	if err := runNewThoughts(ctx, c, s); err != nil {
+		return err
+	}
 
-	// Set description default if not provided
+	// Initialize git repository
+	runNewGitInit(ctx.projectPath, s)
+
+	// Register project in registry and fire lifecycle hooks
+	if err := runNewRegister(ctx); err != nil {
+		return err
+	}
+
+	// Mark success (prevents cleanup)
+	c.success = true
+
+	// Print summary
+	thoughtsProjectBase := filepath.Join(ctx.thoughtsDir, "projects", ctx.name)
+	fmt.Println()
+	fmt.Printf("%s\n", s.Success.Render("Project created successfully!"))
+	fmt.Println()
+	fmt.Printf("%s %s\n", s.Label.Render("Project path:"), s.Path.Render(ctx.projectPath))
+	fmt.Printf("%s %s\n", s.Label.Render("Thoughts:"), s.Path.Render(thoughtsProjectBase))
+	if len(newOpts.aliases) > 0 {
+		fmt.Printf("%s %s\n", s.Label.Render("Aliases:"), strings.Join(newOpts.aliases, ", "))
+	}
+	fmt.Println()
+
+	// Open workspace (tmux session)
+	runNewWorkspace(ctx.name, ctx.projectPath, s)
+
+	return nil
+}
+
+// runNewValidate validates inputs and resolves all paths needed by the new project workflow.
+func runNewValidate(name string) (*newProjectContext, error) {
+	if err := validateName(name); err != nil {
+		return nil, err
+	}
+
+	category := registry.Category(newOpts.category)
+	lang := selectedLanguage()
+
+	reg, err := loadRegistry()
+	if err != nil {
+		return nil, err
+	}
+
+	if _, exists := reg.ProjectByName(name); exists {
+		return nil, fmt.Errorf("project '%s' already exists\nUse 'overlord info %s' to see details", name, name)
+	}
+
+	baseDir, err := expandBaseDir(reg)
+	if err != nil {
+		return nil, err
+	}
+
+	thoughtsDir, err := registry.ExpandPath(reg.Settings.ThoughtsDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to expand thoughts directory: %w", err)
+	}
+
+	categoryPath := category.Path()
+	projectPath := filepath.Join(baseDir, categoryPath, name)
+
+	if _, err := os.Stat(projectPath); err == nil {
+		return nil, fmt.Errorf("directory already exists\nLocation: %s\nUse 'overlord add' to register an existing project", projectPath)
+	}
+
 	description := newOpts.description
 	if description == "" {
 		description = fmt.Sprintf("%s project", name)
 	}
 
-	// Create template data
+	return &newProjectContext{
+		name:         name,
+		category:     category,
+		categoryPath: categoryPath,
+		lang:         lang,
+		description:  description,
+		projectPath:  projectPath,
+		thoughtsDir:  thoughtsDir,
+		reg:          reg,
+	}, nil
+}
+
+// runNewDirectories creates the project directory structure.
+func runNewDirectories(projectPath string, c *cleanup) error {
+	fmt.Printf("  Creating directory structure...")
+
+	if err := os.MkdirAll(projectPath, 0o755); err != nil {
+		return fmt.Errorf("failed to create project directory: %w", err)
+	}
+	c.add(projectPath)
+
+	fmt.Println(" done")
+	return nil
+}
+
+// runNewTemplates renders and writes project templates, then generates .env.pass.
+func runNewTemplates(ctx *newProjectContext, s styles) error {
+	fmt.Printf("  Writing templates...")
+
 	templateData := templates.NewTemplateData(
-		name,
-		description,
-		string(category),
-		string(lang),
+		ctx.name,
+		ctx.description,
+		string(ctx.category),
+		string(ctx.lang),
 	)
 
-	// Map registry language to template language
-	templateLang := templates.Language(lang)
-
-	// Get all templates
-	allTemplates, err := templates.GetAllTemplates(templateLang, templateData)
+	allTemplates, err := templates.GetAllTemplates(templates.Language(ctx.lang), templateData)
 	if err != nil {
 		return fmt.Errorf("failed to render templates: %w", err)
 	}
 
-	// Write each template
 	for templateType, content := range allTemplates {
-		outputPath := filepath.Join(projectPath, templateType.OutputPath())
+		outputPath := filepath.Join(ctx.projectPath, templateType.OutputPath())
 
-		// Ensure parent directory exists (for .opencode/opencode.jsonc)
-		if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
 			return fmt.Errorf("failed to create directory for %s: %w", templateType, err)
 		}
 
-		if err := os.WriteFile(outputPath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(outputPath, []byte(content), 0o644); err != nil {
 			return fmt.Errorf("failed to write %s: %w", templateType, err)
 		}
 	}
 	fmt.Println(" done")
 
-	// 2b. Generate .env.pass template from pass store (best-effort)
+	// Generate .env.pass template from pass store (best-effort)
 	fmt.Printf("  Generating .env.pass template...")
-	envCount, envErr := GenerateEnvPassFile(projectPath)
+	envCount, envErr := GenerateEnvPassFile(ctx.projectPath)
 	if envErr != nil {
 		fmt.Println()
-		fmt.Printf("  %s %s\n", warnStyle.Render("Warning:"), envErr)
+		fmt.Printf("  %s %s\n", s.Warn.Render("Warning:"), envErr)
 	} else if envCount == 0 {
 		fmt.Println(" skipped (no pass entries)")
 	} else {
 		fmt.Printf(" done (%d entries)\n", envCount)
 	}
 
-	// 3. Create thoughts directories and project-root thoughts symlink
-	fmt.Printf("  Creating thoughts structure...")
-	thoughtsProjectBase := filepath.Join(thoughtsDir, "projects", name)
-	c.add(thoughtsProjectBase) // Track for cleanup on failure
+	return nil
+}
 
-	if err := CreateThoughtsStructure(thoughtsDir, name, projectPath); err != nil {
-		return err
+// runNewThoughts creates thoughts directories and the project-root thoughts symlink.
+func runNewThoughts(ctx *newProjectContext, c *cleanup, s styles) error {
+	fmt.Printf("  Creating thoughts structure...")
+
+	thoughtsProjectBase := filepath.Join(ctx.thoughtsDir, "projects", ctx.name)
+	c.add(thoughtsProjectBase)
+
+	preCreateResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
+		Type:        lifecycle.ProjectCreating,
+		ProjectName: ctx.name,
+		ProjectPath: ctx.projectPath,
+		Settings: map[string]string{
+			"thoughts_dir": ctx.thoughtsDir,
+		},
+	})
+	if preCreateResult.Err != nil {
+		return fmt.Errorf("pre-create hook failed: %w", preCreateResult.Err)
 	}
 
-	if warning, err := EnsureProjectThoughtsSymlink(thoughtsDir, name, projectPath, false); err != nil {
+	if warning, err := EnsureProjectThoughtsSymlink(ctx.thoughtsDir, ctx.name, ctx.projectPath, false); err != nil {
 		return err
 	} else if warning != "" {
-		fmt.Printf("\n  %s %s", warnStyle.Render("Warning:"), warning)
+		fmt.Printf("\n  %s %s", s.Warn.Render("Warning:"), warning)
 	}
+
 	fmt.Println(" done")
+	return nil
+}
 
-	// 4. Initialize git repository
-	if !newOpts.noGit {
-		fmt.Printf("  Initializing git repository...")
-
-		// Check if git is available
-		if _, err := exec.LookPath("git"); err != nil {
-			fmt.Println()
-			fmt.Printf("  %s git not found, skipping initialization\n", warnStyle.Render("Warning:"))
-		} else {
-			// Run git commands sequentially, break on error
-			gitCommands := []struct {
-				args []string
-				name string
-			}{
-				{[]string{"init"}, "git init"},
-				{[]string{"add", "."}, "git add"},
-				{[]string{"commit", "-m", "Initial commit"}, "git commit"},
-			}
-
-			success := true
-			for _, gitCmd := range gitCommands {
-				cmd := exec.Command("git", gitCmd.args...)
-				cmd.Dir = projectPath
-				if output, err := cmd.CombinedOutput(); err != nil {
-					fmt.Println()
-					fmt.Printf("  %s %s failed: %s\n", warnStyle.Render("Warning:"), gitCmd.name, strings.TrimSpace(string(output)))
-					success = false
-					break
-				}
-			}
-
-			if success {
-				fmt.Println(" done")
-			}
-		}
-	} else {
+// runNewGitInit initializes a git repository in the project directory.
+// Git failures are treated as warnings rather than fatal errors.
+func runNewGitInit(projectPath string, s styles) {
+	if newOpts.noGit {
 		fmt.Println("  Skipping git initialization (--no-git)")
+		return
 	}
 
-	// 5. Register project in registry
+	fmt.Printf("  Initializing git repository...")
+
+	if _, err := exec.LookPath("git"); err != nil {
+		fmt.Println()
+		fmt.Printf("  %s git not found, skipping initialization\n", s.Warn.Render("Warning:"))
+		return
+	}
+
+	gitCommands := []struct {
+		args []string
+		name string
+	}{
+		{[]string{"init"}, "git init"},
+		{[]string{"add", "."}, "git add"},
+		{[]string{"commit", "-m", "Initial commit"}, "git commit"},
+	}
+
+	for _, gitCmd := range gitCommands {
+		cmd := exec.Command("git", gitCmd.args...)
+		cmd.Dir = projectPath
+		if output, err := cmd.CombinedOutput(); err != nil {
+			fmt.Println()
+			fmt.Printf("  %s %s failed: %s\n", s.Warn.Render("Warning:"), gitCmd.name, strings.TrimSpace(string(output)))
+			return
+		}
+	}
+
+	fmt.Println(" done")
+}
+
+// runNewRegister adds the project to the registry and fires lifecycle hooks.
+func runNewRegister(ctx *newProjectContext) error {
 	fmt.Printf("  Registering project...")
 
-	// Calculate relative path from base_dir
-	relativePath := filepath.Join(categoryPath, name)
+	relativePath := filepath.Join(ctx.categoryPath, ctx.name)
 
 	project := registry.Project{
 		Path:        relativePath,
-		Category:    category,
-		Lang:        lang,
+		Category:    ctx.category,
+		Lang:        ctx.lang,
 		Created:     time.Now().Format("2006-01-02"),
-		Description: description,
+		Description: ctx.description,
 		Aliases:     newOpts.aliases,
 		Tags:        []string{},
 		Status:      registry.Status{State: registry.StateActive},
 	}
 
-	// Add to registry
-	if reg.Projects == nil {
-		reg.Projects = make(map[string]registry.Project)
+	if ctx.reg.Projects == nil {
+		ctx.reg.Projects = make(map[string]registry.Project)
 	}
-	reg.Projects[name] = project
+	ctx.reg.Projects[ctx.name] = project
 
-	// Save registry
-	if err := saveRegistry(reg); err != nil {
+	if err := saveRegistry(ctx.reg); err != nil {
 		return err
 	}
+
+	postCreateResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
+		Type:        lifecycle.ProjectCreated,
+		ProjectName: ctx.name,
+		ProjectPath: ctx.projectPath,
+		Settings: map[string]string{
+			"thoughts_dir": ctx.thoughtsDir,
+		},
+	})
+	for _, warning := range postCreateResult.Warnings {
+		fmt.Fprintf(os.Stderr, "warning: %s\n", warning)
+	}
+
 	fmt.Println(" done")
-
-	// Mark success (prevents cleanup)
-	c.success = true
-
-	fmt.Println()
-	fmt.Printf("%s\n", successStyle.Render("Project created successfully!"))
-	fmt.Println()
-	fmt.Printf("%s %s\n", labelStyle.Render("Project path:"), pathStyle.Render(projectPath))
-	fmt.Printf("%s %s\n", labelStyle.Render("Thoughts:"), pathStyle.Render(thoughtsProjectBase))
-	if len(newOpts.aliases) > 0 {
-		fmt.Printf("%s %s\n", labelStyle.Render("Aliases:"), strings.Join(newOpts.aliases, ", "))
-	}
-	fmt.Println()
-
-	// 6. Open workspace (unless --no-open)
-	if !newOpts.noOpen {
-		fmt.Printf("Opening workspace...\n")
-
-		// Check if tmux is available
-		if _, err := exec.LookPath("tmux"); err != nil {
-			fmt.Printf("%s tmux not found, cannot open workspace\n", warnStyle.Render("Warning:"))
-			fmt.Printf("To open manually: cd %s\n", projectPath)
-			return nil
-		}
-
-		// Create and configure tmux session
-		session := &tmuxSession{
-			Name: name,
-			Dir:  projectPath,
-		}
-
-		// Create session (skip if already exists)
-		if !session.exists() {
-			if err := session.create(); err != nil {
-				fmt.Printf("%s %v\n", warnStyle.Render("Warning:"), err)
-				return nil
-			}
-
-			// Source .tmux.local
-			if err := session.sourceLocal(); err != nil {
-				fmt.Printf("%s %v\n", warnStyle.Render("Warning:"), err)
-			}
-		}
-
-		// Attach or switch to session
-		if err := session.attachOrSwitch(); err != nil {
-			fmt.Printf("%s %v\n", warnStyle.Render("Warning:"), err)
-			fmt.Printf("Attach manually: tmux attach -t %s\n", name)
-		}
-	} else {
-		fmt.Printf("To open workspace: overlord open %s\n", name)
-	}
-
 	return nil
+}
+
+// runNewWorkspace opens the project in a tmux session.
+// Tmux failures are treated as warnings rather than fatal errors.
+func runNewWorkspace(name, projectPath string, s styles) {
+	if newOpts.noOpen {
+		fmt.Printf("To open workspace: overlord open %s\n", name)
+		return
+	}
+
+	fmt.Printf("Opening workspace...\n")
+
+	if _, err := exec.LookPath("tmux"); err != nil {
+		fmt.Printf("%s tmux not found, cannot open workspace\n", s.Warn.Render("Warning:"))
+		fmt.Printf("To open manually: cd %s\n", projectPath)
+		return
+	}
+
+	session := tmux.NewSession(name, projectPath)
+
+	exists, err := session.Exists()
+	if err != nil {
+		fmt.Printf("%s %v\n", s.Warn.Render("Warning:"), err)
+		return
+	}
+
+	if !exists {
+		if err := session.Create(); err != nil {
+			fmt.Printf("%s %v\n", s.Warn.Render("Warning:"), err)
+			return
+		}
+
+		if err := session.SourceLocal(); err != nil {
+			fmt.Printf("%s %v\n", s.Warn.Render("Warning:"), err)
+		}
+	}
+
+	if err := session.AttachOrSwitch(); err != nil {
+		fmt.Printf("%s %v\n", s.Warn.Render("Warning:"), err)
+		fmt.Printf("Attach manually: tmux attach -t %s\n", name)
+	}
 }

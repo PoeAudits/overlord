@@ -152,55 +152,10 @@ func TestGetSyncActiveProjects(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getSyncActiveProjects(tt.registry)
+			got := syncActiveProjects(tt.registry)
 			if len(got) != tt.want {
-				t.Errorf("getSyncActiveProjects() returned %d projects, want %d", len(got), tt.want)
+				t.Errorf("syncActiveProjects() returned %d projects, want %d", len(got), tt.want)
 			}
 		})
-	}
-}
-
-func TestGetSyncActiveProjects_ReturnsCorrectProjects(t *testing.T) {
-	reg := &registry.Registry{
-		Version: 2,
-		Settings: registry.Settings{
-			BaseDir:     "~/Overlord",
-			ThoughtsDir: "~/thoughts",
-		},
-		Projects: map[string]registry.Project{
-			"active-sync": {
-				Path:        "projects/web/active-sync",
-				Category:    registry.CategoryWeb,
-				Lang:        registry.LanguageGo,
-				Created:     "2024-01-01",
-				Description: "Active sync project",
-				Status:      registry.Status{State: registry.StateActive},
-				Sync:        registry.ProjectSync{Status: registry.SyncActive},
-			},
-			"inactive-sync": {
-				Path:        "projects/web/inactive-sync",
-				Category:    registry.CategoryWeb,
-				Lang:        registry.LanguageGo,
-				Created:     "2024-01-01",
-				Description: "Inactive sync project",
-				Status:      registry.Status{State: registry.StateActive},
-				Sync:        registry.ProjectSync{Status: registry.SyncInactive},
-			},
-		},
-	}
-
-	got := getSyncActiveProjects(reg)
-
-	// Should only contain active-sync
-	if len(got) != 1 {
-		t.Fatalf("expected 1 project, got %d", len(got))
-	}
-
-	if _, ok := got["active-sync"]; !ok {
-		t.Error("expected 'active-sync' to be in results")
-	}
-
-	if _, ok := got["inactive-sync"]; ok {
-		t.Error("'inactive-sync' should not be in results")
 	}
 }

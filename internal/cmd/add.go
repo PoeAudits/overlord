@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/PoeAudits/overlord/internal/lifecycle"
 	"github.com/PoeAudits/overlord/internal/registry"
 )
 
@@ -271,7 +274,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if directory exists
-	if _, err := os.Stat(expandedPath); os.IsNotExist(err) {
+	if _, err := os.Stat(expandedPath); errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("project directory does not exist: %s\nUse 'overlord new' to create a new project", expandedPath)
 	}
 
@@ -282,7 +285,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if project name already exists
-	if _, exists := reg.GetProject(name); exists {
+	if _, exists := reg.ProjectByName(name); exists {
 		return fmt.Errorf("project '%s' already exists in registry\nUse 'overlord info %s' to see details", name, name)
 	}
 
@@ -348,8 +351,16 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	// Create thoughts structure
 	fmt.Printf("  Creating thoughts structure...")
-	if err := CreateThoughtsStructure(thoughtsDir, name, expandedPath); err != nil {
-		return err
+	preCreateResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
+		Type:        lifecycle.ProjectCreating,
+		ProjectName: name,
+		ProjectPath: expandedPath,
+		Settings: map[string]string{
+			"thoughts_dir": thoughtsDir,
+		},
+	})
+	if preCreateResult.Err != nil {
+		return fmt.Errorf("pre-create hook failed: %w", preCreateResult.Err)
 	}
 	if warning, err := EnsureProjectThoughtsSymlink(thoughtsDir, name, expandedPath, false); err != nil {
 		return err
@@ -393,6 +404,19 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	if err := saveRegistry(reg); err != nil {
 		return err
 	}
+
+	postCreateResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
+		Type:        lifecycle.ProjectCreated,
+		ProjectName: name,
+		ProjectPath: expandedPath,
+		Settings: map[string]string{
+			"thoughts_dir": thoughtsDir,
+		},
+	})
+	for _, warning := range postCreateResult.Warnings {
+		fmt.Fprintf(os.Stderr, "warning: %s\n", warning)
+	}
+
 	fmt.Println(" done")
 
 	fmt.Println()

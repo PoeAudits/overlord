@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/registry"
+	syncpkg "github.com/PoeAudits/overlord/internal/sync"
 	"github.com/PoeAudits/overlord/internal/syncthing"
 	"github.com/spf13/cobra"
 )
@@ -34,6 +36,14 @@ Examples:
 type activateFlags struct {
 	peer string
 	all  bool
+}
+
+type activateContext struct {
+	reg           *registry.Registry
+	baseDir       string
+	machineConfig *machine.MachineConfig
+	localClient   *syncthing.Client
+	peerSelection syncpkg.PeerSelection
 }
 
 var activateOpts activateFlags
@@ -70,10 +80,8 @@ func runActivate(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if len(targets) > 1 {
-		if err := enforceRegistryLockOwnership(); err != nil {
-			return err
-		}
+	if err := enforceRegistryLockOwnership(); err != nil {
+		return err
 	}
 
 	// Load machine config
@@ -82,7 +90,7 @@ func runActivate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load machine config: %w", err)
 	}
 
-	localClient, err := localSyncthingClient(machineConfig)
+	localClient, err := syncpkg.LocalClient(machineConfig)
 	if err != nil {
 		return err
 	}
@@ -92,7 +100,7 @@ func runActivate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load peers config: %w", err)
 	}
 
-	peerSelection, err := resolveSyncthingPeer(peersConfig, activateOpts.peer)
+	peerSelection, err := syncpkg.ResolvePeer(peersConfig, activateOpts.peer)
 	if err != nil {
 		return err
 	}
@@ -102,6 +110,13 @@ func runActivate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	ctx := context.Background()
+	activateCtx := activateContext{
+		reg:           reg,
+		baseDir:       baseDir,
+		machineConfig: machineConfig,
+		localClient:   localClient,
+		peerSelection: peerSelection,
+	}
 
 	results := make([]string, 0, len(targets))
 	failures := make([]string, 0)
@@ -109,7 +124,7 @@ func runActivate(cmd *cobra.Command, args []string) error {
 
 	for _, projectName := range targets {
 		project := reg.Projects[projectName]
-		peerProjectPath, activateErr := activateProjectSync(ctx, reg, baseDir, machineConfig, localClient, peerSelection, projectName, project)
+		peerProjectPath, activateErr := activateProjectSync(ctx, activateCtx, projectName, project)
 		if activateErr != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", projectName, activateErr))
 			results = append(results, fmt.Sprintf("%s %s - %v", s.Error.Render("✗"), projectName, activateErr))
@@ -120,7 +135,7 @@ func runActivate(cmd *cobra.Command, args []string) error {
 		project.Sync.Method = registry.SyncMethodSyncthing
 		reg.Projects[projectName] = project
 		updated = true
-		results = append(results, fmt.Sprintf("%s %s (peer: %s, path: %s)", s.Success.Render("✓"), projectName, peerSelection.name, peerProjectPath))
+		results = append(results, fmt.Sprintf("%s %s (peer: %s, path: %s)", s.Success.Render("✓"), projectName, peerSelection.Name, peerProjectPath))
 	}
 
 	for _, line := range results {
@@ -173,11 +188,7 @@ func resolveActivateTargets(reg *registry.Registry, args []string, all bool) ([]
 
 func activateProjectSync(
 	ctx context.Context,
-	reg *registry.Registry,
-	baseDir string,
-	machineConfig *machine.MachineConfig,
-	localClient *syncthing.Client,
-	peerSelection syncthingPeerSelection,
+	activateCtx activateContext,
 	projectName string,
 	project registry.Project,
 ) (string, error) {
@@ -185,22 +196,22 @@ func activateProjectSync(
 		return "", fmt.Errorf("archived (run 'overlord unarchive %s' first)", projectName)
 	}
 
-	projectPath := resolveProjectPath(project.Path, baseDir)
-	peerProjectPath, err := projectPathForPeer(project, reg.Settings.BaseDir, peerSelection.peer.BaseDir)
+	projectPath := fileutil.ResolveProjectPath(project.Path, activateCtx.baseDir)
+	peerProjectPath, err := syncpkg.ProjectPathForPeer(project, activateCtx.reg.Settings.BaseDir, activateCtx.peerSelection.Peer.BaseDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve peer path: %w", err)
 	}
 
-	if err := ensureIgnoreFile(projectPath); err != nil {
+	if err := syncpkg.EnsureIgnoreFile(projectPath); err != nil {
 		return "", err
 	}
 
-	if err := ensureSyncthingDevice(ctx, localClient, peerSelection.peer.Syncthing.DeviceID, peerSelection.name, peerSelection.peer.Syncthing.Address); err != nil {
+	if err := syncpkg.EnsureDevice(ctx, activateCtx.localClient, activateCtx.peerSelection); err != nil {
 		return "", fmt.Errorf("failed to ensure peer device on local syncthing: %w", err)
 	}
 
-	localFolder := buildSyncthingFolder(projectName, projectPath, machineConfig.Syncthing.DeviceID, peerSelection.peer.Syncthing.DeviceID)
-	if _, err := localClient.EnsureFolder(ctx, localFolder); err != nil {
+	localFolder := syncpkg.BuildFolder(projectName, projectPath, activateCtx.machineConfig.Syncthing.DeviceID, activateCtx.peerSelection.Peer.Syncthing.DeviceID)
+	if _, err := activateCtx.localClient.EnsureFolder(ctx, localFolder); err != nil {
 		return "", fmt.Errorf("failed to configure local syncthing folder: %w", err)
 	}
 

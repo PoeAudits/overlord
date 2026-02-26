@@ -102,12 +102,6 @@ func getTemplatePath(lang Language, templateType TemplateType) (string, error) {
 	filename := string(templateType)
 	tmplFilename := filename + ".tmpl"
 
-	// Special case for opencode.jsonc - it's in a subdirectory
-	if templateType == TemplateOpenCode {
-		filename = ".opencode/opencode.jsonc"
-		tmplFilename = ".opencode/opencode.jsonc.tmpl"
-	}
-
 	// Try language-specific directory first
 	langDir := "templates/" + string(lang)
 	paths := []string{
@@ -156,9 +150,8 @@ func GetTemplate(lang Language, templateType TemplateType) (string, error) {
 // Templates with .tmpl extension are processed with text/template.
 // Other templates are returned as-is.
 func RenderTemplate(lang Language, templateType TemplateType, data TemplateData) (string, error) {
-	content, err := GetTemplate(lang, templateType)
-	if err != nil {
-		return "", err
+	if !lang.IsValid() {
+		return "", fmt.Errorf("invalid language: %s", lang)
 	}
 
 	templatePath, err := getTemplatePath(lang, templateType)
@@ -166,12 +159,17 @@ func RenderTemplate(lang Language, templateType TemplateType, data TemplateData)
 		return "", err
 	}
 
-	// Only process .tmpl files with text/template
-	if !strings.HasSuffix(templatePath, ".tmpl") {
-		return content, nil
+	rawContent, err := templateFS.ReadFile(templatePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read template %s: %w", templatePath, err)
 	}
 
-	tmpl, err := template.New(string(templateType)).Parse(content)
+	// Only process .tmpl files with text/template
+	if !strings.HasSuffix(templatePath, ".tmpl") {
+		return string(rawContent), nil
+	}
+
+	tmpl, err := template.New(string(templateType)).Parse(string(rawContent))
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template %s: %w", templateType, err)
 	}
@@ -224,20 +222,5 @@ func ListTemplates() ([]string, error) {
 // OutputPath returns the output path for a template type.
 // This is the path where the template should be written in a project.
 func (t TemplateType) OutputPath() string {
-	switch t {
-	case TemplateOpenCode:
-		return ".opencode/opencode.jsonc"
-	default:
-		return string(t)
-	}
-}
-
-// NeedsRendering returns true if the template type requires variable substitution.
-func (t TemplateType) NeedsRendering() bool {
-	switch t {
-	case TemplateREADME, TemplateAGENTS, TemplateOpenCode:
-		return true
-	default:
-		return false
-	}
+	return string(t)
 }

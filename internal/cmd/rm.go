@@ -1,15 +1,22 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/PoeAudits/overlord/internal/fileutil"
+	"github.com/PoeAudits/overlord/internal/lifecycle"
 )
 
-var (
-	rmForce bool
-)
+type rmFlags struct {
+	force bool
+}
+
+var rmOpts rmFlags
 
 // rmCmd represents the rm command
 var rmCmd = &cobra.Command{
@@ -36,7 +43,7 @@ Examples:
 
 func init() {
 	rootCmd.AddCommand(rmCmd)
-	rmCmd.Flags().BoolVar(&rmForce, "force", false, "Delete project directory from disk (requires confirmation)")
+	rmCmd.Flags().BoolVar(&rmOpts.force, "force", false, "Delete project directory from disk (requires confirmation)")
 }
 
 func runRm(cmd *cobra.Command, args []string) error {
@@ -47,6 +54,7 @@ func runRm(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve all projects first before making any changes
+	s := NewStyles()
 	type resolvedProject struct {
 		name string
 		path string
@@ -60,7 +68,7 @@ func runRm(cmd *cobra.Command, args []string) error {
 			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s' not found", name))
 			continue
 		}
-		projectPath, err := expandProjectPath(result.Project.Path, reg.Settings.BaseDir)
+		projectPath, err := fileutil.ExpandProjectPath(result.Project.Path, reg.Settings.BaseDir)
 		if err != nil {
 			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': failed to expand path: %v", name, err))
 			continue
@@ -68,18 +76,22 @@ func runRm(cmd *cobra.Command, args []string) error {
 		resolved = append(resolved, resolvedProject{name: result.Name, path: projectPath})
 	}
 
-	// If any names failed to resolve, report and abort
+	// Print resolution errors and continue with valid projects
 	if len(resolveErrors) > 0 {
 		for _, e := range resolveErrors {
-			fmt.Fprintf(os.Stderr, "Error: %s\n", e)
+			fmt.Printf("%s %s\n", s.StrongWarn.Render("Skipping"), e)
 		}
-		return fmt.Errorf("failed to resolve %d project(s). Run 'overlord list' to see all projects", len(resolveErrors))
+		fmt.Println()
+	}
+
+	if len(resolved) == 0 {
+		return fmt.Errorf("no valid projects to remove")
 	}
 
 	// Handle force mode (delete files)
-	if rmForce {
+	if rmOpts.force {
 		for _, p := range resolved {
-			if _, err := os.Stat(p.path); os.IsNotExist(err) {
+			if _, err := os.Stat(p.path); errors.Is(err, fs.ErrNotExist) {
 				fmt.Printf("Warning: Project directory does not exist: %s\n", p.path)
 				fmt.Println("Removing from registry only...")
 			} else if err != nil {
@@ -102,6 +114,18 @@ func runRm(cmd *cobra.Command, args []string) error {
 
 	// Remove all from registry
 	for _, p := range resolved {
+		preRemoveResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
+			Type:        lifecycle.ProjectRemoving,
+			ProjectName: p.name,
+			ProjectPath: p.path,
+			Settings: map[string]string{
+				"thoughts_dir": reg.Settings.ThoughtsDir,
+			},
+		})
+		if preRemoveResult.Err != nil {
+			return fmt.Errorf("pre-remove hook failed for '%s': %w", p.name, preRemoveResult.Err)
+		}
+
 		delete(reg.Projects, p.name)
 	}
 
@@ -110,15 +134,28 @@ func runRm(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	for _, p := range resolved {
+		postRemoveResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
+			Type:        lifecycle.ProjectRemoved,
+			ProjectName: p.name,
+			ProjectPath: p.path,
+			Settings: map[string]string{
+				"thoughts_dir": reg.Settings.ThoughtsDir,
+			},
+		})
+		for _, warning := range postRemoveResult.Warnings {
+			fmt.Fprintf(os.Stderr, "warning: %s\n", warning)
+		}
+	}
+
 	// Define styles for output
-	s := NewStyles()
 	labelStyle := s.Label
 	successStyle := s.Success
 	pathStyle := s.Path
 
 	// Print success messages
 	for _, p := range resolved {
-		if rmForce {
+		if rmOpts.force {
 			fmt.Printf("%s '%s'\n", successStyle.Render("Deleted project"), p.name)
 			fmt.Printf("%s %s\n", labelStyle.Render("Path:"), pathStyle.Render(p.path))
 		} else {
@@ -138,9 +175,4 @@ func runRm(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-// confirmDelete prompts the user for confirmation before deleting
-func confirmDelete(projectName, projectPath string) (bool, error) {
-	return confirmAction(fmt.Sprintf("Delete project '%s' and all files at %s?", projectName, projectPath))
 }

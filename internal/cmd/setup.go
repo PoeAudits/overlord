@@ -3,7 +3,9 @@ package cmd
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,8 +15,10 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/registry"
+	syncpkg "github.com/PoeAudits/overlord/internal/sync"
 	"github.com/PoeAudits/overlord/internal/syncthing"
 )
 
@@ -167,8 +171,8 @@ func runProjectSetup(projectArg string) error {
 	if err != nil {
 		return err
 	}
-	projectRoot := resolveProjectPath(project.Path, baseDir)
-	if _, err := os.Stat(projectRoot); os.IsNotExist(err) {
+	projectRoot := fileutil.ResolveProjectPath(project.Path, baseDir)
+	if _, err := os.Stat(projectRoot); errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("project directory does not exist: %s", projectRoot)
 	}
 
@@ -177,12 +181,12 @@ func runProjectSetup(projectArg string) error {
 		return fmt.Errorf("failed to load machine config: %w", err)
 	}
 
-	client, err := localSyncthingClient(machineConfig)
+	client, err := syncpkg.LocalClient(machineConfig)
 	if err != nil {
 		return err
 	}
 
-	status, err := client.GetFolderStatus(context.Background(), projectName)
+	status, err := client.FolderStatus(context.Background(), projectName)
 	if err != nil {
 		if syncthing.IsNotFound(err) {
 			return fmt.Errorf("syncthing folder not found for '%s'", projectName)
@@ -218,51 +222,94 @@ func installDependencies(project registry.Project, projectRoot string) error {
 	s := NewStyles()
 	info := s.Info.Render("Info:")
 
-	switch project.Lang {
-	case registry.LanguageGo:
-		if _, err := os.Stat(filepath.Join(projectRoot, "go.mod")); os.IsNotExist(err) {
-			fmt.Printf("  %s go.mod not found, skipping\n", info)
-			return nil
-		}
-		return runSetupCommand(projectRoot, "go", "mod", "download")
-	case registry.LanguagePython:
-		if _, err := os.Stat(filepath.Join(projectRoot, "pyproject.toml")); os.IsNotExist(err) {
-			if _, err := os.Stat(filepath.Join(projectRoot, "requirements.txt")); os.IsNotExist(err) {
-				fmt.Printf("  %s no Python dependency file found, skipping\n", info)
-				return nil
-			}
-		}
-		if _, err := exec.LookPath("uv"); err != nil {
-			return fmt.Errorf("uv not found in PATH")
-		}
-		return runSetupCommand(projectRoot, "uv", "sync")
-	case registry.LanguageTypeScript:
-		if _, err := os.Stat(filepath.Join(projectRoot, "package.json")); os.IsNotExist(err) {
-			fmt.Printf("  %s package.json not found, skipping\n", info)
-			return nil
-		}
-		if _, err := exec.LookPath("bun"); err == nil {
-			return runSetupCommand(projectRoot, "bun", "install")
-		}
-		if _, err := exec.LookPath("pnpm"); err == nil {
-			return runSetupCommand(projectRoot, "pnpm", "install")
-		}
-		return fmt.Errorf("neither bun nor pnpm found in PATH")
-	case registry.LanguageSolidity:
-		if _, err := os.Stat(filepath.Join(projectRoot, "foundry.toml")); os.IsNotExist(err) {
-			fmt.Printf("  %s foundry.toml not found, skipping\n", info)
-			return nil
-		}
-		return runSetupCommand(projectRoot, "forge", "install")
-	default:
+	type langInstaller struct {
+		manifests      []string
+		tools          []string
+		args           []string
+		skipMessage    string
+		missingToolErr string
+	}
+
+	installers := map[registry.Language]langInstaller{
+		registry.LanguageGo: {
+			manifests:      []string{"go.mod"},
+			tools:          []string{"go"},
+			args:           []string{"mod", "download"},
+			skipMessage:    "go.mod not found, skipping",
+			missingToolErr: "go not found in PATH",
+		},
+		registry.LanguagePython: {
+			manifests:      []string{"pyproject.toml", "requirements.txt"},
+			tools:          []string{"uv"},
+			args:           []string{"sync"},
+			skipMessage:    "no Python dependency file found, skipping",
+			missingToolErr: "uv not found in PATH",
+		},
+		registry.LanguageTypeScript: {
+			manifests:      []string{"package.json"},
+			tools:          []string{"bun", "pnpm"},
+			args:           []string{"install"},
+			skipMessage:    "package.json not found, skipping",
+			missingToolErr: "neither bun nor pnpm found in PATH",
+		},
+		registry.LanguageSolidity: {
+			manifests:      []string{"foundry.toml"},
+			tools:          []string{"forge"},
+			args:           []string{"install"},
+			skipMessage:    "foundry.toml not found, skipping",
+			missingToolErr: "forge not found in PATH",
+		},
+	}
+
+	installer, ok := installers[project.Lang]
+	if !ok {
 		fmt.Printf("  %s no dependency installer configured for %s\n", info, project.Lang)
 		return nil
 	}
+
+	manifestExists, err := hasAnyManifest(projectRoot, installer.manifests)
+	if err != nil {
+		return err
+	}
+	if !manifestExists {
+		fmt.Printf("  %s %s\n", info, installer.skipMessage)
+		return nil
+	}
+
+	tool, found := firstAvailableTool(installer.tools)
+	if !found {
+		return fmt.Errorf("%s", installer.missingToolErr)
+	}
+
+	return runSetupCommand(projectRoot, tool, installer.args...)
 }
 
-func runProjectSetupScript(projectRoot string, s Styles) error {
+func hasAnyManifest(projectRoot string, manifests []string) (bool, error) {
+	for _, manifest := range manifests {
+		manifestPath := filepath.Join(projectRoot, manifest)
+		_, err := os.Stat(manifestPath)
+		if err == nil {
+			return true, nil
+		}
+		if !errors.Is(err, fs.ErrNotExist) {
+			return false, fmt.Errorf("failed to check dependency manifest %s: %w", manifestPath, err)
+		}
+	}
+	return false, nil
+}
+
+func firstAvailableTool(tools []string) (string, bool) {
+	for _, tool := range tools {
+		if _, err := exec.LookPath(tool); err == nil {
+			return tool, true
+		}
+	}
+	return "", false
+}
+
+func runProjectSetupScript(projectRoot string, s styles) error {
 	setupPath := filepath.Join(projectRoot, ".overlord-setup.sh")
-	if _, err := os.Stat(setupPath); os.IsNotExist(err) {
+	if _, err := os.Stat(setupPath); errors.Is(err, fs.ErrNotExist) {
 		return nil
 	}
 
@@ -357,7 +404,7 @@ func setupGitRepo(configDir string) error {
 
 	// Directory exists with files: init in place and optionally add remote
 	if !dirExists {
-		if err := os.MkdirAll(configDir, 0755); err != nil {
+		if err := os.MkdirAll(configDir, 0o755); err != nil {
 			return fmt.Errorf("failed to create config directory: %w", err)
 		}
 	}
@@ -407,7 +454,7 @@ func setupGitRepo(configDir string) error {
 func setupGitIgnore(configDir string) error {
 	gitDir := filepath.Join(configDir, ".git")
 	// Only manage .gitignore if this is a git repo
-	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+	if _, err := os.Stat(gitDir); errors.Is(err, fs.ErrNotExist) {
 		return nil
 	}
 
@@ -438,7 +485,7 @@ func setupGitIgnore(configDir string) error {
 	}
 
 	// Append missing entries
-	f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open .gitignore: %w", err)
 	}
@@ -471,184 +518,205 @@ func setupMachineConfig(configDir string, initMode bool) error {
 	interactive := term.IsTerminal(int(os.Stdin.Fd()))
 	reader := bufio.NewReader(os.Stdin)
 
-	promptRole := func(defaultRole machine.Role) (machine.Role, error) {
-		if !interactive {
-			if defaultRole != "" {
-				return defaultRole, nil
-			}
-			return "", fmt.Errorf("machine role is required for --init in non-interactive mode")
-		}
-
-		validRoles := machine.ValidRoles()
-		roleNames := make([]string, 0, len(validRoles))
-		for _, role := range validRoles {
-			roleNames = append(roleNames, string(role))
-		}
-		fmt.Printf("  Machine role [%s] (%s): ", string(defaultRole), strings.Join(roleNames, "/"))
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			return "", fmt.Errorf("failed to read machine role: %w", err)
-		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input == "" {
-			return defaultRole, nil
-		}
-		role := machine.Role(input)
-		if !role.IsValid() {
-			return "", fmt.Errorf("invalid machine role %q", input)
-		}
-		return role, nil
+	handled, err := handleExistingMachineConfig(machineConfigPath, initMode, reader, interactive)
+	if err != nil {
+		return err
 	}
-
-	promptRequiredSyncthing := func(defaults machine.SyncthingConfig) (machine.SyncthingConfig, error) {
-		if !interactive {
-			if defaults.Validate() != nil {
-				return machine.SyncthingConfig{}, fmt.Errorf("syncthing configuration is required for --init in non-interactive mode")
-			}
-			return defaults, nil
-		}
-
-		fmt.Printf("  Syncthing API URL [%s]: ", defaults.APIURL)
-		apiURL, err := reader.ReadString('\n')
-		if err != nil {
-			return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing api url: %w", err)
-		}
-		apiURL = strings.TrimSpace(apiURL)
-		if apiURL == "" {
-			apiURL = defaults.APIURL
-		}
-
-		fmt.Printf("  Syncthing API key [%s]: ", nonEmptyMask(defaults.APIKey))
-		apiKey, err := reader.ReadString('\n')
-		if err != nil {
-			return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing api key: %w", err)
-		}
-		apiKey = strings.TrimSpace(apiKey)
-		if apiKey == "" {
-			apiKey = defaults.APIKey
-		}
-
-		fmt.Printf("  Syncthing device ID [%s]: ", defaults.DeviceID)
-		deviceID, err := reader.ReadString('\n')
-		if err != nil {
-			return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing device id: %w", err)
-		}
-		deviceID = strings.TrimSpace(deviceID)
-		if deviceID == "" {
-			deviceID = defaults.DeviceID
-		}
-
-		fmt.Printf("  Syncthing address [%s]: ", defaults.Address)
-		address, err := reader.ReadString('\n')
-		if err != nil {
-			return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing address: %w", err)
-		}
-		address = strings.TrimSpace(address)
-		if address == "" {
-			address = defaults.Address
-		}
-
-		syncCfg := machine.SyncthingConfig{
-			APIURL:   apiURL,
-			APIKey:   apiKey,
-			DeviceID: deviceID,
-			Address:  address,
-		}
-		if err := syncCfg.Validate(); err != nil {
-			return machine.SyncthingConfig{}, err
-		}
-		return syncCfg, nil
-	}
-
-	// Check if machine.yaml already exists
-	if _, statErr := os.Stat(machineConfigPath); statErr == nil {
-		if !initMode {
-			fmt.Printf("  Exists:  %s\n", machineConfigPath)
-			return nil
-		}
-
-		current, loadErr := machine.Load(machineConfigPath)
-		if loadErr != nil {
-			return fmt.Errorf("failed to load machine config: %w", loadErr)
-		}
-
-		changed := false
-		if current.Role == "" {
-			role, roleErr := promptRole(machine.RoleMain)
-			if roleErr != nil {
-				return roleErr
-			}
-			current.Role = role
-			changed = true
-		}
-
-		if current.Syncthing.Validate() != nil {
-			defaults := current.Syncthing
-			if defaults.APIURL == "" {
-				defaults.APIURL = "http://127.0.0.1:8384"
-			}
-			syncCfg, syncErr := promptRequiredSyncthing(defaults)
-			if syncErr != nil {
-				return syncErr
-			}
-			current.Syncthing = syncCfg
-			changed = true
-		}
-
-		if changed {
-			if saveErr := machine.Save(machineConfigPath, current); saveErr != nil {
-				return fmt.Errorf("failed to update machine config: %w", saveErr)
-			}
-			fmt.Printf("  Updated: %s\n", machineConfigPath)
-		} else {
-			fmt.Printf("  Exists:  %s\n", machineConfigPath)
-		}
-
+	if handled {
 		return nil
 	}
 
-	if _, statErr := os.Stat(machineConfigPath); statErr != nil && !os.IsNotExist(statErr) {
-		return fmt.Errorf("failed to check machine config: %w", statErr)
+	return createMachineConfig(machineConfigPath, initMode, reader, interactive)
+}
+
+func promptMachineRole(reader *bufio.Reader, interactive bool, defaultRole machine.Role) (machine.Role, error) {
+	if !interactive {
+		if defaultRole != "" {
+			return defaultRole, nil
+		}
+		return "", fmt.Errorf("machine role is required for --init in non-interactive mode")
 	}
 
+	validRoles := machine.ValidRoles()
+	roleNames := make([]string, 0, len(validRoles))
+	for _, role := range validRoles {
+		roleNames = append(roleNames, string(role))
+	}
+
+	fmt.Printf("  Machine role [%s] (%s): ", string(defaultRole), strings.Join(roleNames, "/"))
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return "", fmt.Errorf("failed to read machine role: %w", err)
+	}
+
+	input = strings.TrimSpace(strings.ToLower(input))
+	if input == "" {
+		return defaultRole, nil
+	}
+
+	role := machine.Role(input)
+	if !role.IsValid() {
+		return "", fmt.Errorf("invalid machine role %q", input)
+	}
+
+	return role, nil
+}
+
+func promptSyncthingConfig(reader *bufio.Reader, interactive bool, defaults machine.SyncthingConfig) (machine.SyncthingConfig, error) {
+	if !interactive {
+		if defaults.Validate() != nil {
+			return machine.SyncthingConfig{}, fmt.Errorf("syncthing configuration is required for --init in non-interactive mode")
+		}
+		return defaults, nil
+	}
+
+	fmt.Printf("  Syncthing API URL [%s]: ", defaults.APIURL)
+	apiURL, err := reader.ReadString('\n')
+	if err != nil {
+		return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing api url: %w", err)
+	}
+	apiURL = strings.TrimSpace(apiURL)
+	if apiURL == "" {
+		apiURL = defaults.APIURL
+	}
+
+	fmt.Printf("  Syncthing API key [%s]: ", nonEmptyMask(defaults.APIKey))
+	apiKey, err := reader.ReadString('\n')
+	if err != nil {
+		return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing api key: %w", err)
+	}
+	apiKey = strings.TrimSpace(apiKey)
+	if apiKey == "" {
+		apiKey = defaults.APIKey
+	}
+
+	fmt.Printf("  Syncthing device ID [%s]: ", defaults.DeviceID)
+	deviceID, err := reader.ReadString('\n')
+	if err != nil {
+		return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing device id: %w", err)
+	}
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		deviceID = defaults.DeviceID
+	}
+
+	fmt.Printf("  Syncthing address [%s]: ", defaults.Address)
+	address, err := reader.ReadString('\n')
+	if err != nil {
+		return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing address: %w", err)
+	}
+	address = strings.TrimSpace(address)
+	if address == "" {
+		address = defaults.Address
+	}
+
+	syncCfg := machine.SyncthingConfig{
+		APIURL:   apiURL,
+		APIKey:   apiKey,
+		DeviceID: deviceID,
+		Address:  address,
+	}
+	if err := syncCfg.Validate(); err != nil {
+		return machine.SyncthingConfig{}, err
+	}
+
+	return syncCfg, nil
+}
+
+func handleExistingMachineConfig(machineConfigPath string, initMode bool, reader *bufio.Reader, interactive bool) (bool, error) {
+	if _, err := os.Stat(machineConfigPath); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to check machine config: %w", err)
+	}
+
+	if !initMode {
+		fmt.Printf("  Exists:  %s\n", machineConfigPath)
+		return true, nil
+	}
+
+	current, err := machine.Load(machineConfigPath)
+	if err != nil {
+		return true, fmt.Errorf("failed to load machine config: %w", err)
+	}
+
+	changed, err := ensureInitMachineFields(current, reader, interactive)
+	if err != nil {
+		return true, err
+	}
+
+	if !changed {
+		fmt.Printf("  Exists:  %s\n", machineConfigPath)
+		return true, nil
+	}
+
+	if err := machine.Save(machineConfigPath, current); err != nil {
+		return true, fmt.Errorf("failed to update machine config: %w", err)
+	}
+
+	fmt.Printf("  Updated: %s\n", machineConfigPath)
+	return true, nil
+}
+
+func ensureInitMachineFields(config *machine.MachineConfig, reader *bufio.Reader, interactive bool) (bool, error) {
+	changed := false
+
+	if config.Role == "" {
+		role, err := promptMachineRole(reader, interactive, machine.RoleMain)
+		if err != nil {
+			return false, err
+		}
+		config.Role = role
+		changed = true
+	}
+
+	if config.Syncthing.Validate() == nil {
+		return changed, nil
+	}
+
+	defaults := config.Syncthing
+	if defaults.APIURL == "" {
+		defaults.APIURL = "http://127.0.0.1:8384"
+	}
+
+	syncCfg, err := promptSyncthingConfig(reader, interactive, defaults)
+	if err != nil {
+		return false, err
+	}
+
+	config.Syncthing = syncCfg
+	return true, nil
+}
+
+func createMachineConfig(machineConfigPath string, initMode bool, reader *bufio.Reader, interactive bool) error {
 	fmt.Println("\nSetting up machine configuration...")
 
-	// Get hostname for machine name
 	hostname, err := os.Hostname()
 	if err != nil {
 		return fmt.Errorf("failed to get hostname: %w", err)
 	}
 
-	name := hostname
-	if interactive {
-		fmt.Printf("  Machine name [%s]: ", hostname)
-		input, readErr := reader.ReadString('\n')
-		if readErr != nil {
-			return fmt.Errorf("failed to read machine name: %w", readErr)
-		}
-		input = strings.TrimSpace(input)
-		if input != "" {
-			name = input
-		}
+	name, err := promptMachineName(reader, interactive, hostname)
+	if err != nil {
+		return err
 	}
 
 	config := &machine.MachineConfig{Name: name}
-
 	if initMode {
-		role, roleErr := promptRole(machine.RoleMain)
-		if roleErr != nil {
-			return roleErr
+		role, err := promptMachineRole(reader, interactive, machine.RoleMain)
+		if err != nil {
+			return err
 		}
 		config.Role = role
 
-		syncCfg, syncErr := promptRequiredSyncthing(machine.SyncthingConfig{APIURL: "http://127.0.0.1:8384"})
-		if syncErr != nil {
-			return syncErr
+		syncCfg, err := promptSyncthingConfig(reader, interactive, machine.SyncthingConfig{APIURL: "http://127.0.0.1:8384"})
+		if err != nil {
+			return err
 		}
 		config.Syncthing = syncCfg
 	}
 
-	// Save machine config
 	if err := machine.Save(machineConfigPath, config); err != nil {
 		return fmt.Errorf("failed to save machine config: %w", err)
 	}
@@ -667,10 +735,29 @@ func setupMachineConfig(configDir string, initMode bool) error {
 	return nil
 }
 
+func promptMachineName(reader *bufio.Reader, interactive bool, defaultName string) (string, error) {
+	if !interactive {
+		return defaultName, nil
+	}
+
+	fmt.Printf("  Machine name [%s]: ", defaultName)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return "", fmt.Errorf("failed to read machine name: %w", err)
+	}
+
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return defaultName, nil
+	}
+
+	return input, nil
+}
+
 // createDir creates a directory if it doesn't exist
 func createDir(path, name string) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if err := os.MkdirAll(path, 0755); err != nil {
+	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+		if err := os.MkdirAll(path, 0o755); err != nil {
 			return fmt.Errorf("failed to create %s directory: %w", name, err)
 		}
 		fmt.Printf("  Created: %s\n", path)
@@ -699,7 +786,7 @@ func runSetupInitFlow() error {
 		return fmt.Errorf("failed to initialize peers config: %w", err)
 	}
 
-	client, err := localSyncthingClient(machineView.Machine)
+	client, err := syncpkg.LocalClient(machineView.Machine)
 	if err != nil {
 		return err
 	}
@@ -713,17 +800,21 @@ func runSetupInitFlow() error {
 		}
 		peerDeviceID = strings.TrimSpace(peerDeviceID)
 		if peerDeviceID != "" {
-			if ensureErr := ensureSyncthingDevice(context.Background(), client, peerDeviceID, "bootstrap-peer", "dynamic"); ensureErr != nil {
+			selection := syncpkg.PeerSelection{
+				Name: "bootstrap-peer",
+				Peer: machine.Peer{Syncthing: machine.PeerSyncthing{DeviceID: peerDeviceID, Address: "dynamic"}},
+			}
+			if ensureErr := syncpkg.EnsureDevice(context.Background(), client, selection); ensureErr != nil {
 				return fmt.Errorf("failed to ensure bootstrap peer device: %w", ensureErr)
 			}
 			fmt.Printf("  Syncthing: pre-authorized peer device %s\n", peerDeviceID)
 		}
 	}
 
-	if err := ensureOverlordConfigSyncthingFolder(context.Background(), machineView.Machine, machineView.Peers); err != nil {
+	if err := syncpkg.EnsureConfigFolder(context.Background(), client, machineView.Machine, machineView.Peers); err != nil {
 		return err
 	}
-	fmt.Printf("  Syncthing: configured overlord config folder '%s'\n", overlordConfigFolderID)
+	fmt.Printf("  Syncthing: configured overlord config folder '%s'\n", syncpkg.ConfigFolderID)
 
 	lock, err := machine.LoadLock(machine.DefaultRegistryLockPath)
 	if err != nil {
@@ -756,7 +847,7 @@ func runSetupInitFlow() error {
 		return err
 	}
 
-	activeProjects := len(getSyncActiveProjects(latestRegistry))
+	activeProjects := len(syncActiveProjects(latestRegistry))
 	fmt.Printf("  Reconcile: completed for %d sync-active project(s)\n", activeProjects)
 
 	return nil
@@ -784,15 +875,10 @@ func waitForSyncedArtifacts(timeout time.Duration) error {
 	}
 
 	deadline := time.Now().Add(timeout)
+	// Bounded polling loop: terminates when all artifacts arrive or deadline expires.
 	for {
-		if fileExists(registryPath) && fileExists(peersPath) && fileExists(lockPath) {
-			if _, regErr := registry.Load(registry.DefaultRegistryPath); regErr == nil {
-				if _, peersErr := machine.LoadPeers(machine.DefaultPeersPath); peersErr == nil {
-					if lock, lockErr := machine.LoadLock(machine.DefaultRegistryLockPath); lockErr == nil && lock != nil {
-						return nil
-					}
-				}
-			}
+		if allSyncedArtifactsValid(registryPath, peersPath, lockPath) == nil {
+			return nil
 		}
 
 		if time.Now().After(deadline) {
@@ -801,6 +887,62 @@ func waitForSyncedArtifacts(timeout time.Duration) error {
 
 		time.Sleep(2 * time.Second)
 	}
+}
+
+func allSyncedArtifactsValid(registryPath, peersPath, lockPath string) error {
+	if err := validateRegistryArtifact(registryPath); err != nil {
+		return err
+	}
+
+	if err := validatePeersArtifact(peersPath); err != nil {
+		return err
+	}
+
+	if err := validateLockArtifact(lockPath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateRegistryArtifact(path string) error {
+	if !fileExists(path) {
+		return fmt.Errorf("registry artifact is not available")
+	}
+
+	if _, err := registry.Load(registry.DefaultRegistryPath); err != nil {
+		return fmt.Errorf("failed to load registry artifact: %w", err)
+	}
+
+	return nil
+}
+
+func validatePeersArtifact(path string) error {
+	if !fileExists(path) {
+		return fmt.Errorf("peers artifact is not available")
+	}
+
+	if _, err := machine.LoadPeers(machine.DefaultPeersPath); err != nil {
+		return fmt.Errorf("failed to load peers artifact: %w", err)
+	}
+
+	return nil
+}
+
+func validateLockArtifact(path string) error {
+	if !fileExists(path) {
+		return fmt.Errorf("registry lock artifact is not available")
+	}
+
+	lock, err := machine.LoadLock(machine.DefaultRegistryLockPath)
+	if err != nil {
+		return fmt.Errorf("failed to load lock artifact: %w", err)
+	}
+	if lock == nil {
+		return fmt.Errorf("registry lock artifact is empty")
+	}
+
+	return nil
 }
 
 func fileExists(path string) bool {
@@ -814,7 +956,7 @@ func reconcileActiveProjects(ctx context.Context, reg *registry.Registry, machin
 		return err
 	}
 
-	client, err := localSyncthingClient(machineConfig)
+	client, err := syncpkg.LocalClient(machineConfig)
 	if err != nil {
 		return err
 	}
@@ -824,24 +966,25 @@ func reconcileActiveProjects(ctx context.Context, reg *registry.Registry, machin
 		if peer.Syncthing.DeviceID == "" {
 			continue
 		}
-		if err := ensureSyncthingDevice(ctx, client, peer.Syncthing.DeviceID, name, peer.Syncthing.Address); err != nil {
+		selection := syncpkg.PeerSelection{Name: name, Peer: peer}
+		if err := syncpkg.EnsureDevice(ctx, client, selection); err != nil {
 			return fmt.Errorf("failed to ensure syncthing peer device %q: %w", name, err)
 		}
 		peerDevices = append(peerDevices, syncthing.FolderDevice{DeviceID: peer.Syncthing.DeviceID})
 	}
 
-	active := getSyncActiveProjects(reg)
+	active := syncActiveProjects(reg)
 	for _, projectName := range sortedProjectNames(active) {
 		project := reg.Projects[projectName]
 		if project.Status.State == registry.StateArchived {
 			continue
 		}
 
-		projectPath := resolveProjectPath(project.Path, baseDir)
-		if err := os.MkdirAll(projectPath, 0755); err != nil {
+		projectPath := fileutil.ResolveProjectPath(project.Path, baseDir)
+		if err := os.MkdirAll(projectPath, 0o755); err != nil {
 			return fmt.Errorf("failed to create local project directory for %q: %w", projectName, err)
 		}
-		if err := ensureIgnoreFile(projectPath); err != nil {
+		if err := syncpkg.EnsureIgnoreFile(projectPath); err != nil {
 			return fmt.Errorf("failed to ensure .stignore for %q: %w", projectName, err)
 		}
 

@@ -56,14 +56,14 @@ func ExampleRegistry_Resolve_exactAlias() {
 		},
 	}
 
-	results := reg.Resolve("overlord")
+	results := reg.Resolve("ov")
 	if len(results) > 0 {
 		fmt.Printf("Found: %s (score: %d, matched on: %s)\n",
 			results[0].Name, results[0].Score, results[0].MatchedOn)
 	}
 
 	// Output:
-	// Found: overlord (score: 900, matched on: alias:overlord)
+	// Found: overlord (score: 900, matched on: alias:ov)
 }
 
 func ExampleRegistry_Resolve_fuzzy() {

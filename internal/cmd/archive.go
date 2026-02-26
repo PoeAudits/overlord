@@ -1,17 +1,24 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
-	"github.com/PoeAudits/overlord/internal/registry"
 	"github.com/spf13/cobra"
+
+	"github.com/PoeAudits/overlord/internal/fileutil"
+	"github.com/PoeAudits/overlord/internal/lifecycle"
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
-var (
-	archiveNoConfirm bool
-)
+type archiveFlags struct {
+	noConfirm bool
+}
+
+var archiveOpts archiveFlags
 
 // archiveCmd represents the archive command
 var archiveCmd = &cobra.Command{
@@ -38,7 +45,7 @@ Examples:
 
 func init() {
 	rootCmd.AddCommand(archiveCmd)
-	archiveCmd.Flags().BoolVarP(&archiveNoConfirm, "yes", "y", false, "Skip confirmation prompt")
+	archiveCmd.Flags().BoolVarP(&archiveOpts.noConfirm, "yes", "y", false, "Skip confirmation prompt")
 }
 
 // resolvedProject holds pre-resolved info for a project to be archived.
@@ -74,20 +81,20 @@ func runArchive(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		sourcePath, err := expandProjectPath(project.Path, reg.Settings.BaseDir)
+		sourcePath, err := fileutil.ExpandProjectPath(project.Path, reg.Settings.BaseDir)
 		if err != nil {
 			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': failed to expand source path: %v", result.Name, err))
 			continue
 		}
 
 		archivePath := fmt.Sprintf("archive/%s", result.Name)
-		destPath, err := expandProjectPath(archivePath, reg.Settings.BaseDir)
+		destPath, err := fileutil.ExpandProjectPath(archivePath, reg.Settings.BaseDir)
 		if err != nil {
 			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': failed to expand destination path: %v", result.Name, err))
 			continue
 		}
 
-		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+		if _, err := os.Stat(sourcePath); errors.Is(err, fs.ErrNotExist) {
 			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': directory does not exist: %s", result.Name, sourcePath))
 			continue
 		} else if err != nil {
@@ -103,11 +110,12 @@ func runArchive(cmd *cobra.Command, args []string) error {
 		})
 	}
 
+	s := NewStyles()
+
 	// Print resolution errors
 	if len(resolveErrors) > 0 {
-		strongWarnStyle := NewStyles().StrongWarn
 		for _, e := range resolveErrors {
-			fmt.Printf("%s %s\n", strongWarnStyle.Render("Skipping"), e)
+			fmt.Printf("%s %s\n", s.StrongWarn.Render("Skipping"), e)
 		}
 		fmt.Println()
 	}
@@ -117,7 +125,7 @@ func runArchive(cmd *cobra.Command, args []string) error {
 	}
 
 	// Confirm before archiving
-	if !archiveNoConfirm {
+	if !archiveOpts.noConfirm {
 		confirmed, err := confirmArchiveMultiple(resolved)
 		if err != nil {
 			return fmt.Errorf("failed to read confirmation: %w", err)
@@ -130,34 +138,40 @@ func runArchive(cmd *cobra.Command, args []string) error {
 
 	// Archive each project
 	var archiveErrors []string
+	archiveSuccessCount := 0
 
 	for _, rp := range resolved {
 		err := archiveOneProject(reg, rp)
 		if err != nil {
 			archiveErrors = append(archiveErrors, fmt.Sprintf("'%s': %v", rp.name, err))
+		} else {
+			archiveSuccessCount++
 		}
-	}
-
-	// Save registry (once, after all archives)
-	if err := saveRegistry(reg); err != nil {
-		return err
 	}
 
 	// Print archive errors
 	if len(archiveErrors) > 0 {
-		errStyle := NewStyles().Error
 		fmt.Println()
 		for _, e := range archiveErrors {
-			fmt.Printf("%s %s\n", errStyle.Render("Failed"), e)
+			fmt.Printf("%s %s\n", s.Error.Render("Failed"), e)
 		}
 	}
 
-	totalErrors := len(resolveErrors) + len(archiveErrors)
-	if totalErrors > 0 && len(resolved) > len(archiveErrors) {
-		// Some succeeded, some failed
-		return nil
-	} else if len(archiveErrors) == len(resolved) {
+	// All archives failed — nothing to persist
+	if archiveSuccessCount == 0 {
 		return fmt.Errorf("all archive operations failed")
+	}
+
+	// At least one archive succeeded — persist registry changes
+	if err := saveRegistry(reg); err != nil {
+		fmt.Printf("%s Registry save failed after %d successful archive(s); filesystem and registry may be out of sync: %v\n",
+			s.StrongWarn.Render("Warning:"), archiveSuccessCount, err)
+		return err
+	}
+
+	if len(archiveErrors) > 0 {
+		// Partial success — some archives failed but registry saved for the ones that succeeded
+		return nil
 	}
 
 	return nil
@@ -173,46 +187,39 @@ func archiveOneProject(reg *registry.Registry, rp resolvedProject) error {
 
 	// Create archive directory parent
 	archiveParent := filepath.Dir(rp.destPath)
-	if err := os.MkdirAll(archiveParent, 0755); err != nil {
+	if err := os.MkdirAll(archiveParent, 0o755); err != nil {
 		return fmt.Errorf("failed to create archive directory: %w", err)
 	}
 
+	// Prepare lifecycle settings
+	thoughtsDir := reg.Settings.ThoughtsDir
+	settings := map[string]string{}
+	if expandedThoughtsDir, err := registry.ExpandPath(thoughtsDir); err != nil {
+		fmt.Printf("%s Failed to expand thoughts directory for '%s': %v\n", s.StrongWarn.Render("Warning:"), rp.name, err)
+	} else {
+		settings["thoughts_dir"] = expandedThoughtsDir
+	}
+
+	preArchiveResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
+		Type:        lifecycle.ProjectArchiving,
+		ProjectName: rp.name,
+		ProjectPath: rp.sourcePath,
+		DestPath:    rp.destPath,
+		Settings:    settings,
+	})
+	if preArchiveResult.Err != nil {
+		return fmt.Errorf("pre-archive hook failed: %w", preArchiveResult.Err)
+	}
+
 	// Move directory
-	if err := moveDirectory(rp.sourcePath, rp.destPath); err != nil {
+	if err := fileutil.MoveDirectory(rp.sourcePath, rp.destPath); err != nil {
 		return fmt.Errorf("failed to move directory: %w", err)
 	}
 
-	// Move thoughts directories to archive (secondary operation - warn on failure, don't fail archive)
-	thoughtsDir := reg.Settings.ThoughtsDir
-	expandedThoughtsDir, expandErr := registry.ExpandPath(thoughtsDir)
-	if expandErr != nil {
-		fmt.Printf("%s Failed to expand thoughts directory for '%s': %v\n", s.StrongWarn.Render("Warning:"), rp.name, expandErr)
-		expandedThoughtsDir = thoughtsDir
-	}
 	var thoughtsWarnings []string
-	var thoughtsMoved bool
 
-	thoughtsWarnings, err := MoveThoughtsToArchive(thoughtsDir, rp.name)
-	if err != nil {
-		// Thoughts move failed - warn but continue (project archive succeeded)
-		fmt.Printf("%s Failed to move thoughts directories for '%s': %v\n", s.StrongWarn.Render("Warning:"), rp.name, err)
-	} else {
-		thoughtsMoved = true
-
-		// Update symlinks in the archived thoughts docs directory
-		if expandErr == nil {
-			archiveThoughtsPaths := GetArchiveThoughtsPaths(expandedThoughtsDir, rp.name)
-			if symlinkErr := UpdateProjectSymlinks(archiveThoughtsPaths.Docs, rp.destPath); symlinkErr != nil {
-				// Symlink update failed - warn but continue
-				thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to update symlinks: %v", symlinkErr))
-			}
-		} else {
-			thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to update docs symlinks: %v", expandErr))
-		}
-	}
-
-	if expandErr == nil {
-		if warning, err := EnsureProjectThoughtsSymlink(expandedThoughtsDir, rp.name, rp.destPath, true); err != nil {
+	if thoughtsSetting, ok := settings["thoughts_dir"]; ok {
+		if warning, err := EnsureProjectThoughtsSymlink(thoughtsSetting, rp.name, rp.destPath, true); err != nil {
 			thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to update project thoughts symlink: %v", err))
 		} else if warning != "" {
 			thoughtsWarnings = append(thoughtsWarnings, warning)
@@ -226,13 +233,22 @@ func archiveOneProject(reg *registry.Registry, rp resolvedProject) error {
 	project.Status.State = registry.StateArchived
 	reg.Projects[rp.name] = project
 
+	postArchiveResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
+		Type:        lifecycle.ProjectArchived,
+		ProjectName: rp.name,
+		ProjectPath: rp.destPath,
+		DestPath:    rp.destPath,
+		Settings:    settings,
+	})
+	thoughtsWarnings = append(thoughtsWarnings, postArchiveResult.Warnings...)
+
 	// Print success message
 	fmt.Printf("%s '%s'\n", successStyle.Render("Archived"), rp.name)
-	fmt.Printf("  %s %s\n", labelStyle.Render("From:"), pathStyle.Render(formatPathWithTilde(rp.sourcePath)))
-	fmt.Printf("  %s %s\n", labelStyle.Render("To:"), pathStyle.Render(formatPathWithTilde(rp.destPath)))
+	fmt.Printf("  %s %s\n", labelStyle.Render("From:"), pathStyle.Render(fileutil.FormatPathWithTilde(rp.sourcePath)))
+	fmt.Printf("  %s %s\n", labelStyle.Render("To:"), pathStyle.Render(fileutil.FormatPathWithTilde(rp.destPath)))
 
 	// Print thoughts status
-	if thoughtsMoved {
+	if _, ok := settings["thoughts_dir"]; ok {
 		fmt.Printf("  %s %s/archive/%s/\n", labelStyle.Render("Thoughts:"), thoughtsDir, rp.name)
 	}
 	fmt.Println()
@@ -246,22 +262,4 @@ func archiveOneProject(reg *registry.Registry, rp resolvedProject) error {
 	}
 
 	return nil
-}
-
-// confirmArchiveMultiple prompts the user for confirmation before archiving multiple projects.
-func confirmArchiveMultiple(projects []resolvedProject) (bool, error) {
-	if len(projects) == 1 {
-		p := projects[0]
-		fmt.Printf("Archive project '%s'?\n", p.name)
-		fmt.Printf("  From: %s\n", formatPathWithTilde(p.sourcePath))
-		fmt.Printf("  To:   %s\n", formatPathWithTilde(p.destPath))
-	} else {
-		fmt.Printf("Archive %d projects?\n", len(projects))
-		for _, p := range projects {
-			fmt.Printf("  %s\n", p.name)
-			fmt.Printf("    From: %s\n", formatPathWithTilde(p.sourcePath))
-			fmt.Printf("    To:   %s\n", formatPathWithTilde(p.destPath))
-		}
-	}
-	return confirmAction("Continue?")
 }

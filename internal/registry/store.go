@@ -1,16 +1,23 @@
 package registry
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
+	"github.com/PoeAudits/overlord/internal/fileutil"
 	"gopkg.in/yaml.v3"
 )
 
 const (
-	// DefaultRegistryPath is the default location for the registry file
+	// DefaultRegistryPath is the default location for the registry file.
 	DefaultRegistryPath = "~/.config/overlord/registry.yaml"
+	// DefaultBaseDir is the default base directory for project worktrees.
+	DefaultBaseDir = "~/Overlord"
+	// DefaultThoughtsDir is the default root directory for thoughts files.
+	DefaultThoughtsDir = "~/thoughts"
 )
 
 // Load reads the registry from the specified path.
@@ -23,7 +30,7 @@ func Load(path string) (*Registry, error) {
 	}
 
 	// Check if file exists
-	if _, err := os.Stat(expandedPath); os.IsNotExist(err) {
+	if _, err := os.Stat(expandedPath); errors.Is(err, fs.ErrNotExist) {
 		// Return default registry
 		return defaultRegistry(), nil
 	}
@@ -69,7 +76,7 @@ func Save(path string, registry *Registry) error {
 
 	// Create parent directories
 	dir := filepath.Dir(expandedPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
@@ -79,17 +86,16 @@ func Save(path string, registry *Registry) error {
 		return fmt.Errorf("failed to marshal registry to YAML: %w", err)
 	}
 
-	// Write to temp file first (atomic write)
-	tempPath := expandedPath + ".tmp"
-	if err := os.WriteFile(tempPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write temp file: %w", err)
+	// Backup existing file to .bak before overwriting
+	backupPath := expandedPath + ".bak"
+	if existing, err := os.ReadFile(expandedPath); err == nil {
+		if err := os.WriteFile(backupPath, existing, 0o644); err != nil {
+			return fmt.Errorf("failed to create backup file: %w", err)
+		}
 	}
 
-	// Atomic rename
-	if err := os.Rename(tempPath, expandedPath); err != nil {
-		// Clean up temp file on failure
-		os.Remove(tempPath)
-		return fmt.Errorf("failed to rename temp file: %w", err)
+	if err := fileutil.AtomicWriteFile(expandedPath, data, 0o644); err != nil {
+		return err
 	}
 
 	return nil
@@ -135,8 +141,8 @@ func defaultRegistry() *Registry {
 	return &Registry{
 		Version: 2,
 		Settings: Settings{
-			BaseDir:     "~/Overlord",
-			ThoughtsDir: "~/thoughts",
+			BaseDir:     DefaultBaseDir,
+			ThoughtsDir: DefaultThoughtsDir,
 		},
 		Projects: make(map[string]Project),
 	}

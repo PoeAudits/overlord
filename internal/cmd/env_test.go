@@ -7,137 +7,16 @@ import (
 	"strings"
 	"testing"
 
+	"errors"
+	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/registry"
+
+	// ---------------------------------------------------------------------------
+	// Atomic write behavior: temp file → chmod 0600 → rename
+	// Tests atomicWriteEnvFile from env.go.
+	// ---------------------------------------------------------------------------
+	"io/fs"
 )
-
-// ---------------------------------------------------------------------------
-// passEntryPath: derives the pass store path from a project name.
-// This mirrors the logic in runEnvPull: fmt.Sprintf("overlord/env/%s", name)
-// ---------------------------------------------------------------------------
-
-func TestPassEntryPath(t *testing.T) {
-	tests := []struct {
-		name        string
-		projectName string
-		want        string
-	}{
-		{
-			name:        "simple project name",
-			projectName: "myproject",
-			want:        "overlord/env/myproject",
-		},
-		{
-			name:        "hyphenated project name",
-			projectName: "my-cool-project",
-			want:        "overlord/env/my-cool-project",
-		},
-		{
-			name:        "project with underscores",
-			projectName: "my_project_v2",
-			want:        "overlord/env/my_project_v2",
-		},
-		{
-			name:        "single character name",
-			projectName: "x",
-			want:        "overlord/env/x",
-		},
-		{
-			name:        "project with numbers",
-			projectName: "project123",
-			want:        "overlord/env/project123",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := fmt.Sprintf("overlord/env/%s", tt.projectName)
-			if got != tt.want {
-				t.Errorf("passEntryPath(%q) = %q, want %q", tt.projectName, got, tt.want)
-			}
-		})
-	}
-}
-
-// ---------------------------------------------------------------------------
-// resolveProjectPath: tested here for env-specific scenarios.
-// The function is defined in fileutil.go and already tested elsewhere,
-// but we verify the env-specific usage patterns.
-// ---------------------------------------------------------------------------
-
-func TestResolveProjectPath_EnvScenarios(t *testing.T) {
-	tests := []struct {
-		name        string
-		projectPath string
-		baseDir     string
-		want        string
-	}{
-		{
-			name:        "relative path joined with base",
-			projectPath: "projects/web/myapp",
-			baseDir:     "/home/user/Overlord",
-			want:        "/home/user/Overlord/projects/web/myapp",
-		},
-		{
-			name:        "absolute path returned as-is",
-			projectPath: "/opt/custom/myapp",
-			baseDir:     "/home/user/Overlord",
-			want:        "/opt/custom/myapp",
-		},
-		{
-			name:        "nested relative path",
-			projectPath: "core/tools/overlord",
-			baseDir:     "/home/user/Overlord",
-			want:        "/home/user/Overlord/core/tools/overlord",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := resolveProjectPath(tt.projectPath, tt.baseDir)
-			if got != tt.want {
-				t.Errorf("resolveProjectPath(%q, %q) = %q, want %q",
-					tt.projectPath, tt.baseDir, got, tt.want)
-			}
-		})
-	}
-}
-
-// ---------------------------------------------------------------------------
-// envFilePath: the .env file target path derivation
-// ---------------------------------------------------------------------------
-
-func TestEnvFilePath(t *testing.T) {
-	tests := []struct {
-		name        string
-		projectRoot string
-		want        string
-	}{
-		{
-			name:        "standard project root",
-			projectRoot: "/home/user/Overlord/projects/web/myapp",
-			want:        "/home/user/Overlord/projects/web/myapp/.env",
-		},
-		{
-			name:        "root directory",
-			projectRoot: "/",
-			want:        "/.env",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := filepath.Join(tt.projectRoot, ".env")
-			if got != tt.want {
-				t.Errorf("envFilePath = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Atomic write behavior: temp file → chmod 0600 → rename
-// Tests atomicWriteEnvFile from env.go.
-// ---------------------------------------------------------------------------
 
 func TestAtomicWriteEnvFile(t *testing.T) {
 	t.Run("writes content to .env file", func(t *testing.T) {
@@ -170,7 +49,7 @@ func TestAtomicWriteEnvFile(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to stat .env: %v", err)
 		}
-		if perm := info.Mode().Perm(); perm != 0600 {
+		if perm := info.Mode().Perm(); perm != 0o600 {
 			t.Errorf("permissions = %o, want 0600", perm)
 		}
 	})
@@ -184,7 +63,7 @@ func TestAtomicWriteEnvFile(t *testing.T) {
 		}
 
 		tempPath := envPath + ".tmp"
-		if _, err := os.Stat(tempPath); !os.IsNotExist(err) {
+		if _, err := os.Stat(tempPath); !errors.Is(err, fs.ErrNotExist) {
 			t.Error("temp file should not exist after successful write")
 		}
 	})
@@ -194,7 +73,7 @@ func TestAtomicWriteEnvFile(t *testing.T) {
 		envPath := filepath.Join(dir, ".env")
 
 		// Write initial content
-		if err := os.WriteFile(envPath, []byte("OLD=value\n"), 0644); err != nil {
+		if err := os.WriteFile(envPath, []byte("OLD=value\n"), 0o644); err != nil {
 			t.Fatalf("failed to write initial .env: %v", err)
 		}
 
@@ -247,10 +126,10 @@ func TestAtomicWriteEnvFile_Errors(t *testing.T) {
 
 	t.Run("fails on read-only directory", func(t *testing.T) {
 		dir := t.TempDir()
-		if err := os.Chmod(dir, 0555); err != nil {
+		if err := os.Chmod(dir, 0o555); err != nil {
 			t.Fatalf("failed to chmod dir: %v", err)
 		}
-		t.Cleanup(func() { os.Chmod(dir, 0755) })
+		t.Cleanup(func() { os.Chmod(dir, 0o755) })
 
 		err := atomicWriteEnvFile(filepath.Join(dir, ".env"), []byte("data"))
 		if err == nil {
@@ -271,8 +150,8 @@ func TestParseEnvPassFile(t *testing.T) {
 		t.Helper()
 		dir := t.TempDir()
 		path := filepath.Join(dir, envPassFile)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("failed to write template: %v", err)
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("failed to write env pass file: %v", err)
 		}
 		return path
 	}
@@ -710,58 +589,6 @@ func TestEnvPull_AutoDetection(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Match info formatting: tests the display logic for match type
-// ---------------------------------------------------------------------------
-
-func TestMatchInfoFormatting(t *testing.T) {
-	tests := []struct {
-		name      string
-		matchedOn string
-		wantInfo  string
-	}{
-		{
-			name:      "name match shows nothing special",
-			matchedOn: "name",
-			wantInfo:  "", // No extra info shown for name matches
-		},
-		{
-			name:      "alias match formats correctly",
-			matchedOn: "alias:api",
-			wantInfo:  "alias 'api'",
-		},
-		{
-			name:      "alias match with hyphenated alias",
-			matchedOn: "alias:my-alias",
-			wantInfo:  "alias 'my-alias'",
-		},
-		{
-			name:      "fuzzy match type",
-			matchedOn: "fuzzy",
-			wantInfo:  "fuzzy",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// This mirrors the logic in runEnvPull lines 135-141
-			if tt.matchedOn == "name" {
-				// No extra info shown for name matches
-				return
-			}
-
-			matchInfo := tt.matchedOn
-			if strings.HasPrefix(matchInfo, "alias:") {
-				matchInfo = fmt.Sprintf("alias '%s'", strings.TrimPrefix(matchInfo, "alias:"))
-			}
-
-			if matchInfo != tt.wantInfo {
-				t.Errorf("matchInfo = %q, want %q", matchInfo, tt.wantInfo)
-			}
-		})
-	}
-}
-
-// ---------------------------------------------------------------------------
 // End-to-end env pull logic (without pass): tests the full flow using
 // a temporary registry and project directory, mocking only the pass call.
 // ---------------------------------------------------------------------------
@@ -770,7 +597,7 @@ func TestEnvPull_EndToEnd_WithoutPass(t *testing.T) {
 	// Create temp directory structure
 	tmpDir := t.TempDir()
 	projectDir := filepath.Join(tmpDir, "projects", "web", "myapp")
-	if err := os.MkdirAll(projectDir, 0755); err != nil {
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
 		t.Fatalf("failed to create project dir: %v", err)
 	}
 
@@ -814,13 +641,13 @@ func TestEnvPull_EndToEnd_WithoutPass(t *testing.T) {
 		}
 
 		// Verify project root computation
-		projectRoot := resolveProjectPath(result.Project.Path, tmpDir)
+		projectRoot := fileutil.ResolveProjectPath(result.Project.Path, tmpDir)
 		if projectRoot != projectDir {
 			t.Errorf("projectRoot = %q, want %q", projectRoot, projectDir)
 		}
 
 		// Verify project directory exists
-		if _, err := os.Stat(projectRoot); os.IsNotExist(err) {
+		if _, err := os.Stat(projectRoot); errors.Is(err, fs.ErrNotExist) {
 			t.Errorf("project directory should exist: %s", projectRoot)
 		}
 
@@ -856,20 +683,20 @@ func TestEnvPull_EndToEnd_WithoutPass(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to stat .env: %v", err)
 		}
-		if info.Mode().Perm() != 0600 {
+		if info.Mode().Perm() != 0o600 {
 			t.Errorf("permissions = %o, want 0600", info.Mode().Perm())
 		}
 	})
 
 	t.Run("project directory missing returns error", func(t *testing.T) {
 		missingDir := filepath.Join(tmpDir, "projects", "web", "nonexistent")
-		if _, err := os.Stat(missingDir); !os.IsNotExist(err) {
+		if _, err := os.Stat(missingDir); !errors.Is(err, fs.ErrNotExist) {
 			t.Skip("directory unexpectedly exists")
 		}
 
 		// This mirrors the check in runEnvPull
 		_, err := os.Stat(missingDir)
-		if !os.IsNotExist(err) {
+		if !errors.Is(err, fs.ErrNotExist) {
 			t.Error("expected os.IsNotExist for missing project directory")
 		}
 	})
@@ -1087,16 +914,16 @@ func TestListPassEntries(t *testing.T) {
 		dir := t.TempDir()
 
 		// Create .gpg-id file (mimics real pass store)
-		if err := os.WriteFile(filepath.Join(dir, ".gpg-id"), []byte("test@example.com\n"), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, ".gpg-id"), []byte("test@example.com\n"), 0o644); err != nil {
 			t.Fatalf("failed to create .gpg-id: %v", err)
 		}
 
 		for _, entry := range entries {
 			gpgPath := filepath.Join(dir, entry+".gpg")
-			if err := os.MkdirAll(filepath.Dir(gpgPath), 0755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(gpgPath), 0o755); err != nil {
 				t.Fatalf("failed to create dir for %s: %v", entry, err)
 			}
-			if err := os.WriteFile(gpgPath, []byte("encrypted"), 0644); err != nil {
+			if err := os.WriteFile(gpgPath, []byte("encrypted"), 0o644); err != nil {
 				t.Fatalf("failed to create %s.gpg: %v", entry, err)
 			}
 		}
@@ -1168,10 +995,10 @@ func TestListPassEntries(t *testing.T) {
 
 		// Create a .git directory with a .gpg file (should be skipped)
 		gitDir := filepath.Join(storeDir, ".git")
-		if err := os.MkdirAll(gitDir, 0755); err != nil {
+		if err := os.MkdirAll(gitDir, 0o755); err != nil {
 			t.Fatalf("failed to create .git: %v", err)
 		}
-		if err := os.WriteFile(filepath.Join(gitDir, "something.gpg"), []byte("data"), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(gitDir, "something.gpg"), []byte("data"), 0o644); err != nil {
 			t.Fatalf("failed to create .git/something.gpg: %v", err)
 		}
 
@@ -1220,12 +1047,12 @@ func TestListPassEntries(t *testing.T) {
 		// Mimics the real ~/.password-store directory
 		parent := t.TempDir()
 		storeDir := filepath.Join(parent, ".password-store")
-		if err := os.MkdirAll(storeDir, 0700); err != nil {
+		if err := os.MkdirAll(storeDir, 0o700); err != nil {
 			t.Fatalf("failed to create .password-store: %v", err)
 		}
 
 		// Create a .gpg file
-		if err := os.WriteFile(filepath.Join(storeDir, "my-key.gpg"), []byte("enc"), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(storeDir, "my-key.gpg"), []byte("enc"), 0o644); err != nil {
 			t.Fatalf("failed to create gpg file: %v", err)
 		}
 
@@ -1248,8 +1075,8 @@ func TestListPassEntries(t *testing.T) {
 		storeDir := createMockPassStore(t, []string{"real-key"})
 
 		// Add non-.gpg files
-		os.WriteFile(filepath.Join(storeDir, "README.md"), []byte("readme"), 0644)
-		os.WriteFile(filepath.Join(storeDir, ".gitattributes"), []byte("attrs"), 0644)
+		os.WriteFile(filepath.Join(storeDir, "README.md"), []byte("readme"), 0o644)
+		os.WriteFile(filepath.Join(storeDir, ".gitattributes"), []byte("attrs"), 0o644)
 
 		t.Setenv("PASSWORD_STORE_DIR", storeDir)
 
@@ -1265,39 +1092,6 @@ func TestListPassEntries(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// getPassStoreDir: resolves the pass store location
-// ---------------------------------------------------------------------------
-
-func TestGetPassStoreDir(t *testing.T) {
-	t.Run("uses PASSWORD_STORE_DIR if set", func(t *testing.T) {
-		t.Setenv("PASSWORD_STORE_DIR", "/custom/store")
-
-		dir, err := getPassStoreDir()
-		if err != nil {
-			t.Fatalf("getPassStoreDir() error = %v", err)
-		}
-		if dir != "/custom/store" {
-			t.Errorf("dir = %q, want /custom/store", dir)
-		}
-	})
-
-	t.Run("defaults to ~/.password-store", func(t *testing.T) {
-		t.Setenv("PASSWORD_STORE_DIR", "")
-
-		dir, err := getPassStoreDir()
-		if err != nil {
-			t.Fatalf("getPassStoreDir() error = %v", err)
-		}
-
-		home, _ := os.UserHomeDir()
-		want := filepath.Join(home, ".password-store")
-		if dir != want {
-			t.Errorf("dir = %q, want %q", dir, want)
-		}
-	})
-}
-
-// ---------------------------------------------------------------------------
 // GenerateEnvPassFile: end-to-end file generation
 // ---------------------------------------------------------------------------
 
@@ -1307,7 +1101,7 @@ func TestGenerateEnvPassFile(t *testing.T) {
 		storeDir := t.TempDir()
 		for _, entry := range []string{"api-key", "db-secret"} {
 			gpgPath := filepath.Join(storeDir, entry+".gpg")
-			if err := os.WriteFile(gpgPath, []byte("enc"), 0644); err != nil {
+			if err := os.WriteFile(gpgPath, []byte("enc"), 0o644); err != nil {
 				t.Fatalf("failed to create %s.gpg: %v", entry, err)
 			}
 		}
@@ -1353,7 +1147,7 @@ func TestGenerateEnvPassFile(t *testing.T) {
 		}
 
 		// Verify file was NOT written
-		if _, err := os.Stat(filepath.Join(projectDir, envPassFile)); !os.IsNotExist(err) {
+		if _, err := os.Stat(filepath.Join(projectDir, envPassFile)); !errors.Is(err, fs.ErrNotExist) {
 			t.Error(".env.pass should not be created for empty store")
 		}
 	})

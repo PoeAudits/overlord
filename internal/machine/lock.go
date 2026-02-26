@@ -1,11 +1,14 @@
 package machine
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/registry"
 	"gopkg.in/yaml.v3"
 )
@@ -47,7 +50,7 @@ func LoadLock(path string) (*RegistryLock, error) {
 		return nil, fmt.Errorf("failed to expand path: %w", err)
 	}
 
-	if _, err := os.Stat(expandedPath); os.IsNotExist(err) {
+	if _, err := os.Stat(expandedPath); errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
 
@@ -83,7 +86,7 @@ func SaveLock(path string, lock *RegistryLock) error {
 	}
 
 	dir := filepath.Dir(expandedPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
@@ -92,14 +95,16 @@ func SaveLock(path string, lock *RegistryLock) error {
 		return fmt.Errorf("failed to marshal registry lock to YAML: %w", err)
 	}
 
-	tempPath := expandedPath + ".tmp"
-	if err := os.WriteFile(tempPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write temp file: %w", err)
+	// Backup existing file to .bak before overwriting
+	backupPath := expandedPath + ".bak"
+	if existing, err := os.ReadFile(expandedPath); err == nil {
+		if err := os.WriteFile(backupPath, existing, 0o644); err != nil {
+			return fmt.Errorf("failed to create backup file: %w", err)
+		}
 	}
 
-	if err := os.Rename(tempPath, expandedPath); err != nil {
-		_ = os.Remove(tempPath)
-		return fmt.Errorf("failed to rename temp file: %w", err)
+	if err := fileutil.AtomicWriteFile(expandedPath, data, 0o644); err != nil {
+		return err
 	}
 
 	return nil

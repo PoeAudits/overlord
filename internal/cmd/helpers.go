@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"bufio"
-	"context"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 
-	"github.com/PoeAudits/overlord/internal/gitops"
+	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/registry"
 	"golang.org/x/term"
@@ -63,46 +63,8 @@ func enforceRegistryLockOwnership() error {
 	)
 }
 
-// commitAndPushRegistry stages, commits, and pushes registry.yaml changes.
-// The action parameter is used as the commit message (e.g. "activate project-name").
-// Returns an error only for stage/commit failures; push failures are warned but not fatal.
-func commitAndPushRegistry(action string) error {
-	gitRepoPath, err := registry.ExpandPath("~/.config/overlord")
-	if err != nil {
-		return fmt.Errorf("failed to expand git repo path: %w", err)
-	}
-
-	git := gitops.New(gitRepoPath)
-
-	if err := git.Add(context.Background(), "registry.yaml"); err != nil {
-		return fmt.Errorf("failed to stage registry: %w", err)
-	}
-
-	if err := git.Commit(context.Background(), action); err != nil {
-		return fmt.Errorf("failed to commit registry: %w", err)
-	}
-
-	hasRemote, err := git.HasRemote(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to verify registry remote: %w", err)
-	}
-	if !hasRemote {
-		s := NewStyles()
-		fmt.Printf("  %s Registry committed locally, but no git remote is configured for ~/.config/overlord\n", s.Warn.Render("Warning:"))
-		return nil
-	}
-
-	// Push - warn but don't fail if push fails
-	if err := git.Push(context.Background()); err != nil {
-		s := NewStyles()
-		fmt.Printf("  %s Failed to push registry: %v\n", s.Warn.Render("Warning:"), err)
-	}
-
-	return nil
-}
-
-// confirmAction prompts the user with the given prompt followed by " [y/N]: "
-// and returns true if the user responds with "y" or "yes".
+// confirmAction allows a quick "y" acknowledgement for reversible operations,
+// accepting "y" or "yes" to lower friction for common confirmations.
 // Returns (false, nil) if not in a terminal.
 func confirmAction(prompt string) (bool, error) {
 	return confirm(prompt, "[y/N]: ", func(r string) bool {
@@ -110,8 +72,8 @@ func confirmAction(prompt string) (bool, error) {
 	})
 }
 
-// confirmStrict prompts the user and requires typing "yes" (not just "y").
-// Use for destructive operations that cannot be undone.
+// confirmStrict requires typing the full word "yes" to prevent accidental
+// destructive operations — a single keystroke is not sufficient to confirm.
 // Returns (false, nil) if not in a terminal.
 func confirmStrict(prompt string) (bool, error) {
 	return confirm(prompt, "Type 'yes' to confirm: ", func(r string) bool {
@@ -151,7 +113,7 @@ func expandBaseDir(reg *registry.Registry) (string, error) {
 func resolveProject(reg *registry.Registry, name string) (string, registry.Project, error) {
 	result, err := reg.ResolveOne(name)
 	if err != nil {
-		return "", registry.Project{}, fmt.Errorf("project '%s' not found\nRun 'overlord list' to see all projects", name)
+		return "", registry.Project{}, fmt.Errorf("%w\nhint: run 'overlord list' to see all projects", err)
 	}
 	return result.Name, result.Project, nil
 }
@@ -167,23 +129,15 @@ func countTrue(flags ...bool) int {
 	return count
 }
 
-// mergeExcludes combines global and per-project exclusion patterns.
-func mergeExcludes(global, project []string) []string {
-	excludes := make([]string, 0, len(global)+len(project))
-	excludes = append(excludes, global...)
-	excludes = append(excludes, project...)
-	return excludes
-}
-
 // languageFromFlags determines the language from boolean flags.
 // Returns the language and whether any flag was explicitly set.
-func languageFromFlags(py, ts, gol, sol, base bool) (registry.Language, bool) {
+func languageFromFlags(py, ts, goLang, sol, base bool) (registry.Language, bool) {
 	switch {
 	case py:
 		return registry.LanguagePython, true
 	case ts:
 		return registry.LanguageTypeScript, true
-	case gol:
+	case goLang:
 		return registry.LanguageGo, true
 	case sol:
 		return registry.LanguageSolidity, true
@@ -206,4 +160,79 @@ func validateCategory(name string) (registry.Category, error) {
 		return "", fmt.Errorf("invalid category '%s'\nValid categories: %s", name, strings.Join(validCats, ", "))
 	}
 	return category, nil
+}
+
+// confirmDelete prompts the user for confirmation before deleting.
+func confirmDelete(projectName, projectPath string) (bool, error) {
+	return confirmAction(fmt.Sprintf("Delete project '%s' and all files at %s?", projectName, projectPath))
+}
+
+// confirmArchiveMultiple prompts the user for confirmation before archiving multiple projects.
+func confirmArchiveMultiple(projects []resolvedProject) (bool, error) {
+	if len(projects) == 1 {
+		p := projects[0]
+		fmt.Printf("Archive project '%s'?\n", p.name)
+		fmt.Printf("  From: %s\n", fileutil.FormatPathWithTilde(p.sourcePath))
+		fmt.Printf("  To:   %s\n", fileutil.FormatPathWithTilde(p.destPath))
+	} else {
+		fmt.Printf("Archive %d projects?\n", len(projects))
+		for _, p := range projects {
+			fmt.Printf("  %s\n", p.name)
+			fmt.Printf("    From: %s\n", fileutil.FormatPathWithTilde(p.sourcePath))
+			fmt.Printf("    To:   %s\n", fileutil.FormatPathWithTilde(p.destPath))
+		}
+	}
+	return confirmAction("Continue?")
+}
+
+// confirmClear displays everything that will be removed and prompts for confirmation.
+func confirmClear(targets []clearTarget) (bool, error) {
+	// Styles for the warning
+	s := NewStyles()
+	warnStyle := s.Error
+	nameStyle := s.Label
+	pathStyle := s.Path
+	dimStyle := s.Dim
+
+	fmt.Println()
+	fmt.Printf("%s This will permanently delete the following:\n\n", warnStyle.Render("WARNING:"))
+
+	for _, t := range targets {
+		fmt.Printf("  %s\n", nameStyle.Render(t.name))
+		fmt.Printf("    %s\n", dimStyle.Render("Registry entry"))
+
+		if t.projectExists {
+			fmt.Printf("    %s\n", pathStyle.Render(fileutil.FormatPathWithTilde(t.projectPath)))
+		} else {
+			fmt.Printf("    %s %s\n", pathStyle.Render(fileutil.FormatPathWithTilde(t.projectPath)), dimStyle.Render("(not found)"))
+		}
+
+		if t.thoughtsExists {
+			fmt.Printf("    %s\n", pathStyle.Render(fileutil.FormatPathWithTilde(t.thoughtsDir)))
+		}
+
+		if t.archiveExists {
+			fmt.Printf("    %s\n", pathStyle.Render(fileutil.FormatPathWithTilde(t.archiveDir)))
+		}
+
+		if !t.thoughtsExists && !t.archiveExists {
+			fmt.Printf("    %s\n", dimStyle.Render("No thoughts directories found"))
+		}
+
+		fmt.Println()
+	}
+
+	fmt.Printf("%s This cannot be undone.\n", warnStyle.Render("CAUTION:"))
+	return confirmStrict("")
+}
+
+func formatBytes(value int64) string {
+	if value <= 0 {
+		return "0 B"
+	}
+	units := []string{"B", "KB", "MB", "GB", "TB"}
+	base := float64(value)
+	exp := int(math.Min(float64(len(units)-1), math.Floor(math.Log(base)/math.Log(1024))))
+	formatted := base / math.Pow(1024, float64(exp))
+	return fmt.Sprintf("%.1f %s", formatted, units[exp])
 }

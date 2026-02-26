@@ -1,12 +1,16 @@
 package machine
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
-	"github.com/PoeAudits/overlord/internal/registry"
+	"github.com/PoeAudits/overlord/internal/fileutil"
 	"gopkg.in/yaml.v3"
+
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 const (
@@ -76,7 +80,7 @@ func (m *MachineConfig) Validate() error {
 // Validate checks if the Syncthing configuration is valid.
 // Empty config is permitted for backward compatibility.
 func (c SyncthingConfig) Validate() error {
-	if c.isZero() {
+	if c.DeviceID == "" && c.APIURL == "" && c.APIKey == "" && c.Address == "" {
 		return nil
 	}
 
@@ -89,10 +93,6 @@ func (c SyncthingConfig) Validate() error {
 	}
 
 	return nil
-}
-
-func (c SyncthingConfig) isZero() bool {
-	return c.DeviceID == "" && c.APIURL == "" && c.APIKey == "" && c.Address == ""
 }
 
 // Save writes the machine config to the specified path.
@@ -116,7 +116,7 @@ func Save(path string, config *MachineConfig) error {
 
 	// Create parent directories
 	dir := filepath.Dir(expandedPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
@@ -126,16 +126,16 @@ func Save(path string, config *MachineConfig) error {
 		return fmt.Errorf("failed to marshal machine config to YAML: %w", err)
 	}
 
-	// Write to temp file first (atomic write)
-	tempPath := expandedPath + ".tmp"
-	if err := os.WriteFile(tempPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write temp file: %w", err)
+	// Backup existing file to .bak before overwriting
+	backupPath := expandedPath + ".bak"
+	if existing, err := os.ReadFile(expandedPath); err == nil {
+		if err := os.WriteFile(backupPath, existing, 0o644); err != nil {
+			return fmt.Errorf("failed to create backup file: %w", err)
+		}
 	}
 
-	// Atomic rename
-	if err := os.Rename(tempPath, expandedPath); err != nil {
-		os.Remove(tempPath)
-		return fmt.Errorf("failed to rename temp file: %w", err)
+	if err := fileutil.AtomicWriteFile(expandedPath, data, 0o644); err != nil {
+		return err
 	}
 
 	return nil
@@ -151,7 +151,7 @@ func Load(path string) (*MachineConfig, error) {
 	}
 
 	// Check if file exists
-	if _, err := os.Stat(expandedPath); os.IsNotExist(err) {
+	if _, err := os.Stat(expandedPath); errors.Is(err, fs.ErrNotExist) {
 		// Return default config
 		return defaultConfig()
 	}

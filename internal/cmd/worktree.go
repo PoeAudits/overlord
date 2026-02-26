@@ -1,33 +1,19 @@
 package cmd
 
 import (
-	"crypto/rand"
 	"fmt"
-	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/registry"
+	"github.com/PoeAudits/overlord/internal/tmux"
+	"github.com/PoeAudits/overlord/internal/worktree"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
-
-// worktreeInfo holds information about the current git context
-type worktreeInfo struct {
-	projectName   string // name of the project (from directory name)
-	mainRepoPath  string // path to the main working tree
-	isWorktree    bool   // true if cwd is a worktree (not main repo)
-	currentBranch string // current branch name (if in worktree)
-}
-
-// worktreeEntry represents a single worktree from git worktree list
-type worktreeEntry struct {
-	path   string
-	branch string
-	isMain bool
-}
 
 // worktreeCmd is the parent command for worktree management
 var worktreeCmd = &cobra.Command{
@@ -128,190 +114,57 @@ func init() {
 	worktreeCmd.Aliases = []string{"wt"}
 }
 
-// detectProject detects the project from the current working directory
-func detectProject() (*worktreeInfo, error) {
-	// Get current directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current directory: %w", err)
-	}
-
-	// Check if we're in a git repository
-	cmd := exec.Command("git", "rev-parse", "--git-dir")
-	cmd.Dir = cwd
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("not in a git repository")
-	}
-
-	// Get the toplevel of the current worktree
-	cmd = exec.Command("git", "rev-parse", "--show-toplevel")
-	cmd.Dir = cwd
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get git toplevel: %w", err)
-	}
-	currentToplevel := strings.TrimSpace(string(output))
-
-	// Check if this is a worktree by looking at git worktree list
-	cmd = exec.Command("git", "worktree", "list", "--porcelain")
-	cmd.Dir = cwd
-	output, err = cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list worktrees: %w", err)
-	}
-
-	worktrees := parseWorktreeList(string(output))
-	if len(worktrees) == 0 {
-		return nil, fmt.Errorf("failed to parse worktree list")
-	}
-
-	// Find the main worktree and check if current is a worktree
-	var mainPath string
-	var isWorktree bool
-	var currentBranch string
-
-	for _, wt := range worktrees {
-		if wt.isMain {
-			mainPath = wt.path
-		}
-		if wt.path == currentToplevel {
-			isWorktree = !wt.isMain
-			if isWorktree {
-				currentBranch = wt.branch
-			}
-		}
-	}
-
-	if mainPath == "" {
-		mainPath = currentToplevel
-	}
-
-	// Extract project name from main repo path
-	projectName := filepath.Base(mainPath)
-
-	return &worktreeInfo{
-		projectName:   projectName,
-		mainRepoPath:  mainPath,
-		isWorktree:    isWorktree,
-		currentBranch: currentBranch,
-	}, nil
-}
-
-// parseWorktreeList parses the output of git worktree list --porcelain
-func parseWorktreeList(output string) []worktreeEntry {
-	var entries []worktreeEntry
-	var current worktreeEntry
-	isFirst := true
-
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			if current.path != "" {
-				// First entry is always the main worktree
-				current.isMain = isFirst
-				isFirst = false
-				entries = append(entries, current)
-				current = worktreeEntry{}
-			}
-			continue
-		}
-
-		if strings.HasPrefix(line, "worktree ") {
-			current.path = strings.TrimPrefix(line, "worktree ")
-		} else if strings.HasPrefix(line, "branch refs/heads/") {
-			current.branch = strings.TrimPrefix(line, "branch refs/heads/")
-		}
-	}
-
-	// Don't forget the last entry
-	if current.path != "" {
-		current.isMain = isFirst
-		entries = append(entries, current)
-	}
-
-	return entries
-}
-
-// generateBranchName generates a random adjective-noun branch name
-func generateBranchName() (string, error) {
-	adjIdx, err := rand.Int(rand.Reader, big.NewInt(int64(len(worktreeAdjectives))))
-	if err != nil {
-		return "", fmt.Errorf("failed to generate random adjective: %w", err)
-	}
-
-	nounIdx, err := rand.Int(rand.Reader, big.NewInt(int64(len(worktreeNouns))))
-	if err != nil {
-		return "", fmt.Errorf("failed to generate random noun: %w", err)
-	}
-
-	return fmt.Sprintf("%s-%s", worktreeAdjectives[adjIdx.Int64()], worktreeNouns[nounIdx.Int64()]), nil
-}
-
-// worktreeSessionName returns the tmux session name for a project/branch
-func worktreeSessionName(project, branch string) string {
-	// Replace slashes in branch name with dashes for valid session names
-	safeBranch := strings.ReplaceAll(branch, "/", "-")
-	return fmt.Sprintf("%s--%s", project, safeBranch)
-}
-
 // worktreePath returns the path for a worktree
 func worktreePath(project, branch string) (string, error) {
 	baseDir, err := registry.ExpandPath(defaultWorktreeBaseDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to expand worktree base dir: %w", err)
 	}
-	// Replace slashes in branch name with dashes for valid directory names
-	safeBranch := strings.ReplaceAll(branch, "/", "-")
-	return filepath.Join(baseDir, project, safeBranch), nil
+	return worktree.Path(baseDir, project, branch), nil
 }
 
-// branchExists checks if a git branch already exists
-func branchExists(repoPath, branch string) bool {
-	cmd := exec.Command("git", "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
-	cmd.Dir = repoPath
-	return cmd.Run() == nil
-}
-
-// worktreeExists checks if a worktree already exists for a branch
-func worktreeExists(repoPath, branch string) bool {
-	cmd := exec.Command("git", "worktree", "list", "--porcelain")
+func existingBranches(repoPath string) ([]string, error) {
+	cmd := exec.Command("git", "for-each-ref", "--format=%(refname:short)", "refs/heads")
 	cmd.Dir = repoPath
 	output, err := cmd.Output()
 	if err != nil {
-		return false
+		return nil, fmt.Errorf("failed to list branches: %w", err)
 	}
 
-	worktrees := parseWorktreeList(string(output))
-	for _, wt := range worktrees {
-		if wt.branch == branch {
-			return true
+	seen := make(map[string]struct{})
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			seen[trimmed] = struct{}{}
 		}
 	}
-	return false
-}
 
-// ensureUniqueBranch ensures the branch name is unique, appending a counter if needed
-func ensureUniqueBranch(repoPath, baseName string) string {
-	name := baseName
-	counter := 2
-
-	for branchExists(repoPath, name) || worktreeExists(repoPath, name) {
-		name = fmt.Sprintf("%s-%d", baseName, counter)
-		counter++
+	wtCmd := exec.Command("git", "worktree", "list", "--porcelain")
+	wtCmd.Dir = repoPath
+	wtOutput, err := wtCmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list worktrees: %w", err)
+	}
+	for _, entry := range worktree.ParseWorktreeList(string(wtOutput)) {
+		if entry.Branch != "" {
+			seen[entry.Branch] = struct{}{}
+		}
 	}
 
-	return name
+	branches := make([]string, 0, len(seen))
+	for b := range seen {
+		branches = append(branches, b)
+	}
+	return branches, nil
 }
 
 // resolveBranchArg resolves branch name from args or current worktree context.
 // Used by attach and remove commands.
-func resolveBranchArg(args []string, info *worktreeInfo, usage string) (string, error) {
+func resolveBranchArg(args []string, info *worktree.Info, usage string) (string, error) {
 	if len(args) > 0 {
 		return args[0], nil
 	}
-	if info.isWorktree {
-		return info.currentBranch, nil
+	if info.IsWorktree {
+		return info.CurrentBranch, nil
 	}
 	return "", fmt.Errorf("no branch specified and not in a worktree\n%s", usage)
 }
@@ -320,7 +173,12 @@ func runWorktreeNew(cmd *cobra.Command, args []string) error {
 	s := NewStyles()
 
 	// Detect project
-	info, err := detectProject()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	info, err := worktree.DetectProject(cwd)
 	if err != nil {
 		return err
 	}
@@ -330,32 +188,31 @@ func runWorktreeNew(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		branch = args[0]
 		// Check if branch/worktree already exists
-		if worktreeExists(info.mainRepoPath, branch) {
+		if worktree.WorktreeExists(info.MainRepoPath, branch) {
 			return fmt.Errorf("worktree for branch '%s' already exists\nUse 'overlord worktree attach %s' to attach", branch, branch)
 		}
 	} else {
-		// Generate a unique name
-		baseName, err := generateBranchName()
+		existingBranches, err := existingBranches(info.MainRepoPath)
 		if err != nil {
 			return err
 		}
-		branch = ensureUniqueBranch(info.mainRepoPath, baseName)
+		branch = worktree.GenerateBranchName(existingBranches)
 	}
 
 	// Get worktree path
-	wtPath, err := worktreePath(info.projectName, branch)
+	wtPath, err := worktreePath(info.ProjectName, branch)
 	if err != nil {
 		return err
 	}
 
 	// Create parent directory
-	if err := os.MkdirAll(filepath.Dir(wtPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(wtPath), 0o755); err != nil {
 		return fmt.Errorf("failed to create worktree directory: %w", err)
 	}
 
-	sessionName := worktreeSessionName(info.projectName, branch)
+	sessionName := worktree.SessionName(info.ProjectName, branch)
 
-	fmt.Printf("%s %s\n", s.Label.Render("Project:"), info.projectName)
+	fmt.Printf("%s %s\n", s.Label.Render("Project:"), info.ProjectName)
 	fmt.Printf("%s %s\n", s.Label.Render("Branch:"), branch)
 	fmt.Printf("%s %s\n", s.Label.Render("Path:"), s.Path.Render(wtPath))
 	fmt.Printf("%s %s\n", s.Label.Render("Session:"), sessionName)
@@ -364,38 +221,41 @@ func runWorktreeNew(cmd *cobra.Command, args []string) error {
 	// Create worktree
 	fmt.Printf("  Creating worktree...")
 	var gitCmd *exec.Cmd
-	if branchExists(info.mainRepoPath, branch) {
+	if worktree.BranchExists(info.MainRepoPath, branch) {
 		// Branch exists, create worktree from it
 		gitCmd = exec.Command("git", "worktree", "add", wtPath, branch)
 	} else {
 		// Create new branch with worktree
 		gitCmd = exec.Command("git", "worktree", "add", "-b", branch, wtPath)
 	}
-	gitCmd.Dir = info.mainRepoPath
+	gitCmd.Dir = info.MainRepoPath
 	if output, err := gitCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to create worktree: %s", strings.TrimSpace(string(output)))
+		return fmt.Errorf("failed to create worktree: %w (output: %s)", err, strings.TrimSpace(string(output)))
 	}
 	fmt.Println(" done")
 
 	// Create tmux session
 	fmt.Printf("  Creating tmux session...")
-	session := &tmuxSession{
-		Name: sessionName,
-		Dir:  wtPath,
+	session := tmux.NewSession(sessionName, wtPath)
+	exists := false
+	if ok, err := session.Exists(); err == nil {
+		exists = ok
+	} else {
+		fmt.Printf("\n  %s failed to check tmux session: %v\n", s.Warn.Render("Warning:"), err)
 	}
 
-	if session.exists() {
+	if exists {
 		fmt.Println(" already exists")
 	} else {
-		if err := session.create(); err != nil {
-			// Rollback: remove worktree
+		if err := session.Create(); err != nil {
+			// Rollback: remove worktree (best-effort)
 			rollbackCmd := exec.Command("git", "worktree", "remove", "--force", wtPath)
-			rollbackCmd.Dir = info.mainRepoPath
-			rollbackCmd.Run()
+			rollbackCmd.Dir = info.MainRepoPath
+			_ = rollbackCmd.Run()
 			return fmt.Errorf("failed to create tmux session: %w", err)
 		}
 
-		// Send opencode command to the base window
+		// Send opencode command to the base window (best-effort)
 		sendCmd := exec.Command("tmux", "send-keys", "-t", sessionName+":base", "opencode", "C-m")
 		if err := sendCmd.Run(); err != nil {
 			fmt.Printf("\n  %s failed to start opencode: %v\n", s.Warn.Render("Warning:"), err)
@@ -409,7 +269,7 @@ func runWorktreeNew(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 
 	// Attach to session
-	if err := session.attachOrSwitch(); err != nil {
+	if err := session.AttachOrSwitch(); err != nil {
 		fmt.Printf("%s %v\n", s.Warn.Render("Warning:"), err)
 		fmt.Printf("Attach manually: tmux attach -t %s\n", sessionName)
 	}
@@ -421,58 +281,63 @@ func runWorktreeList(cmd *cobra.Command, args []string) error {
 	s := NewStyles()
 
 	// Detect project
-	info, err := detectProject()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	info, err := worktree.DetectProject(cwd)
 	if err != nil {
 		return err
 	}
 
 	// Get worktree list
 	gitCmd := exec.Command("git", "worktree", "list", "--porcelain")
-	gitCmd.Dir = info.mainRepoPath
+	gitCmd.Dir = info.MainRepoPath
 	output, err := gitCmd.Output()
 	if err != nil {
 		return fmt.Errorf("failed to list worktrees: %w", err)
 	}
 
-	worktrees := parseWorktreeList(string(output))
+	worktrees := worktree.ParseWorktreeList(string(output))
 
 	// Get worktree base path
 	baseDir, err := registry.ExpandPath(defaultWorktreeBaseDir)
 	if err != nil {
 		return fmt.Errorf("failed to expand worktree base dir: %w", err)
 	}
-	projectWorktreeDir := filepath.Join(baseDir, info.projectName)
+	projectWorktreeDir := filepath.Join(baseDir, info.ProjectName)
 
-	fmt.Printf("%s %s\n\n", s.Label.Render("Worktrees for"), s.Bold.Render(info.projectName))
+	fmt.Printf("%s %s\n\n", s.Label.Render("Worktrees for"), s.Bold.Render(info.ProjectName))
 
 	// Filter to show only worktrees in our managed directory (plus main)
 	hasWorktrees := false
 	activeSessions := 0
 
-	for _, wt := range worktrees {
-		if wt.isMain {
+	for i, wt := range worktrees {
+		if i == 0 {
 			// Show main repo
 			status := s.Dim.Render("(main)")
-			fmt.Printf("  %-20s  %s  %s\n", s.Bold.Render(wt.branch), formatPathWithTilde(wt.path), status)
+			fmt.Printf("  %-20s  %s  %s\n", s.Bold.Render(wt.Branch), fileutil.FormatPathWithTilde(wt.Path), status)
 			continue
 		}
 
 		// Only show worktrees in our managed directory
-		if !strings.HasPrefix(wt.path, projectWorktreeDir) {
+		if !strings.HasPrefix(wt.Path, projectWorktreeDir) {
 			continue
 		}
 
 		hasWorktrees = true
-		sessionName := worktreeSessionName(info.projectName, wt.branch)
+		sessionName := worktree.SessionName(info.ProjectName, wt.Branch)
 
 		// Check session status
 		var status string
 		checkSession := exec.Command("tmux", "has-session", "-t", sessionName)
 		if checkSession.Run() == nil {
-			// Check if attached
+			// Check if attached; if list-sessions fails, treat as detached
 			listCmd := exec.Command("tmux", "list-sessions", "-F", "#{session_name}:#{session_attached}")
-			listOutput, _ := listCmd.Output()
-			if strings.Contains(string(listOutput), sessionName+":1") {
+			listOutput, err := listCmd.Output()
+			if err == nil && strings.Contains(string(listOutput), sessionName+":1") {
 				status = s.Success.Render("(attached)")
 			} else {
 				status = s.Info.Render("(detached)")
@@ -482,7 +347,7 @@ func runWorktreeList(cmd *cobra.Command, args []string) error {
 			status = s.Dim.Render("(no session)")
 		}
 
-		fmt.Printf("  %-20s  %s  %s\n", s.Name.Render(wt.branch), formatPathWithTilde(wt.path), status)
+		fmt.Printf("  %-20s  %s  %s\n", s.Name.Render(wt.Branch), fileutil.FormatPathWithTilde(wt.Path), status)
 	}
 
 	if !hasWorktrees {
@@ -501,7 +366,12 @@ func runWorktreeAttach(cmd *cobra.Command, args []string) error {
 	s := NewStyles()
 
 	// Detect project
-	info, err := detectProject()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	info, err := worktree.DetectProject(cwd)
 	if err != nil {
 		return err
 	}
@@ -512,41 +382,37 @@ func runWorktreeAttach(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	sessionName := worktreeSessionName(info.projectName, branch)
+	sessionName := worktree.SessionName(info.ProjectName, branch)
 
 	// Check if session exists
 	checkSession := exec.Command("tmux", "has-session", "-t", sessionName)
 	if checkSession.Run() != nil {
 		// Session doesn't exist - check if worktree exists
-		if !worktreeExists(info.mainRepoPath, branch) {
+		if !worktree.WorktreeExists(info.MainRepoPath, branch) {
 			return fmt.Errorf("no worktree found for branch '%s'\nCreate one with: overlord worktree new %s", branch, branch)
 		}
 
 		// Worktree exists but no session - create one
-		wtPath, err := worktreePath(info.projectName, branch)
+		wtPath, err := worktreePath(info.ProjectName, branch)
 		if err != nil {
 			return err
 		}
 
 		fmt.Printf("Creating session for existing worktree...\n")
-		session := &tmuxSession{
-			Name: sessionName,
-			Dir:  wtPath,
-		}
-
-		if err := session.create(); err != nil {
+		session := tmux.NewSession(sessionName, wtPath)
+		if err := session.Create(); err != nil {
 			return fmt.Errorf("failed to create session: %w", err)
 		}
 
-		// Start opencode
+		// Start opencode (best-effort)
 		sendCmd := exec.Command("tmux", "send-keys", "-t", sessionName+":base", "opencode", "C-m")
-		sendCmd.Run()
+		_ = sendCmd.Run()
 	}
 
 	fmt.Printf("%s %s\n", s.Label.Render("Attaching to:"), sessionName)
 
-	session := &tmuxSession{Name: sessionName}
-	if err := session.attachOrSwitch(); err != nil {
+	session := tmux.NewSession(sessionName, "")
+	if err := session.AttachOrSwitch(); err != nil {
 		return fmt.Errorf("failed to attach to session: %w", err)
 	}
 
@@ -557,7 +423,12 @@ func runWorktreeRemove(cmd *cobra.Command, args []string) error {
 	s := NewStyles()
 
 	// Detect project
-	info, err := detectProject()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	info, err := worktree.DetectProject(cwd)
 	if err != nil {
 		return err
 	}
@@ -569,12 +440,12 @@ func runWorktreeRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if worktree exists
-	if !worktreeExists(info.mainRepoPath, branch) {
+	if !worktree.WorktreeExists(info.MainRepoPath, branch) {
 		return fmt.Errorf("no worktree found for branch '%s'", branch)
 	}
 
-	sessionName := worktreeSessionName(info.projectName, branch)
-	wtPath, err := worktreePath(info.projectName, branch)
+	sessionName := worktree.SessionName(info.ProjectName, branch)
+	wtPath, err := worktreePath(info.ProjectName, branch)
 	if err != nil {
 		return err
 	}
@@ -596,11 +467,10 @@ func runWorktreeRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// If we're in the worktree being removed, warn user
-	cwd, _ := os.Getwd()
-	if strings.HasPrefix(cwd, wtPath) {
+	// If we're in the worktree being removed, warn user (skip check if Getwd fails)
+	if cwd, err = os.Getwd(); err == nil && strings.HasPrefix(cwd, wtPath) {
 		fmt.Printf("\n%s You are currently in this worktree.\n", s.Warn.Render("Note:"))
-		fmt.Printf("After removal, run: cd %s\n\n", info.mainRepoPath)
+		fmt.Printf("After removal, run: cd %s\n\n", info.MainRepoPath)
 	}
 
 	// Kill tmux session if exists
@@ -615,26 +485,26 @@ func runWorktreeRemove(cmd *cobra.Command, args []string) error {
 	// Remove worktree
 	fmt.Printf("  Removing worktree...")
 	removeCmd := exec.Command("git", "worktree", "remove", "--force", wtPath)
-	removeCmd.Dir = info.mainRepoPath
+	removeCmd.Dir = info.MainRepoPath
 	if output, err := removeCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to remove worktree: %s", strings.TrimSpace(string(output)))
+		return fmt.Errorf("failed to remove worktree: %w (output: %s)", err, strings.TrimSpace(string(output)))
 	}
 	fmt.Println(" done")
 
 	// Delete branch
 	fmt.Printf("  Deleting branch...")
 	deleteBranch := exec.Command("git", "branch", "-D", branch)
-	deleteBranch.Dir = info.mainRepoPath
+	deleteBranch.Dir = info.MainRepoPath
 	if output, err := deleteBranch.CombinedOutput(); err != nil {
 		fmt.Printf(" %s %s\n", s.Warn.Render("warning:"), strings.TrimSpace(string(output)))
 	} else {
 		fmt.Println(" done")
 	}
 
-	// Clean up empty directories
+	// Clean up empty directories (best-effort)
 	projectDir := filepath.Dir(wtPath)
 	if entries, err := os.ReadDir(projectDir); err == nil && len(entries) == 0 {
-		os.Remove(projectDir)
+		_ = os.Remove(projectDir)
 	}
 
 	fmt.Println()

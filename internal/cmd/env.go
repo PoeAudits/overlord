@@ -2,16 +2,19 @@ package cmd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/PoeAudits/overlord/internal/registry"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+
+	"github.com/PoeAudits/overlord/internal/fileutil"
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 const envPassFile = ".env.pass"
@@ -60,8 +63,8 @@ func resolveEnvProject(args []string, reg *registry.Registry, baseDir, cwdUsage 
 	}
 
 	// Derive and verify project root
-	info.ProjectRoot = resolveProjectPath(info.Project.Path, baseDir)
-	if _, err := os.Stat(info.ProjectRoot); os.IsNotExist(err) {
+	info.ProjectRoot = fileutil.ResolveProjectPath(info.Project.Path, baseDir)
+	if _, err := os.Stat(info.ProjectRoot); errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("project directory does not exist: %s", info.ProjectRoot)
 	}
 
@@ -179,11 +182,6 @@ func init() {
 // When called with an argument, resolves the project by name/alias/fuzzy match.
 // When called without arguments, auto-detects the project from the current directory.
 func runEnvPull(cmd *cobra.Command, args []string) error {
-	// Define styles for output
-	s := NewStyles()
-	successStyle := s.Success
-	labelStyle := s.Label
-
 	// Load registry
 	reg, err := loadRegistry()
 	if err != nil {
@@ -207,15 +205,15 @@ func runEnvPull(cmd *cobra.Command, args []string) error {
 
 	// Try .env.pass template first
 	if _, err := os.Stat(envPassPath); err == nil {
-		return pullFromTemplate(envPassPath, envPath, info.Name, info.MatchInfo, successStyle, labelStyle)
+		return pullFromTemplate(envPassPath, envPath, info.Name, info.MatchInfo)
 	}
 
 	// Fall back to blob approach (overlord/env/<project-name> in pass)
-	return pullFromBlob(envPath, info.Name, info.MatchInfo, successStyle, labelStyle)
+	return pullFromBlob(envPath, info.Name, info.MatchInfo)
 }
 
 // pullFromTemplate reads a .env.pass template, resolves pass references, and writes .env.
-func pullFromTemplate(envPassPath, envPath, projectName, matchInfo string, successStyle, labelStyle lipgloss.Style) error {
+func pullFromTemplate(envPassPath, envPath, projectName, matchInfo string) error {
 	entries, err := parseEnvPassFile(envPassPath)
 	if err != nil {
 		return err
@@ -234,21 +232,13 @@ func pullFromTemplate(envPassPath, envPath, projectName, matchInfo string, succe
 		return err
 	}
 
-	// Success output (never print secret content)
-	fmt.Printf("%s Pulled .env for '%s'\n", successStyle.Render("✓"), projectName)
-	fmt.Printf("  %s %s (%d vars, %d from pass)\n",
-		labelStyle.Render("Template:"), envPassPath, len(entries), passCount)
-	fmt.Printf("  %s %s\n", labelStyle.Render("Written to:"), envPath)
-
-	if matchInfo != "" {
-		fmt.Printf("  %s %s (matched via %s)\n", labelStyle.Render("Project:"), projectName, matchInfo)
-	}
+	printEnvPullSuccess(envPath, projectName, matchInfo, "Template:", fmt.Sprintf("%s (%d vars, %d from pass)", envPassPath, len(entries), passCount))
 
 	return nil
 }
 
 // pullFromBlob falls back to the old approach: fetch entire .env from a single pass entry.
-func pullFromBlob(envPath, projectName, matchInfo string, successStyle, labelStyle lipgloss.Style) error {
+func pullFromBlob(envPath, projectName, matchInfo string) error {
 	passEntry := fmt.Sprintf("overlord/env/%s", projectName)
 
 	passCmd := exec.Command("pass", "show", passEntry)
@@ -258,24 +248,35 @@ func pullFromBlob(envPath, projectName, matchInfo string, successStyle, labelSty
 		if _, lookErr := exec.LookPath("pass"); lookErr != nil {
 			return fmt.Errorf("'pass' is not installed or not in PATH\nInstall pass: https://www.passwordstore.org/")
 		}
-		return fmt.Errorf("no %s file found and no pass entry at '%s'\n\nCreate a %s file in the project root:\n  KEY=pass:pass-entry-name\n  KEY=literal-value",
-			envPassFile, passEntry, envPassFile)
+		return fmt.Errorf(
+			"no %s file found and no pass entry at '%s': %w\n\nCreate a %s file in the project root:\n  KEY=pass:pass-entry-name\n  KEY=literal-value",
+			envPassFile,
+			passEntry,
+			err,
+			envPassFile,
+		)
 	}
 
 	if err := atomicWriteEnvFile(envPath, output); err != nil {
 		return err
 	}
 
-	// Success output (never print secret content)
-	fmt.Printf("%s Pulled .env for '%s'\n", successStyle.Render("✓"), projectName)
-	fmt.Printf("  %s %s\n", labelStyle.Render("Source:"), passEntry)
-	fmt.Printf("  %s %s\n", labelStyle.Render("Written to:"), envPath)
-
-	if matchInfo != "" {
-		fmt.Printf("  %s %s (matched via %s)\n", labelStyle.Render("Project:"), projectName, matchInfo)
-	}
+	printEnvPullSuccess(envPath, projectName, matchInfo, "Source:", passEntry)
 
 	return nil
+}
+
+// printEnvPullSuccess prints consistent success output for env pull operations.
+func printEnvPullSuccess(envPath, projectName, matchInfo, sourceLabel, sourceValue string) {
+	s := NewStyles()
+
+	fmt.Printf("%s Pulled .env for '%s'\n", s.Success.Render("✓"), projectName)
+	fmt.Printf("  %s %s\n", s.Label.Render(sourceLabel), sourceValue)
+	fmt.Printf("  %s %s\n", s.Label.Render("Written to:"), envPath)
+
+	if matchInfo != "" {
+		fmt.Printf("  %s %s (matched via %s)\n", s.Label.Render("Project:"), projectName, matchInfo)
+	}
 }
 
 // parseEnvPassFile parses a .env.pass template file.
@@ -434,7 +435,7 @@ func runEnvGenerate(cmd *cobra.Command, args []string) error {
 	// Generate and write the template
 	content := generateEnvPassContent(entries)
 
-	if err := os.WriteFile(envPassPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(envPassPath, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("failed to write %s: %w", envPassFile, err)
 	}
 
@@ -446,9 +447,9 @@ func runEnvGenerate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// getPassStoreDir returns the password store directory.
+// passStoreDir returns the password store directory.
 // Uses $PASSWORD_STORE_DIR if set, otherwise defaults to ~/.password-store.
-func getPassStoreDir() (string, error) {
+func passStoreDir() (string, error) {
 	dir := os.Getenv("PASSWORD_STORE_DIR")
 	if dir != "" {
 		return dir, nil
@@ -465,12 +466,12 @@ func getPassStoreDir() (string, error) {
 // Entry names are the relative paths of .gpg files without the .gpg extension.
 // Results are sorted alphabetically.
 func listPassEntries() ([]string, error) {
-	storeDir, err := getPassStoreDir()
+	storeDir, err := passStoreDir()
 	if err != nil {
 		return nil, err
 	}
 
-	if _, err := os.Stat(storeDir); os.IsNotExist(err) {
+	if _, err := os.Stat(storeDir); errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("pass store directory does not exist: %s\ninitialize with: pass init <gpg-id>", storeDir)
 	}
 
@@ -556,7 +557,7 @@ func GenerateEnvPassFile(projectRoot string) (int, error) {
 	content := generateEnvPassContent(entries)
 	envPassPath := filepath.Join(projectRoot, envPassFile)
 
-	if err := os.WriteFile(envPassPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(envPassPath, []byte(content), 0o644); err != nil {
 		return 0, fmt.Errorf("failed to write %s: %w", envPassFile, err)
 	}
 
@@ -567,17 +568,17 @@ func GenerateEnvPassFile(projectRoot string) (int, error) {
 func atomicWriteEnvFile(envPath string, content []byte) error {
 	tempPath := envPath + ".tmp"
 
-	if err := os.WriteFile(tempPath, content, 0600); err != nil {
+	if err := os.WriteFile(tempPath, content, 0o600); err != nil {
 		return fmt.Errorf("failed to write temp file: %w", err)
 	}
 
-	if err := os.Chmod(tempPath, 0600); err != nil {
-		os.Remove(tempPath)
+	if err := os.Chmod(tempPath, 0o600); err != nil {
+		_ = os.Remove(tempPath) // Best-effort cleanup of temp file
 		return fmt.Errorf("failed to set file permissions: %w", err)
 	}
 
 	if err := os.Rename(tempPath, envPath); err != nil {
-		os.Remove(tempPath)
+		_ = os.Remove(tempPath) // Best-effort cleanup of temp file
 		return fmt.Errorf("failed to write .env file: %w", err)
 	}
 

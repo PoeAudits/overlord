@@ -101,9 +101,9 @@ func flagErrorFunc(cmd *cobra.Command, err error) error {
 func runRoot(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		// No args - run list command
-		return RunList(cmd, args)
+		return runList(cmd, args)
 	}
 
 	// Has args - treat as project name and run open
-	return RunOpen(cmd, args)
+	return runOpen(cmd, args)
 }

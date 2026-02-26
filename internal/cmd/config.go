@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 
@@ -35,7 +37,7 @@ func runConfig(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if registry file exists
-	if _, err := os.Stat(registryPath); os.IsNotExist(err) {
+	if _, err := os.Stat(registryPath); errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("registry file not found: %s\nRun 'overlord setup' to initialize", registryPath)
 	}
 

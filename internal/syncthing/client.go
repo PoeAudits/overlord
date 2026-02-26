@@ -14,6 +14,9 @@ import (
 	"time"
 )
 
+// httpClientTimeout is the default timeout for all Syncthing REST API requests.
+const httpClientTimeout = 15 * time.Second
+
 // Client provides access to the Syncthing REST API.
 type Client struct {
 	baseURL    string
@@ -28,7 +31,7 @@ func NewClient(baseURL, apiKey string) *Client {
 		baseURL: baseURL,
 		apiKey:  apiKey,
 		httpClient: &http.Client{
-			Timeout: 15 * time.Second,
+			Timeout: httpClientTimeout,
 		},
 	}
 }
@@ -79,8 +82,8 @@ type Connection struct {
 	Connected bool `json:"connected"`
 }
 
-// GetDevices returns configured devices.
-func (c *Client) GetDevices(ctx context.Context) ([]Device, error) {
+// Devices returns configured devices.
+func (c *Client) Devices(ctx context.Context) ([]Device, error) {
 	var devices []Device
 	if err := c.getJSON(ctx, "/rest/config/devices", &devices); err != nil {
 		return nil, err
@@ -88,8 +91,8 @@ func (c *Client) GetDevices(ctx context.Context) ([]Device, error) {
 	return devices, nil
 }
 
-// GetDevice returns a single device by ID.
-func (c *Client) GetDevice(ctx context.Context, id string) (*Device, error) {
+// Device returns a single device by ID.
+func (c *Client) Device(ctx context.Context, id string) (*Device, error) {
 	var device Device
 	if err := c.getJSON(ctx, "/rest/config/devices/"+url.PathEscape(id), &device); err != nil {
 		return nil, err
@@ -109,7 +112,7 @@ func (c *Client) UpdateDevice(ctx context.Context, device Device) error {
 
 // EnsureDevice creates or updates a device configuration.
 func (c *Client) EnsureDevice(ctx context.Context, device Device) (bool, error) {
-	current, err := c.GetDevice(ctx, device.DeviceID)
+	current, err := c.Device(ctx, device.DeviceID)
 	if err != nil {
 		if IsNotFound(err) {
 			return true, c.AddDevice(ctx, device)
@@ -142,8 +145,8 @@ func (c *Client) EnsureDevice(ctx context.Context, device Device) (bool, error) 
 	return true, c.UpdateDevice(ctx, *current)
 }
 
-// GetFolders returns configured folders.
-func (c *Client) GetFolders(ctx context.Context) ([]Folder, error) {
+// Folders returns configured folders.
+func (c *Client) Folders(ctx context.Context) ([]Folder, error) {
 	var folders []Folder
 	if err := c.getJSON(ctx, "/rest/config/folders", &folders); err != nil {
 		return nil, err
@@ -151,8 +154,8 @@ func (c *Client) GetFolders(ctx context.Context) ([]Folder, error) {
 	return folders, nil
 }
 
-// GetFolder returns a folder by ID.
-func (c *Client) GetFolder(ctx context.Context, id string) (*Folder, error) {
+// Folder returns a folder by ID.
+func (c *Client) Folder(ctx context.Context, id string) (*Folder, error) {
 	var folder Folder
 	if err := c.getJSON(ctx, "/rest/config/folders/"+url.PathEscape(id), &folder); err != nil {
 		return nil, err
@@ -172,7 +175,7 @@ func (c *Client) UpdateFolder(ctx context.Context, folder Folder) error {
 
 // EnsureFolder creates or updates a folder configuration.
 func (c *Client) EnsureFolder(ctx context.Context, folder Folder) (bool, error) {
-	current, err := c.GetFolder(ctx, folder.ID)
+	current, err := c.Folder(ctx, folder.ID)
 	if err != nil {
 		if IsNotFound(err) {
 			return true, c.AddFolder(ctx, folder)
@@ -193,8 +196,8 @@ func (c *Client) DeleteFolder(ctx context.Context, id string) error {
 	return c.delete(ctx, "/rest/config/folders/"+url.PathEscape(id))
 }
 
-// GetFolderStatus returns status for a folder.
-func (c *Client) GetFolderStatus(ctx context.Context, id string) (*FolderStatus, error) {
+// FolderStatus returns status for a folder.
+func (c *Client) FolderStatus(ctx context.Context, id string) (*FolderStatus, error) {
 	endpoint := "/rest/db/status?folder=" + url.QueryEscape(id)
 	var status FolderStatus
 	if err := c.getJSON(ctx, endpoint, &status); err != nil {
@@ -203,8 +206,8 @@ func (c *Client) GetFolderStatus(ctx context.Context, id string) (*FolderStatus,
 	return &status, nil
 }
 
-// GetConnections returns Syncthing device connection status.
-func (c *Client) GetConnections(ctx context.Context) (*ConnectionsResponse, error) {
+// Connections returns Syncthing device connection status.
+func (c *Client) Connections(ctx context.Context) (*ConnectionsResponse, error) {
 	var connections ConnectionsResponse
 	if err := c.getJSON(ctx, "/rest/system/connections", &connections); err != nil {
 		return nil, err
@@ -271,7 +274,7 @@ func (c *Client) do(req *http.Request, out any) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body) // Best-effort: read error body for diagnostics
 		return httpError{statusCode: resp.StatusCode, body: strings.TrimSpace(string(body))}
 	}
 

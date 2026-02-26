@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -10,11 +9,7 @@ import (
 
 func TestActivateCommand(t *testing.T) {
 	// Create a temporary directory for test registry
-	tmpDir, err := os.MkdirTemp("", "overlord-activate-test")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	registryPath := filepath.Join(tmpDir, "registry.yaml")
 
@@ -178,82 +173,4 @@ func TestActivateCommand(t *testing.T) {
 			t.Error("expected error for non-existent project")
 		}
 	})
-}
-
-func TestActivateLogic(t *testing.T) {
-	tests := []struct {
-		name           string
-		projectState   registry.State
-		syncStatus     registry.SyncStatus
-		expectError    bool
-		expectNoChange bool
-		errorContains  string
-	}{
-		{
-			name:           "activate inactive project",
-			projectState:   registry.StateActive,
-			syncStatus:     registry.SyncInactive,
-			expectError:    false,
-			expectNoChange: false,
-		},
-		{
-			name:           "activate project with empty sync status",
-			projectState:   registry.StateActive,
-			syncStatus:     "", // Empty is treated as inactive
-			expectError:    false,
-			expectNoChange: false,
-		},
-		{
-			name:           "activate already active project",
-			projectState:   registry.StateActive,
-			syncStatus:     registry.SyncActive,
-			expectError:    false,
-			expectNoChange: true,
-		},
-		{
-			name:           "activate archived project",
-			projectState:   registry.StateArchived,
-			syncStatus:     registry.SyncInactive,
-			expectError:    true,
-			expectNoChange: true,
-			errorContains:  "archived",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			project := registry.Project{
-				Path:        "test/path",
-				Category:    registry.CategoryWeb,
-				Lang:        registry.LanguageGo,
-				Created:     "2024-01-01",
-				Description: "Test project",
-				Status:      registry.Status{State: tt.projectState},
-				Sync:        registry.ProjectSync{Status: tt.syncStatus},
-			}
-
-			// Check archived state
-			if project.Status.State == registry.StateArchived {
-				if !tt.expectError {
-					t.Error("expected no error but project is archived")
-				}
-				return
-			}
-
-			// Check if already active
-			if project.Sync.Status == registry.SyncActive {
-				if !tt.expectNoChange {
-					t.Error("expected change but project is already active")
-				}
-				return
-			}
-
-			// Simulate activation
-			project.Sync.Status = registry.SyncActive
-
-			if project.Sync.Status != registry.SyncActive {
-				t.Error("sync status should be active after activation")
-			}
-		})
-	}
 }

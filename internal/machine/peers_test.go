@@ -118,7 +118,7 @@ func TestLoadPeersMalformedYAML(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "peers.yaml")
 
-	if err := os.WriteFile(path, []byte("peers: [bad"), 0644); err != nil {
+	if err := os.WriteFile(path, []byte("peers: [bad"), 0o644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 

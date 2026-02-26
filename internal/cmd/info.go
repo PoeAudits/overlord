@@ -7,14 +7,17 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/registry"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/PoeAudits/overlord/internal/thoughts"
 	"github.com/spf13/cobra"
 )
 
-var (
-	infoJSON bool
-)
+type infoFlags struct {
+	json bool
+}
+
+var infoOpts infoFlags
 
 // infoCmd represents the info command
 var infoCmd = &cobra.Command{
@@ -34,7 +37,7 @@ Examples:
 
 func init() {
 	rootCmd.AddCommand(infoCmd)
-	infoCmd.Flags().BoolVar(&infoJSON, "json", false, "Output in JSON format")
+	infoCmd.Flags().BoolVar(&infoOpts.json, "json", false, "Output in JSON format")
 }
 
 func runInfo(cmd *cobra.Command, args []string) error {
@@ -53,7 +56,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	// Output based on format
-	if infoJSON {
+	if infoOpts.json {
 		return outputInfoJSON(projectName, project, reg.Settings)
 	}
 
@@ -66,7 +69,7 @@ func outputInfoHuman(name string, project registry.Project, settings registry.Se
 	labelStyle := s.Label
 	valueStyle := s.Value
 	categoryStyle := s.Category
-	langStyle := lipgloss.NewStyle().Foreground(ColorYellow)
+	langStyle := s.Lang
 	statusActiveStyle := s.Success
 	statusArchivedStyle := s.Info
 	pathStyle := s.Path
@@ -87,10 +90,10 @@ func outputInfoHuman(name string, project registry.Project, settings registry.Se
 	// Get thoughts paths
 	thoughtsPaths := getThoughtsPaths(name, project.Status.State, project.Path, settings.ThoughtsDir)
 
-	projectPath, projectPathErr := expandProjectPath(project.Path, settings.BaseDir)
+	projectPath, projectPathErr := fileutil.ExpandProjectPath(project.Path, settings.BaseDir)
 	projectThoughtsSymlink := "-"
 	if projectPathErr == nil {
-		projectThoughtsSymlink = formatPathWithTilde(filepath.Join(projectPath, "thoughts"))
+		projectThoughtsSymlink = fileutil.FormatPathWithTilde(filepath.Join(projectPath, "thoughts"))
 	}
 
 	// Determine status style
@@ -121,32 +124,56 @@ func outputInfoHuman(name string, project registry.Project, settings registry.Se
 	return nil
 }
 
+// infoThoughts holds the thoughts directory paths for JSON output.
+type infoThoughts struct {
+	Briefs   string `json:"briefs"`
+	Research string `json:"research"`
+	Plans    string `json:"plans"`
+	Logs     string `json:"logs"`
+	Docs     string `json:"docs"`
+	Symlink  string `json:"symlink"`
+}
+
+// infoOutput is the typed shape for --json output from the info command.
+type infoOutput struct {
+	Name        string            `json:"name"`
+	Path        string            `json:"path"`
+	Category    registry.Category `json:"category"`
+	Lang        registry.Language `json:"lang"`
+	Description string            `json:"description"`
+	Tags        []string          `json:"tags"`
+	Aliases     []string          `json:"aliases"`
+	Status      registry.State    `json:"status"`
+	Created     string            `json:"created"`
+	Thoughts    infoThoughts      `json:"thoughts"`
+}
+
 func outputInfoJSON(name string, project registry.Project, settings registry.Settings) error {
 	thoughtsPaths := getThoughtsPaths(name, project.Status.State, project.Path, settings.ThoughtsDir)
 
-	projectPath, projectPathErr := expandProjectPath(project.Path, settings.BaseDir)
+	projectPath, projectPathErr := fileutil.ExpandProjectPath(project.Path, settings.BaseDir)
 	projectThoughtsSymlink := ""
 	if projectPathErr == nil {
-		projectThoughtsSymlink = formatPathWithTilde(filepath.Join(projectPath, "thoughts"))
+		projectThoughtsSymlink = fileutil.FormatPathWithTilde(filepath.Join(projectPath, "thoughts"))
 	}
 
-	output := map[string]interface{}{
-		"name":        name,
-		"path":        project.Path,
-		"category":    project.Category,
-		"lang":        project.Lang,
-		"description": project.Description,
-		"tags":        project.Tags,
-		"aliases":     project.Aliases,
-		"status":      project.Status.State,
-		"created":     project.Created,
-		"thoughts": map[string]string{
-			"briefs":   thoughtsPaths.Briefs,
-			"research": thoughtsPaths.Research,
-			"plans":    thoughtsPaths.Plans,
-			"logs":     thoughtsPaths.Logs,
-			"docs":     thoughtsPaths.Docs,
-			"symlink":  projectThoughtsSymlink,
+	output := infoOutput{
+		Name:        name,
+		Path:        project.Path,
+		Category:    project.Category,
+		Lang:        project.Lang,
+		Description: project.Description,
+		Tags:        project.Tags,
+		Aliases:     project.Aliases,
+		Status:      project.Status.State,
+		Created:     project.Created,
+		Thoughts: infoThoughts{
+			Briefs:   thoughtsPaths.Briefs,
+			Research: thoughtsPaths.Research,
+			Plans:    thoughtsPaths.Plans,
+			Logs:     thoughtsPaths.Logs,
+			Docs:     thoughtsPaths.Docs,
+			Symlink:  projectThoughtsSymlink,
 		},
 	}
 
@@ -159,38 +186,22 @@ func outputInfoJSON(name string, project registry.Project, settings registry.Set
 	return nil
 }
 
-type thoughtsPaths struct {
-	Briefs   string
-	Research string
-	Plans    string
-	Logs     string
-	Docs     string
-}
-
-func getThoughtsPaths(projectName string, state registry.State, projectPath, thoughtsDir string) thoughtsPaths {
-	// Expand thoughts dir if it starts with ~
-	expandedThoughtsDir := thoughtsDir
-	homeDir, err := os.UserHomeDir()
-	if err == nil && strings.HasPrefix(thoughtsDir, "~") {
-		expandedThoughtsDir = filepath.Join(homeDir, strings.TrimPrefix(thoughtsDir, "~"))
+func getThoughtsPaths(projectName string, state registry.State, projectPath, thoughtsDir string) thoughts.Paths {
+	expandedThoughtsDir, err := registry.ExpandPath(thoughtsDir)
+	if err != nil {
+		expandedThoughtsDir = thoughtsDir
 	}
 
-	base := "projects"
+	paths := thoughts.ProjectPaths(expandedThoughtsDir, projectName)
 	if state == registry.StateArchived || strings.HasPrefix(projectPath, "archive/") {
-		base = "archive"
+		paths = thoughts.ArchivePaths(expandedThoughtsDir, projectName)
 	}
 
-	briefsPath := filepath.Join(expandedThoughtsDir, base, projectName, "briefs") + "/"
-	researchPath := filepath.Join(expandedThoughtsDir, base, projectName, "research") + "/"
-	plansPath := filepath.Join(expandedThoughtsDir, base, projectName, "plans") + "/"
-	logsPath := filepath.Join(expandedThoughtsDir, base, projectName, "logs") + "/"
-	docsPath := filepath.Join(expandedThoughtsDir, base, projectName, "docs") + "/"
+	paths.Briefs = fileutil.FormatPathWithTilde(paths.Briefs) + "/"
+	paths.Research = fileutil.FormatPathWithTilde(paths.Research) + "/"
+	paths.Plans = fileutil.FormatPathWithTilde(paths.Plans) + "/"
+	paths.Logs = fileutil.FormatPathWithTilde(paths.Logs) + "/"
+	paths.Docs = fileutil.FormatPathWithTilde(paths.Docs) + "/"
 
-	return thoughtsPaths{
-		Briefs:   formatPathWithTilde(briefsPath),
-		Research: formatPathWithTilde(researchPath),
-		Plans:    formatPathWithTilde(plansPath),
-		Logs:     formatPathWithTilde(logsPath),
-		Docs:     formatPathWithTilde(docsPath),
-	}
+	return paths
 }

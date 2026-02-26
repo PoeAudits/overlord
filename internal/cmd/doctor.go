@@ -7,8 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/registry"
+	syncpkg "github.com/PoeAudits/overlord/internal/sync"
+	"github.com/PoeAudits/overlord/internal/syncthing"
 	"github.com/spf13/cobra"
 )
 
@@ -44,167 +47,335 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	checks := make([]doctorCheck, 0, 10)
 
-	machineCfg, machineErr := machine.Load(machine.DefaultConfigPath)
-	if machineErr != nil {
-		checks = append(checks, doctorCheck{
-			name:        "Machine config",
-			status:      doctorFail,
-			message:     machineErr.Error(),
-			remediation: "Run `overlord setup --init` to generate machine.yaml",
-		})
+	machineCfg, machineCfgCheck := checkMachineConfig()
+	if machineCfgCheck != nil {
+		checks = append(checks, *machineCfgCheck)
 		return printDoctorChecksAndExit(checks, s)
 	}
 
-	if machineCfg.Name == "" || machineCfg.Role == "" {
-		checks = append(checks, doctorCheck{
-			name:        "Machine identity",
-			status:      doctorFail,
-			message:     "machine name or role is missing",
-			remediation: "Set `name` and `role` in ~/.config/overlord/machine.yaml",
-		})
-	} else {
-		checks = append(checks, doctorCheck{
-			name:    "Machine identity",
-			status:  doctorPass,
-			message: fmt.Sprintf("name=%s role=%s", machineCfg.Name, machineCfg.Role),
-		})
-	}
+	checks = append(checks, checkMachineIdentity(machineCfg))
 
-	client, clientErr := localSyncthingClient(machineCfg)
-	if clientErr != nil {
-		checks = append(checks, doctorCheck{
-			name:        "Syncthing config",
-			status:      doctorFail,
-			message:     clientErr.Error(),
-			remediation: "Set `syncthing.device_id/api_url/api_key/address` in machine.yaml",
-		})
+	client, syncthingCfgCheck := checkSyncthingConfig(machineCfg)
+	if syncthingCfgCheck != nil {
+		checks = append(checks, *syncthingCfgCheck)
 		return printDoctorChecksAndExit(checks, s)
 	}
 
-	if _, err := client.GetFolders(ctx); err != nil {
-		checks = append(checks, doctorCheck{
-			name:        "Syncthing API",
-			status:      doctorFail,
-			message:     err.Error(),
-			remediation: "Ensure local Syncthing is running and API URL/API key are correct",
-		})
-	} else {
-		checks = append(checks, doctorCheck{name: "Syncthing API", status: doctorPass, message: "reachable"})
+	checks = append(checks, checkSyncthingConnectivity(ctx, client))
+
+	checks = append(checks, checkRegistryValidity())
+
+	peersCfg, peerRegistryCheck, peersLoaded := checkPeerRegistry()
+	checks = append(checks, peerRegistryCheck)
+
+	checks = append(checks, checkRegistryLock(machineCfg.Name))
+
+	if peersLoaded {
+		checks = append(checks, checkPeerReachability(ctx, client, peersCfg))
 	}
 
-	registryPath, _ := registry.ExpandPath(registry.DefaultRegistryPath)
-	if _, err := os.Stat(registryPath); err != nil {
-		checks = append(checks, doctorCheck{
-			name:        "Registry file",
-			status:      doctorFail,
-			message:     "registry.yaml not found",
-			remediation: "Run `overlord setup` to create registry.yaml",
-		})
-	} else if _, err := loadRegistry(); err != nil {
-		checks = append(checks, doctorCheck{name: "Registry file", status: doctorFail, message: err.Error(), remediation: "Fix registry YAML format and rerun doctor"})
-	} else {
-		checks = append(checks, doctorCheck{name: "Registry file", status: doctorPass, message: "present and readable"})
-	}
-
-	peersCfg, peersErr := machine.LoadPeers(machine.DefaultPeersPath)
-	if peersErr != nil {
-		checks = append(checks, doctorCheck{name: "Peer registry", status: doctorFail, message: peersErr.Error(), remediation: "Fix peers.yaml and rerun doctor"})
-	} else {
-		checks = append(checks, doctorCheck{name: "Peer registry", status: doctorPass, message: fmt.Sprintf("%d peer(s) loaded", len(peersCfg.Peers))})
-	}
-
-	lock, lockErr := machine.LoadLock(machine.DefaultRegistryLockPath)
-	if lockErr != nil {
-		checks = append(checks, doctorCheck{name: "Registry lock", status: doctorFail, message: lockErr.Error(), remediation: "Fix registry.lock.yaml or regenerate with `overlord sync lock claim`"})
-	} else if lock == nil {
-		checks = append(checks, doctorCheck{name: "Registry lock", status: doctorFail, message: "registry.lock.yaml is missing", remediation: "Run `overlord sync lock claim`"})
-	} else {
-		ownerMsg := fmt.Sprintf("owner=%s updated_at=%s", lock.Owner, lock.UpdatedAt)
-		if lock.Owner != machineCfg.Name {
-			checks = append(checks, doctorCheck{name: "Registry lock", status: doctorWarn, message: ownerMsg, remediation: fmt.Sprintf("If needed, request transfer: `overlord sync lock transfer %s`", machineCfg.Name)})
-		} else {
-			checks = append(checks, doctorCheck{name: "Registry lock", status: doctorPass, message: ownerMsg})
-		}
-	}
-
-	if peersErr == nil {
-		connections, err := client.GetConnections(ctx)
-		if err != nil {
-			checks = append(checks, doctorCheck{name: "Peer connectivity", status: doctorWarn, message: err.Error(), remediation: "Check Syncthing connection status in UI"})
-		} else {
-			disconnected := make([]string, 0)
-			for name, peer := range peersCfg.Peers {
-				conn, ok := connections.Connections[peer.Syncthing.DeviceID]
-				if !ok || !conn.Connected {
-					disconnected = append(disconnected, name)
-				}
-			}
-			if len(disconnected) > 0 {
-				checks = append(checks, doctorCheck{name: "Peer connectivity", status: doctorWarn, message: fmt.Sprintf("disconnected: %s", strings.Join(disconnected, ", ")), remediation: "Ensure peers are online and reachable over Tailscale"})
-			} else {
-				checks = append(checks, doctorCheck{name: "Peer connectivity", status: doctorPass, message: "all configured peers connected"})
-			}
-		}
-	}
-
-	configDir, configErr := registryConfigDir()
+	configDir, configErr := syncpkg.ConfigDir()
 	if configErr != nil {
-		checks = append(checks, doctorCheck{name: "Overlord config folder", status: doctorFail, message: configErr.Error()})
+		checks = append(checks, doctorCheck{
+			name:    "Overlord config folder",
+			status:  doctorFail,
+			message: configErr.Error(),
+		})
 	} else {
-		ignorePath := filepath.Join(configDir, ".stignore")
-		content, err := os.ReadFile(ignorePath)
-		if err != nil {
-			checks = append(checks, doctorCheck{name: "Config .stignore", status: doctorFail, message: ".stignore missing", remediation: "Run `overlord setup --init`"})
-		} else if !containsExactLine(string(content), "machine.yaml") {
-			checks = append(checks, doctorCheck{name: "Config .stignore", status: doctorFail, message: "missing machine.yaml exclusion", remediation: "Add `machine.yaml` to ~/.config/overlord/.stignore"})
-		} else {
-			checks = append(checks, doctorCheck{name: "Config .stignore", status: doctorPass, message: "machine.yaml excluded"})
-		}
-
-		if _, err := client.GetFolder(ctx, overlordConfigFolderID); err != nil {
-			checks = append(checks, doctorCheck{name: "Config Syncthing folder", status: doctorFail, message: err.Error(), remediation: "Run `overlord setup --init` to configure overlord-config folder"})
-		} else {
-			checks = append(checks, doctorCheck{name: "Config Syncthing folder", status: doctorPass, message: fmt.Sprintf("folder '%s' configured", overlordConfigFolderID)})
-		}
+		checks = append(checks, checkConfigIgnoreFile(configDir))
+		checks = append(checks, checkConfigFolderConsistency(ctx, client))
 	}
 
 	reg, regErr := loadRegistry()
 	if regErr == nil {
-		active := getSyncActiveProjects(reg)
-		mismatches := make([]string, 0)
-		baseDir, baseErr := expandBaseDir(reg)
-		if baseErr != nil {
-			checks = append(checks, doctorCheck{name: "Active project folders", status: doctorFail, message: baseErr.Error(), remediation: "Fix registry settings.base_dir"})
-		} else {
-			for name := range active {
-				project := reg.Projects[name]
-				projectPath := resolveProjectPath(project.Path, baseDir)
-				if _, err := os.Stat(projectPath); err != nil {
-					mismatches = append(mismatches, fmt.Sprintf("%s (missing path)", name))
-					continue
-				}
-				folder, err := client.GetFolder(ctx, name)
-				if err != nil {
-					mismatches = append(mismatches, fmt.Sprintf("%s (missing syncthing folder)", name))
-					continue
-				}
-				if folder.Path != projectPath {
-					mismatches = append(mismatches, fmt.Sprintf("%s (path mismatch)", name))
-				}
-			}
-
-			if len(mismatches) > 0 {
-				checks = append(checks, doctorCheck{name: "Active project folders", status: doctorWarn, message: strings.Join(mismatches, ", "), remediation: "Run `overlord setup --init` then `overlord activate <name>` for affected projects"})
-			} else {
-				checks = append(checks, doctorCheck{name: "Active project folders", status: doctorPass, message: fmt.Sprintf("%d active project(s) verified", len(active))})
-			}
-		}
+		checks = append(checks, checkFolderConsistency(ctx, client, reg))
 	}
 
 	return printDoctorChecksAndExit(checks, s)
 }
 
-func printDoctorChecksAndExit(checks []doctorCheck, s Styles) error {
+func checkMachineConfig() (*machine.MachineConfig, *doctorCheck) {
+	machineCfg, machineErr := machine.Load(machine.DefaultConfigPath)
+	if machineErr != nil {
+		check := doctorCheck{
+			name:        "Machine config",
+			status:      doctorFail,
+			message:     machineErr.Error(),
+			remediation: "Run `overlord setup --init` to generate machine.yaml",
+		}
+		return nil, &check
+	}
+
+	return machineCfg, nil
+}
+
+func checkMachineIdentity(machineCfg *machine.MachineConfig) doctorCheck {
+	if machineCfg.Name == "" || machineCfg.Role == "" {
+		return doctorCheck{
+			name:        "Machine identity",
+			status:      doctorFail,
+			message:     "machine name or role is missing",
+			remediation: "Set `name` and `role` in ~/.config/overlord/machine.yaml",
+		}
+	}
+
+	return doctorCheck{
+		name:    "Machine identity",
+		status:  doctorPass,
+		message: fmt.Sprintf("name=%s role=%s", machineCfg.Name, machineCfg.Role),
+	}
+}
+
+func checkSyncthingConfig(machineCfg *machine.MachineConfig) (*syncthing.Client, *doctorCheck) {
+	client, clientErr := syncpkg.LocalClient(machineCfg)
+	if clientErr != nil {
+		check := doctorCheck{
+			name:        "Syncthing config",
+			status:      doctorFail,
+			message:     clientErr.Error(),
+			remediation: "Set `syncthing.device_id/api_url/api_key/address` in machine.yaml",
+		}
+		return nil, &check
+	}
+
+	return client, nil
+}
+
+func checkSyncthingConnectivity(ctx context.Context, client *syncthing.Client) doctorCheck {
+	if _, err := client.Folders(ctx); err != nil {
+		return doctorCheck{
+			name:        "Syncthing API",
+			status:      doctorFail,
+			message:     err.Error(),
+			remediation: "Ensure local Syncthing is running and API URL/API key are correct",
+		}
+	}
+
+	return doctorCheck{
+		name:    "Syncthing API",
+		status:  doctorPass,
+		message: "reachable",
+	}
+}
+
+func checkRegistryValidity() doctorCheck {
+	registryPath, registryPathErr := registry.ExpandPath(registry.DefaultRegistryPath)
+	if registryPathErr != nil {
+		return doctorCheck{
+			name:        "Registry file",
+			status:      doctorFail,
+			message:     fmt.Sprintf("failed to expand registry path: %s", registryPathErr.Error()),
+			remediation: "Check HOME environment variable and file permissions",
+		}
+	}
+
+	if _, err := os.Stat(registryPath); err != nil {
+		return doctorCheck{
+			name:        "Registry file",
+			status:      doctorFail,
+			message:     "registry.yaml not found",
+			remediation: "Run `overlord setup` to create registry.yaml",
+		}
+	}
+
+	if _, err := loadRegistry(); err != nil {
+		return doctorCheck{
+			name:        "Registry file",
+			status:      doctorFail,
+			message:     err.Error(),
+			remediation: "Fix registry YAML format and rerun doctor",
+		}
+	}
+
+	return doctorCheck{
+		name:    "Registry file",
+		status:  doctorPass,
+		message: "present and readable",
+	}
+}
+
+func checkPeerRegistry() (*machine.PeersConfig, doctorCheck, bool) {
+	peersCfg, peersErr := machine.LoadPeers(machine.DefaultPeersPath)
+	if peersErr != nil {
+		return nil, doctorCheck{
+			name:        "Peer registry",
+			status:      doctorFail,
+			message:     peersErr.Error(),
+			remediation: "Fix peers.yaml and rerun doctor",
+		}, false
+	}
+
+	return peersCfg, doctorCheck{
+		name:    "Peer registry",
+		status:  doctorPass,
+		message: fmt.Sprintf("%d peer(s) loaded", len(peersCfg.Peers)),
+	}, true
+}
+
+func checkRegistryLock(machineName string) doctorCheck {
+	lock, lockErr := machine.LoadLock(machine.DefaultRegistryLockPath)
+	if lockErr != nil {
+		return doctorCheck{
+			name:        "Registry lock",
+			status:      doctorFail,
+			message:     lockErr.Error(),
+			remediation: "Fix registry.lock.yaml or regenerate with `overlord sync lock claim`",
+		}
+	}
+
+	if lock == nil {
+		return doctorCheck{
+			name:        "Registry lock",
+			status:      doctorFail,
+			message:     "registry.lock.yaml is missing",
+			remediation: "Run `overlord sync lock claim`",
+		}
+	}
+
+	ownerMsg := fmt.Sprintf("owner=%s updated_at=%s", lock.Owner, lock.UpdatedAt)
+	if lock.Owner != machineName {
+		return doctorCheck{
+			name:        "Registry lock",
+			status:      doctorWarn,
+			message:     ownerMsg,
+			remediation: fmt.Sprintf("If needed, request transfer: `overlord sync lock transfer %s`", machineName),
+		}
+	}
+
+	return doctorCheck{
+		name:    "Registry lock",
+		status:  doctorPass,
+		message: ownerMsg,
+	}
+}
+
+func checkPeerReachability(ctx context.Context, client *syncthing.Client, peersCfg *machine.PeersConfig) doctorCheck {
+	connections, err := client.Connections(ctx)
+	if err != nil {
+		return doctorCheck{
+			name:        "Peer connectivity",
+			status:      doctorWarn,
+			message:     err.Error(),
+			remediation: "Check Syncthing connection status in UI",
+		}
+	}
+
+	disconnected := make([]string, 0)
+	for name, peer := range peersCfg.Peers {
+		conn, ok := connections.Connections[peer.Syncthing.DeviceID]
+		if !ok || !conn.Connected {
+			disconnected = append(disconnected, name)
+		}
+	}
+
+	if len(disconnected) > 0 {
+		return doctorCheck{
+			name:        "Peer connectivity",
+			status:      doctorWarn,
+			message:     fmt.Sprintf("disconnected: %s", strings.Join(disconnected, ", ")),
+			remediation: "Ensure peers are online and reachable over Tailscale",
+		}
+	}
+
+	return doctorCheck{
+		name:    "Peer connectivity",
+		status:  doctorPass,
+		message: "all configured peers connected",
+	}
+}
+
+func checkConfigIgnoreFile(configDir string) doctorCheck {
+	ignorePath := filepath.Join(configDir, ".stignore")
+	content, err := os.ReadFile(ignorePath)
+	if err != nil {
+		return doctorCheck{
+			name:        "Config .stignore",
+			status:      doctorFail,
+			message:     ".stignore missing",
+			remediation: "Run `overlord setup --init`",
+		}
+	}
+
+	if !containsExactLine(string(content), "machine.yaml") {
+		return doctorCheck{
+			name:        "Config .stignore",
+			status:      doctorFail,
+			message:     "missing machine.yaml exclusion",
+			remediation: "Add `machine.yaml` to ~/.config/overlord/.stignore",
+		}
+	}
+
+	return doctorCheck{
+		name:    "Config .stignore",
+		status:  doctorPass,
+		message: "machine.yaml excluded",
+	}
+}
+
+func checkConfigFolderConsistency(ctx context.Context, client *syncthing.Client) doctorCheck {
+	if _, err := client.Folder(ctx, syncpkg.ConfigFolderID); err != nil {
+		return doctorCheck{
+			name:        "Config Syncthing folder",
+			status:      doctorFail,
+			message:     err.Error(),
+			remediation: "Run `overlord setup --init` to configure overlord-config folder",
+		}
+	}
+
+	return doctorCheck{
+		name:    "Config Syncthing folder",
+		status:  doctorPass,
+		message: fmt.Sprintf("folder '%s' configured", syncpkg.ConfigFolderID),
+	}
+}
+
+func checkFolderConsistency(ctx context.Context, client *syncthing.Client, reg *registry.Registry) doctorCheck {
+	active := syncActiveProjects(reg)
+	baseDir, baseErr := expandBaseDir(reg)
+	if baseErr != nil {
+		return doctorCheck{
+			name:        "Active project folders",
+			status:      doctorFail,
+			message:     baseErr.Error(),
+			remediation: "Fix registry settings.base_dir",
+		}
+	}
+
+	mismatches := make([]string, 0)
+	for name := range active {
+		project := reg.Projects[name]
+		projectPath := fileutil.ResolveProjectPath(project.Path, baseDir)
+		if _, err := os.Stat(projectPath); err != nil {
+			mismatches = append(mismatches, fmt.Sprintf("%s (missing path)", name))
+			continue
+		}
+		folder, err := client.Folder(ctx, name)
+		if err != nil {
+			mismatches = append(mismatches, fmt.Sprintf("%s (missing syncthing folder)", name))
+			continue
+		}
+		if folder.Path != projectPath {
+			mismatches = append(mismatches, fmt.Sprintf("%s (path mismatch)", name))
+		}
+	}
+
+	if len(mismatches) > 0 {
+		return doctorCheck{
+			name:        "Active project folders",
+			status:      doctorWarn,
+			message:     strings.Join(mismatches, ", "),
+			remediation: "Run `overlord setup --init` then `overlord activate <name>` for affected projects",
+		}
+	}
+
+	return doctorCheck{
+		name:    "Active project folders",
+		status:  doctorPass,
+		message: fmt.Sprintf("%d active project(s) verified", len(active)),
+	}
+}
+
+func printDoctorChecksAndExit(checks []doctorCheck, s styles) error {
 	fails := 0
 	warns := 0
 

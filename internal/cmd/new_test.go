@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 func TestValidateName(t *testing.T) {
@@ -48,103 +50,49 @@ func TestValidateName(t *testing.T) {
 	}
 }
 
-func TestGetLanguage(t *testing.T) {
-	// Save original values
-	origPy := newOpts.langPy
-	origTs := newOpts.langTs
-	origGo := newOpts.langGo
-	origSol := newOpts.langSol
-
-	// Restore after test
-	defer func() {
-		newOpts.langPy = origPy
-		newOpts.langTs = origTs
-		newOpts.langGo = origGo
-		newOpts.langSol = origSol
-	}()
-
-	tests := []struct {
-		name     string
-		py       bool
-		ts       bool
-		goLang   bool
-		sol      bool
-		expected string
-	}{
-		{name: "default", py: false, ts: false, goLang: false, sol: false, expected: "base"},
-		{name: "python", py: true, ts: false, goLang: false, sol: false, expected: "python"},
-		{name: "typescript", py: false, ts: true, goLang: false, sol: false, expected: "typescript"},
-		{name: "go", py: false, ts: false, goLang: true, sol: false, expected: "go"},
-		{name: "solidity", py: false, ts: false, goLang: false, sol: true, expected: "solidity"},
-		// First flag wins when multiple are set
-		{name: "py wins over ts", py: true, ts: true, goLang: false, sol: false, expected: "python"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			newOpts.langPy = tt.py
-			newOpts.langTs = tt.ts
-			newOpts.langGo = tt.goLang
-			newOpts.langSol = tt.sol
-
-			result := getLanguage()
-			if string(result) != tt.expected {
-				t.Errorf("getLanguage() = %v, want %v", result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestExpandPath(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
-	}{
-		{name: "absolute path", input: "/home/user/project", wantErr: false},
-		{name: "tilde path", input: "~/project", wantErr: false},
-		{name: "tilde only", input: "~", wantErr: false},
-		{name: "empty", input: "", wantErr: true},
-		{name: "tilde user", input: "~user/project", wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := registry.ExpandPath(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("registry.ExpandPath(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
-			}
-		})
-	}
-}
-
 func TestCleanup(t *testing.T) {
-	t.Run("cleanup runs on failure", func(t *testing.T) {
-		c := &cleanup{}
-		c.add("/tmp/test1")
-		c.add("/tmp/test2")
+	t.Run("success=false removes files", func(t *testing.T) {
+		dir := t.TempDir()
+		fileA := filepath.Join(dir, "fileA.txt")
+		fileB := filepath.Join(dir, "fileB.txt")
 
-		// success is false by default, so cleanup should run
-		// We can't easily test the actual removal without creating files,
-		// but we can verify the structure
-		if c.success {
-			t.Error("cleanup.success should be false by default")
+		if err := os.WriteFile(fileA, []byte("a"), 0o644); err != nil {
+			t.Fatalf("failed to create fileA: %v", err)
 		}
-		if len(c.paths) != 2 {
-			t.Errorf("cleanup.paths should have 2 items, got %d", len(c.paths))
+		if err := os.WriteFile(fileB, []byte("b"), 0o644); err != nil {
+			t.Fatalf("failed to create fileB: %v", err)
+		}
+
+		c := &cleanup{}
+		c.add(fileA)
+		c.add(fileB)
+		// success is false by default — run() should remove all paths
+		c.run()
+
+		if _, err := os.Stat(fileA); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("fileA still exists after cleanup with success=false")
+		}
+		if _, err := os.Stat(fileB); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("fileB still exists after cleanup with success=false")
 		}
 	})
 
-	t.Run("cleanup skipped on success", func(t *testing.T) {
-		c := &cleanup{}
-		c.add("/tmp/test1")
-		c.success = true
+	t.Run("success=true preserves files", func(t *testing.T) {
+		dir := t.TempDir()
+		fileA := filepath.Join(dir, "fileA.txt")
 
-		// When success is true, run() should not remove anything
-		// This is a behavioral test - the paths should still be there
+		if err := os.WriteFile(fileA, []byte("a"), 0o644); err != nil {
+			t.Fatalf("failed to create fileA: %v", err)
+		}
+
+		c := &cleanup{}
+		c.add(fileA)
+		c.success = true
+		// When success=true, run() must not delete anything
 		c.run()
-		if len(c.paths) != 1 {
-			t.Errorf("cleanup.paths should still have 1 item after successful run, got %d", len(c.paths))
+
+		if _, err := os.Stat(fileA); errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("fileA was deleted by cleanup even though success=true")
 		}
 	})
 }

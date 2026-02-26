@@ -303,14 +303,14 @@ func (r *Registry) Validate() error {
 	return nil
 }
 
-// GetProject retrieves a project by name
-func (r *Registry) GetProject(name string) (Project, bool) {
+// ProjectByName retrieves a project by name.
+func (r *Registry) ProjectByName(name string) (Project, bool) {
 	project, ok := r.Projects[name]
 	return project, ok
 }
 
-// GetProjectByAlias retrieves a project by alias
-func (r *Registry) GetProjectByAlias(alias string) (string, Project, bool) {
+// ProjectByAlias retrieves a project by alias.
+func (r *Registry) ProjectByAlias(alias string) (string, Project, bool) {
 	for name, project := range r.Projects {
 		for _, a := range project.Aliases {
 			if a == alias {
@@ -321,9 +321,9 @@ func (r *Registry) GetProjectByAlias(alias string) (string, Project, bool) {
 	return "", Project{}, false
 }
 
-// GetActiveProjects retrieves all active projects
-func (r *Registry) GetActiveProjects() map[string]Project {
-	result := make(map[string]Project)
+// ActiveProjects retrieves all active projects.
+func (r *Registry) ActiveProjects() map[string]Project {
+	result := make(map[string]Project, len(r.Projects))
 	for name, project := range r.Projects {
 		if project.Status.State == StateActive {
 			result[name] = project
@@ -332,9 +332,9 @@ func (r *Registry) GetActiveProjects() map[string]Project {
 	return result
 }
 
-// GetArchivedProjects retrieves all archived projects
-func (r *Registry) GetArchivedProjects() map[string]Project {
-	result := make(map[string]Project)
+// ArchivedProjects retrieves all archived projects.
+func (r *Registry) ArchivedProjects() map[string]Project {
+	result := make(map[string]Project, len(r.Projects))
 	for name, project := range r.Projects {
 		if project.Status.State == StateArchived {
 			result[name] = project

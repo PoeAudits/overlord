@@ -18,20 +18,7 @@ const (
 
 	// defaultWorktreeBaseDir is the base directory for all worktrees.
 	defaultWorktreeBaseDir = "~/Overlord/worktrees"
+
+	// pickerInputWidth is the display width of the filter text input in the TUI picker.
+	pickerInputWidth = 40
 )
-
-// worktreeAdjectives are used for auto-generating branch names.
-var worktreeAdjectives = []string{
-	"swift", "bright", "clever", "smooth", "quick",
-	"clean", "sharp", "neat", "cool", "fast",
-	"bold", "calm", "clear", "crisp", "fresh",
-	"light", "prime", "ready", "smart", "steady",
-}
-
-// worktreeNouns are used for auto-generating branch names.
-var worktreeNouns = []string{
-	"fix", "task", "work", "dev", "patch",
-	"branch", "code", "build", "test", "run",
-	"flow", "sync", "push", "pull", "draft",
-	"spike", "probe", "check", "scan", "forge",
-}

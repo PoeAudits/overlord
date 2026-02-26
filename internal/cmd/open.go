@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"sort"
@@ -14,7 +16,10 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/PoeAudits/overlord/internal/fileutil"
+	"github.com/PoeAudits/overlord/internal/lifecycle"
 	"github.com/PoeAudits/overlord/internal/registry"
+	"github.com/PoeAudits/overlord/internal/tmux"
 )
 
 // projectItem represents a project for the picker
@@ -46,8 +51,8 @@ func newPickerModel(projects []projectItem) pickerModel {
 	ti := textinput.New()
 	ti.Placeholder = "Type to filter..."
 	ti.Focus()
-	ti.CharLimit = 64
-	ti.Width = 40
+	ti.CharLimit = maxProjectNameLen
+	ti.Width = pickerInputWidth
 
 	// Calculate max lengths for alignment
 	maxNameLen := 0
@@ -100,18 +105,6 @@ func (m pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 			return m, nil
-		}
-
-		// Handle j/k for vim-style navigation (only when not typing)
-		if msg.Type == tea.KeyRunes {
-			switch string(msg.Runes) {
-			case "j":
-				// Only navigate if input is empty or ends with j
-				// Actually, let's just use arrow keys for navigation
-				// and let j/k be typed as filter characters
-			case "k":
-				// Same as above
-			}
 		}
 
 	case tea.WindowSizeMsg:
@@ -273,15 +266,14 @@ Examples:
   overlord open                # Interactive picker
   overlord dispatch            # Shorthand (same as 'overlord open dispatch')`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: RunOpen,
+	RunE: runOpen,
 }
 
 func init() {
 	rootCmd.AddCommand(openCmd)
 }
 
-// RunOpen executes the open command (exported for root command handler)
-func RunOpen(cmd *cobra.Command, args []string) error {
+func runOpen(cmd *cobra.Command, args []string) error {
 	// Load registry
 	reg, err := loadRegistry()
 	if err != nil {
@@ -304,6 +296,8 @@ func RunOpen(cmd *cobra.Command, args []string) error {
 	} else {
 		// Name provided - try to resolve
 		query := args[0]
+		// Use Resolve (multi-result) instead of ResolveOne so ambiguous matches can
+		// flow into the interactive picker instead of returning an ambiguity error.
 		results := reg.Resolve(query)
 
 		if len(results) == 0 {
@@ -348,7 +342,7 @@ func RunOpen(cmd *cobra.Command, args []string) error {
 
 	// Check if project is archived
 	if project.Status.State == registry.StateArchived {
-		return fmt.Errorf("Error: '%s' is archived\nRestore it first: overlord unarchive %s --category=%s",
+		return fmt.Errorf("'%s' is archived\nRestore it first: overlord unarchive %s --category=%s",
 			projectName, projectName, project.Category)
 	}
 
@@ -362,7 +356,7 @@ func RunOpen(cmd *cobra.Command, args []string) error {
 	}
 
 	// Open the project
-	return openProject(projectName, project, reg.Settings)
+	return openProject(projectName, project, reg)
 }
 
 // showPicker shows the interactive picker with all active projects
@@ -373,9 +367,9 @@ func showPicker(reg *registry.Registry, initialQuery string) (string, registry.P
 	}
 
 	// Get active projects
-	activeProjects := reg.GetActiveProjects()
+	activeProjects := reg.ActiveProjects()
 	if len(activeProjects) == 0 {
-		return "", registry.Project{}, fmt.Errorf("Error: no active projects found\nRun 'overlord list --all' to see all projects")
+		return "", registry.Project{}, fmt.Errorf("no active projects found\nRun 'overlord list --all' to see all projects")
 	}
 
 	// Convert to picker items
@@ -406,7 +400,10 @@ func showPicker(reg *registry.Registry, initialQuery string) (string, registry.P
 	}
 
 	// Get the full project from registry
-	proj, _ := reg.GetProject(selected.name)
+	proj, ok := reg.ProjectByName(selected.name)
+	if !ok {
+		return "", registry.Project{}, fmt.Errorf("selected project '%s' not found in registry", selected.name)
+	}
 	return selected.name, proj, nil
 }
 
@@ -416,22 +413,22 @@ func showPickerWithResults(results []registry.ResolveResult) (string, registry.P
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		// Not in terminal - show ambiguous error
 		names := make([]string, len(results))
-		for i, r := range results {
-			names[i] = r.Name
+		for i, result := range results {
+			names[i] = result.Name
 		}
-		return "", registry.Project{}, fmt.Errorf("Error: multiple projects match: %s\nProvide a more specific name", strings.Join(names, ", "))
+		return "", registry.Project{}, fmt.Errorf("multiple projects match: %s\nProvide a more specific name", strings.Join(names, ", "))
 	}
 
 	// Convert to picker items
 	items := make([]projectItem, 0, len(results))
-	for _, r := range results {
+	for _, result := range results {
 		items = append(items, projectItem{
-			name:        r.Name,
-			category:    string(r.Project.Category),
-			description: r.Project.Description,
-			path:        r.Project.Path,
-			status:      r.Project.Status.State,
-			aliases:     r.Project.Aliases,
+			name:        result.Name,
+			category:    string(result.Project.Category),
+			description: result.Project.Description,
+			path:        result.Project.Path,
+			status:      result.Project.Status.State,
+			aliases:     result.Project.Aliases,
 		})
 	}
 
@@ -445,9 +442,9 @@ func showPickerWithResults(results []registry.ResolveResult) (string, registry.P
 	}
 
 	// Find the project in results
-	for _, r := range results {
-		if r.Name == selected.name {
-			return r.Name, r.Project, nil
+	for _, result := range results {
+		if result.Name == selected.name {
+			return result.Name, result.Project, nil
 		}
 	}
 
@@ -477,19 +474,32 @@ func runPicker(items []projectItem, initialQuery string) (*projectItem, error) {
 }
 
 // openProject opens a project in tmux
-func openProject(name string, project registry.Project, settings registry.Settings) error {
+func openProject(name string, project registry.Project, reg *registry.Registry) error {
 	// Expand base directory
-	baseDir, err := registry.ExpandPath(settings.BaseDir)
+	baseDir, err := expandBaseDir(reg)
 	if err != nil {
-		return fmt.Errorf("failed to expand base directory: %w", err)
+		return err
 	}
+	settings := reg.Settings
 
 	// Build full project path (handles both relative and absolute paths)
-	projectPath := resolveProjectPath(project.Path, baseDir)
+	projectPath := fileutil.ResolveProjectPath(project.Path, baseDir)
 
 	// Check if directory exists
-	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
-		return fmt.Errorf("Error: project directory not found\nExpected location: %s", projectPath)
+	if _, err := os.Stat(projectPath); errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("project directory not found\nExpected location: %s", projectPath)
+	}
+
+	openResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
+		Type:        lifecycle.ProjectOpening,
+		ProjectName: name,
+		ProjectPath: projectPath,
+		Settings: map[string]string{
+			"thoughts_dir": settings.ThoughtsDir,
+		},
+	})
+	if openResult.Err != nil {
+		return fmt.Errorf("pre-open hook failed: %w", openResult.Err)
 	}
 
 	// Define styles for output
@@ -501,29 +511,30 @@ func openProject(name string, project registry.Project, settings registry.Settin
 
 	// Check if tmux is available
 	if _, err := exec.LookPath("tmux"); err != nil {
-		return fmt.Errorf("Error: tmux not found in PATH\nInstall tmux to use workspace features")
+		return fmt.Errorf("tmux not found in PATH\nInstall tmux to use workspace features")
 	}
 
 	// Create tmux session helper
-	session := &tmuxSession{
-		Name: name,
-		Dir:  projectPath,
-	}
+	session := tmux.NewSession(name, projectPath)
 
 	// Check if session already exists
-	if session.exists() {
+	exists, err := session.Exists()
+	if err != nil {
+		return err
+	}
+	if exists {
 		fmt.Printf("%s %s\n", labelStyle.Render("Attaching to session:"), name)
 	} else {
 		fmt.Printf("%s %s\n", labelStyle.Render("Creating session:"), name)
 		fmt.Printf("%s %s\n", labelStyle.Render("Path:"), pathStyle.Render(projectPath))
 
 		// Create new session
-		if err := session.create(); err != nil {
+		if err := session.Create(); err != nil {
 			return err
 		}
 
 		// Source .tmux.local if it exists
-		if err := session.sourceLocal(); err != nil {
+		if err := session.SourceLocal(); err != nil {
 			fmt.Printf("%s %v\n", warnStyle.Render("Warning:"), err)
 		}
 
@@ -531,7 +542,7 @@ func openProject(name string, project registry.Project, settings registry.Settin
 	}
 
 	// Attach to session (or switch if already in tmux)
-	if err := session.attachOrSwitch(); err != nil {
+	if err := session.AttachOrSwitch(); err != nil {
 		fmt.Printf("%s %v\n", warnStyle.Render("Warning:"), err)
 		fmt.Printf("Attach manually: tmux attach -t %s\n", name)
 	}

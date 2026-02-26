@@ -43,7 +43,7 @@ func Example() {
 		log.Fatal(err)
 	}
 
-	project, ok := loaded.GetProject("my-cli-tool")
+	project, ok := loaded.ProjectByName("my-cli-tool")
 	if ok {
 		fmt.Printf("Project: %s\n", project.Description)
 		fmt.Printf("Category: %s\n", project.Category)

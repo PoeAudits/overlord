@@ -43,17 +43,8 @@ func createTestFile(t *testing.T, dir, name, content string) {
 	t.Helper()
 
 	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
-	}
-}
-
-func TestNew(t *testing.T) {
-	repoPath := "/test/repo"
-	gitOps := New(repoPath)
-
-	if gitOps.RepoPath != repoPath {
-		t.Errorf("expected RepoPath %q, got %q", repoPath, gitOps.RepoPath)
 	}
 }
 
@@ -378,31 +369,6 @@ func TestPull_InvalidRepo(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "failed to check git remote") {
 		t.Errorf("expected error message about git remote, got: %v", err)
-	}
-}
-
-func TestNew_WithEnv(t *testing.T) {
-	gitOps := New("/test/repo")
-	gitOps.Env = []string{"GIT_SSH_COMMAND=ssh -o ControlMaster=auto"}
-
-	if gitOps.RepoPath != "/test/repo" {
-		t.Errorf("expected RepoPath %q, got %q", "/test/repo", gitOps.RepoPath)
-	}
-
-	if len(gitOps.Env) != 1 {
-		t.Fatalf("expected 1 env var, got %d", len(gitOps.Env))
-	}
-
-	if gitOps.Env[0] != "GIT_SSH_COMMAND=ssh -o ControlMaster=auto" {
-		t.Errorf("expected GIT_SSH_COMMAND env, got %q", gitOps.Env[0])
-	}
-}
-
-func TestEnv_DefaultNil(t *testing.T) {
-	gitOps := New("/test/repo")
-
-	if gitOps.Env != nil {
-		t.Errorf("expected nil Env by default, got %v", gitOps.Env)
 	}
 }
 

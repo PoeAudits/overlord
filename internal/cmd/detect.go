@@ -2,13 +2,16 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/PoeAudits/overlord/internal/registry"
 	"github.com/spf13/cobra"
+
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 var (
@@ -96,7 +99,7 @@ func runDetect(cmd *cobra.Command, args []string) error {
 		absDir := filepath.Join(expandedBase, target.dir)
 		entries, err := os.ReadDir(absDir)
 		if err != nil {
-			if os.IsNotExist(err) {
+			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
 			return fmt.Errorf("failed to read directory %s: %w", absDir, err)

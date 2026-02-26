@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 
+	"github.com/PoeAudits/overlord/internal/lifecycle"
 	"github.com/PoeAudits/overlord/internal/registry"
 	"github.com/PoeAudits/overlord/internal/templates"
 )
@@ -34,7 +37,7 @@ Writes the following files (skips any that already exist):
   - Makefile (language-specific build commands)
   - README.md (project documentation)
   - AGENTS.md (AI agent instructions)
-  - .opencode/opencode.jsonc (editor configuration)
+  - opencode.jsonc (editor configuration)
 
 Also ensures thoughts artifacts exist for this project:
   - ~/thoughts/projects/{name}/{briefs,research,audits,plans,logs,reviews,docs}/
@@ -101,7 +104,7 @@ func runInitCmd(cmd *cobra.Command, args []string) error {
 
 	// Check directory exists
 	info, err := os.Stat(absPath)
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("directory does not exist: %s", absPath)
 	}
 	if err != nil {
@@ -180,13 +183,13 @@ func runInitCmd(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		// Ensure parent directory exists (for .opencode/opencode.jsonc)
-		if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		// Ensure parent directory exists (for nested template paths)
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
 			return fmt.Errorf("failed to create directory for %s: %w", relPath, err)
 		}
 
 		// Write file
-		if err := os.WriteFile(outputPath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(outputPath, []byte(content), 0o644); err != nil {
 			return fmt.Errorf("failed to write %s: %w", relPath, err)
 		}
 
@@ -206,8 +209,16 @@ func runInitCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("  Creating thoughts structure... ")
-	if err := CreateThoughtsStructure(thoughtsDir, name, absPath); err != nil {
-		return err
+	preInitResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
+		Type:        lifecycle.ProjectInitializing,
+		ProjectName: name,
+		ProjectPath: absPath,
+		Settings: map[string]string{
+			"thoughts_dir": thoughtsDir,
+		},
+	})
+	if preInitResult.Err != nil {
+		return fmt.Errorf("pre-init hook failed: %w", preInitResult.Err)
 	}
 	if warning, err := EnsureProjectThoughtsSymlink(thoughtsDir, name, absPath, false); err != nil {
 		return err

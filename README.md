@@ -254,7 +254,7 @@ overlord new my-project --dry-run
 Creates:
 - Project directory structure
 - Registry entry with metadata
-- Template files (Makefile, README.md, AGENTS.md, .tmux.local, .opencode/opencode.jsonc)
+- Template files (Makefile, README.md, AGENTS.md, .tmux.local, opencode.jsonc)
 
 #### Register Existing Project
 
@@ -463,7 +463,7 @@ New projects are initialized with language-specific templates:
 | `README.md` | Project documentation (with variables filled) |
 | `AGENTS.md` | AI agent documentation (with variables filled) |
 | `.tmux.local` | Tmux session setup script |
-| `.opencode/opencode.jsonc` | OpenCode configuration |
+| `opencode.jsonc` | OpenCode configuration |
 
 Templates support variable substitution:
 - `{{.ProjectName}}` - Project name
