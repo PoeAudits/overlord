@@ -35,31 +35,15 @@ func EnsureProjectThoughtsSymlink(thoughtsDir, projectName, projectPath string, 
 	targetPath := filepath.Join(thoughtsDir, thoughtsBase, projectName)
 	linkPath := filepath.Join(absProjectPath, "thoughts")
 
-	info, err := os.Lstat(linkPath)
-	if err == nil {
-		if info.Mode()&os.ModeSymlink == 0 {
-			return "warning: 'thoughts' exists and is not a symlink, skipping", nil
-		}
-
-		currentTarget, readErr := os.Readlink(linkPath)
-		if readErr != nil {
-			return "", fmt.Errorf("failed to read existing thoughts symlink: %w", readErr)
-		}
-
-		resolvedCurrentTarget := currentTarget
-		if !filepath.IsAbs(currentTarget) {
-			resolvedCurrentTarget = filepath.Join(absProjectPath, currentTarget)
-		}
-
-		if filepath.Clean(resolvedCurrentTarget) == filepath.Clean(targetPath) {
-			return updateDocsSymlinks(thoughtsDir, projectName, absProjectPath, archived)
-		}
-
-		if err := os.Remove(linkPath); err != nil {
-			return "", fmt.Errorf("failed to remove existing thoughts symlink: %w", err)
-		}
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		return "", fmt.Errorf("failed to check thoughts symlink: %w", err)
+	upToDate, warning, err := ensureThoughtsLink(linkPath, absProjectPath, targetPath)
+	if warning != "" {
+		return warning, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if upToDate {
+		return updateDocsSymlinks(thoughtsDir, projectName, absProjectPath, archived)
 	}
 
 	relTarget, err := filepath.Rel(absProjectPath, targetPath)
@@ -72,6 +56,39 @@ func EnsureProjectThoughtsSymlink(thoughtsDir, projectName, projectPath string, 
 	}
 
 	return updateDocsSymlinks(thoughtsDir, projectName, absProjectPath, archived)
+}
+
+func ensureThoughtsLink(linkPath, absProjectPath, targetPath string) (bool, string, error) {
+	info, err := os.Lstat(linkPath)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, "", nil
+	}
+	if err != nil {
+		return false, "", fmt.Errorf("failed to check thoughts symlink: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		return false, "warning: 'thoughts' exists and is not a symlink, skipping", nil
+	}
+
+	currentTarget, err := os.Readlink(linkPath)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to read existing thoughts symlink: %w", err)
+	}
+
+	resolvedCurrentTarget := currentTarget
+	if !filepath.IsAbs(currentTarget) {
+		resolvedCurrentTarget = filepath.Join(absProjectPath, currentTarget)
+	}
+
+	if filepath.Clean(resolvedCurrentTarget) == filepath.Clean(targetPath) {
+		return true, "", nil
+	}
+
+	if err := os.Remove(linkPath); err != nil {
+		return false, "", fmt.Errorf("failed to remove existing thoughts symlink: %w", err)
+	}
+
+	return false, "", nil
 }
 
 func updateDocsSymlinks(thoughtsDir, projectName, projectPath string, archived bool) (string, error) {

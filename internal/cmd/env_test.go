@@ -24,8 +24,8 @@ func TestAtomicWriteEnvFile(t *testing.T) {
 		envPath := filepath.Join(dir, ".env")
 		content := []byte("DB_HOST=localhost\nDB_PORT=5432\n")
 
-		if err := atomicWriteEnvFile(envPath, content); err != nil {
-			t.Fatalf("atomicWriteEnvFile() error = %v", err)
+		if err := fileutil.AtomicWriteFile(envPath, content, 0o600); err != nil {
+			t.Fatalf("AtomicWriteFile() error = %v", err)
 		}
 
 		got, err := os.ReadFile(envPath)
@@ -41,8 +41,8 @@ func TestAtomicWriteEnvFile(t *testing.T) {
 		dir := t.TempDir()
 		envPath := filepath.Join(dir, ".env")
 
-		if err := atomicWriteEnvFile(envPath, []byte("SECRET=value\n")); err != nil {
-			t.Fatalf("atomicWriteEnvFile() error = %v", err)
+		if err := fileutil.AtomicWriteFile(envPath, []byte("SECRET=value\n"), 0o600); err != nil {
+			t.Fatalf("AtomicWriteFile() error = %v", err)
 		}
 
 		info, err := os.Stat(envPath)
@@ -58,8 +58,8 @@ func TestAtomicWriteEnvFile(t *testing.T) {
 		dir := t.TempDir()
 		envPath := filepath.Join(dir, ".env")
 
-		if err := atomicWriteEnvFile(envPath, []byte("KEY=value\n")); err != nil {
-			t.Fatalf("atomicWriteEnvFile() error = %v", err)
+		if err := fileutil.AtomicWriteFile(envPath, []byte("KEY=value\n"), 0o600); err != nil {
+			t.Fatalf("AtomicWriteFile() error = %v", err)
 		}
 
 		tempPath := envPath + ".tmp"
@@ -78,8 +78,8 @@ func TestAtomicWriteEnvFile(t *testing.T) {
 		}
 
 		newContent := []byte("NEW=value\n")
-		if err := atomicWriteEnvFile(envPath, newContent); err != nil {
-			t.Fatalf("atomicWriteEnvFile() error = %v", err)
+		if err := fileutil.AtomicWriteFile(envPath, newContent, 0o600); err != nil {
+			t.Fatalf("AtomicWriteFile() error = %v", err)
 		}
 
 		got, err := os.ReadFile(envPath)
@@ -95,8 +95,8 @@ func TestAtomicWriteEnvFile(t *testing.T) {
 		dir := t.TempDir()
 		envPath := filepath.Join(dir, ".env")
 
-		if err := atomicWriteEnvFile(envPath, []byte{}); err != nil {
-			t.Fatalf("atomicWriteEnvFile() error = %v", err)
+		if err := fileutil.AtomicWriteFile(envPath, []byte{}, 0o600); err != nil {
+			t.Fatalf("AtomicWriteFile() error = %v", err)
 		}
 
 		got, err := os.ReadFile(envPath)
@@ -115,7 +115,7 @@ func TestAtomicWriteEnvFile(t *testing.T) {
 
 func TestAtomicWriteEnvFile_Errors(t *testing.T) {
 	t.Run("fails on non-existent directory", func(t *testing.T) {
-		err := atomicWriteEnvFile("/nonexistent/path/.env", []byte("data"))
+		err := fileutil.AtomicWriteFile("/nonexistent/path/.env", []byte("data"), 0o600)
 		if err == nil {
 			t.Fatal("expected error for non-existent directory")
 		}
@@ -131,7 +131,7 @@ func TestAtomicWriteEnvFile_Errors(t *testing.T) {
 		}
 		t.Cleanup(func() { os.Chmod(dir, 0o755) })
 
-		err := atomicWriteEnvFile(filepath.Join(dir, ".env"), []byte("data"))
+		err := fileutil.AtomicWriteFile(filepath.Join(dir, ".env"), []byte("data"), 0o600)
 		if err == nil {
 			t.Fatal("expected error for read-only directory")
 		}
@@ -663,9 +663,9 @@ func TestEnvPull_EndToEnd_WithoutPass(t *testing.T) {
 		mockPassOutput := []byte("DB_HOST=localhost\nDB_PORT=5432\nSECRET_KEY=abc123\n")
 		envPath := filepath.Join(projectDir, ".env")
 
-		err := atomicWriteEnvFile(envPath, mockPassOutput)
+		err := fileutil.AtomicWriteFile(envPath, mockPassOutput, 0o600)
 		if err != nil {
-			t.Fatalf("atomicWriteEnvFile() error = %v", err)
+			t.Fatalf("AtomicWriteFile() error = %v", err)
 		}
 
 		// Verify .env was written

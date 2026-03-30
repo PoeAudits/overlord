@@ -33,54 +33,44 @@ type searchTarget struct {
 // Resolve finds projects matching the query
 // Returns matches sorted by score (best first)
 func (r *Registry) Resolve(query string) []ResolveResult {
-	if query == "" {
+	if query == "" || len(r.Projects) == 0 {
 		return nil
 	}
 
-	if len(r.Projects) == 0 {
-		return nil
-	}
-
-	var results []ResolveResult
-
-	// Step 1: Check for exact name match
 	if project, ok := r.Projects[query]; ok {
-		results = append(results, ResolveResult{
+		return []ResolveResult{{
 			Name:      query,
 			Project:   project,
 			Score:     scoreExactName,
 			MatchedOn: "name",
-		})
-		return results // Exact match found, return immediately
+		}}
 	}
 
-	// Step 2: Check for exact alias match
 	for name, project := range r.Projects {
 		for _, alias := range project.Aliases {
 			if alias == query {
-				results = append(results, ResolveResult{
+				return []ResolveResult{{
 					Name:      name,
 					Project:   project,
 					Score:     scoreExactAlias,
 					MatchedOn: fmt.Sprintf("alias:%s", alias),
-				})
-				return results // Exact alias match found, return immediately
+				}}
 			}
 		}
 	}
 
-	// Step 3: Fuzzy matching
-	// Build list of searchable targets
-	var targets []searchTarget
-	for name, project := range r.Projects {
-		// Add project name
-		targets = append(targets, searchTarget{
-			text:       name,
-			projectKey: name,
-			matchType:  "name",
-		})
+	results := fuzzyMatch(query, buildSearchTargets(r.Projects), r.Projects)
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Score > results[j].Score
+	})
 
-		// Add aliases
+	return results
+}
+
+func buildSearchTargets(projects map[string]Project) []searchTarget {
+	targets := make([]searchTarget, 0, len(projects))
+	for name, project := range projects {
+		targets = append(targets, searchTarget{text: name, projectKey: name, matchType: "name"})
 		for _, alias := range project.Aliases {
 			targets = append(targets, searchTarget{
 				text:       alias,
@@ -89,44 +79,37 @@ func (r *Registry) Resolve(query string) []ResolveResult {
 			})
 		}
 	}
+	return targets
+}
 
-	// Extract text for fuzzy matching
+func fuzzyMatch(query string, targets []searchTarget, projects map[string]Project) []ResolveResult {
 	targetStrings := make([]string, len(targets))
 	for i, t := range targets {
 		targetStrings[i] = t.text
 	}
 
-	// Perform fuzzy match
 	matches := fuzzy.Find(query, targetStrings)
+	results := make([]ResolveResult, 0, len(matches))
+	seenProjects := make(map[string]struct{}, len(matches))
 
-	// Convert fuzzy matches to ResolveResults
-	seenProjects := make(map[string]struct{}) // Track projects we've already added
 	for _, match := range matches {
 		if match.Score < scoreFuzzyMin {
-			continue // Skip low-quality matches
+			continue
 		}
 
 		target := targets[match.Index]
-
-		// Skip if we've already added this project (prefer first/best match)
 		if _, ok := seenProjects[target.projectKey]; ok {
 			continue
 		}
-		seenProjects[target.projectKey] = struct{}{}
 
-		project := r.Projects[target.projectKey]
+		seenProjects[target.projectKey] = struct{}{}
 		results = append(results, ResolveResult{
 			Name:      target.projectKey,
-			Project:   project,
+			Project:   projects[target.projectKey],
 			Score:     match.Score,
 			MatchedOn: target.matchType,
 		})
 	}
-
-	// Sort by score (highest first)
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Score > results[j].Score
-	})
 
 	return results
 }

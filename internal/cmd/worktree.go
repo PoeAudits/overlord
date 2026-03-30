@@ -15,6 +15,18 @@ import (
 	"golang.org/x/term"
 )
 
+const (
+	// tmuxBaseWindow is the default window name created in new sessions.
+	tmuxBaseWindow = "base"
+	// tmuxAttachedSuffix indicates attached clients in tmux list output.
+	tmuxAttachedSuffix = ":1"
+
+	worktreeStatusMain      = "(main)"
+	worktreeStatusAttached  = "(attached)"
+	worktreeStatusDetached  = "(detached)"
+	worktreeStatusNoSession = "(no session)"
+)
+
 // worktreeCmd is the parent command for worktree management
 var worktreeCmd = &cobra.Command{
 	Use:   "worktree",
@@ -123,7 +135,13 @@ func worktreePath(project, branch string) (string, error) {
 	return worktree.Path(baseDir, project, branch), nil
 }
 
-func existingBranches(repoPath string) ([]string, error) {
+// collectExistingBranchNames merges branch names from refs and worktree metadata.
+//
+// refs/heads captures every local branch, including ones without a worktree.
+// git worktree list captures branches currently attached to linked worktrees.
+// We union both sources so generated names avoid collisions across both plain
+// branches and active worktree branches.
+func collectExistingBranchNames(repoPath string) ([]string, error) {
 	cmd := exec.Command("git", "for-each-ref", "--format=%(refname:short)", "refs/heads")
 	cmd.Dir = repoPath
 	output, err := cmd.Output()
@@ -157,6 +175,23 @@ func existingBranches(repoPath string) ([]string, error) {
 	return branches, nil
 }
 
+func resolveBranch(args []string, repoPath string) (string, error) {
+	if len(args) > 0 {
+		branch := args[0]
+		if worktree.WorktreeExists(repoPath, branch) {
+			return "", fmt.Errorf("worktree for branch '%s' already exists\nUse 'overlord worktree attach %s' to attach", branch, branch)
+		}
+		return branch, nil
+	}
+
+	existing, err := collectExistingBranchNames(repoPath)
+	if err != nil {
+		return "", err
+	}
+
+	return worktree.GenerateBranchName(existing), nil
+}
+
 // resolveBranchArg resolves branch name from args or current worktree context.
 // Used by attach and remove commands.
 func resolveBranchArg(args []string, info *worktree.Info, usage string) (string, error) {
@@ -169,34 +204,191 @@ func resolveBranchArg(args []string, info *worktree.Info, usage string) (string,
 	return "", fmt.Errorf("no branch specified and not in a worktree\n%s", usage)
 }
 
-func runWorktreeNew(cmd *cobra.Command, args []string) error {
-	s := NewStyles()
+func createWorktreeSession(s styles, info *worktree.Info, sessionName, wtPath string) (*tmux.Session, error) {
+	fmt.Printf("  Creating tmux session...")
+	session := tmux.NewSession(sessionName, wtPath)
 
-	// Detect project
-	cwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current directory: %w", err)
+	exists := false
+	if ok, err := session.Exists(); err == nil {
+		exists = ok
+	} else {
+		fmt.Printf("\n  %s failed to check tmux session: %v\n", s.Warn.Render("Warning:"), err)
 	}
 
-	info, err := worktree.DetectProject(cwd)
+	if exists {
+		fmt.Println(" already exists")
+		return session, nil
+	}
+
+	if err := session.Create(); err != nil {
+		rollbackCmd := exec.Command("git", "worktree", "remove", "--force", wtPath)
+		rollbackCmd.Dir = info.MainRepoPath
+		_ = rollbackCmd.Run()
+		return nil, fmt.Errorf("failed to create tmux session: %w", err)
+	}
+
+	sendCmd := exec.Command("tmux", "send-keys", "-t", sessionName+":"+tmuxBaseWindow, "opencode", "C-m")
+	if err := sendCmd.Run(); err != nil {
+		fmt.Printf("\n  %s failed to start opencode: %v\n", s.Warn.Render("Warning:"), err)
+	}
+
+	fmt.Println(" done")
+	return session, nil
+}
+
+func worktreeSessionStatus(s styles, sessionName string) (string, bool, error) {
+	sessionExists, err := tmux.NewSession(sessionName, "").Exists()
+	if err != nil {
+		return s.Dim.Render(worktreeStatusNoSession), false, err
+	}
+	if !sessionExists {
+		return s.Dim.Render(worktreeStatusNoSession), false, nil
+	}
+
+	listCmd := exec.Command("tmux", "list-sessions", "-F", "#{session_name}:#{session_attached}")
+	listOutput, err := listCmd.Output()
+	if err == nil && strings.Contains(string(listOutput), sessionName+tmuxAttachedSuffix) {
+		return s.Success.Render(worktreeStatusAttached), true, nil
+	}
+
+	return s.Info.Render(worktreeStatusDetached), true, nil
+}
+
+func formatWorktreeEntry(branch, path, status string) string {
+	return fmt.Sprintf("  %-20s  %s  %s", branch, fileutil.FormatPathWithTilde(path), status)
+}
+
+func removeWorktreeResources(s styles, info *worktree.Info, branch, sessionName, wtPath string) error {
+	fmt.Printf("  Killing tmux session...")
+	killSession := exec.Command("tmux", "kill-session", "-t", sessionName)
+	if killSession.Run() == nil {
+		fmt.Println(" done")
+	} else {
+		fmt.Println(" not running")
+	}
+
+	fmt.Printf("  Removing worktree...")
+	removeCmd := exec.Command("git", "worktree", "remove", "--force", wtPath)
+	removeCmd.Dir = info.MainRepoPath
+	if output, err := removeCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to remove worktree: %w (output: %s)", err, strings.TrimSpace(string(output)))
+	}
+	fmt.Println(" done")
+
+	fmt.Printf("  Deleting branch...")
+	deleteBranch := exec.Command("git", "branch", "-D", branch)
+	deleteBranch.Dir = info.MainRepoPath
+	if output, err := deleteBranch.CombinedOutput(); err != nil {
+		fmt.Printf(" %s %s\n", s.Warn.Render("warning:"), strings.TrimSpace(string(output)))
+	} else {
+		fmt.Println(" done")
+	}
+
+	return nil
+}
+
+func cleanupEmptyWorktreeDir(wtPath string) {
+	projectDir := filepath.Dir(wtPath)
+	if entries, err := os.ReadDir(projectDir); err == nil && len(entries) == 0 {
+		_ = os.Remove(projectDir)
+	}
+}
+
+func detectWorktreeProject() (*worktree.Info, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current directory: %w", err)
+	}
+	return worktree.DetectProject(cwd)
+}
+
+func printWorktreeDetails(s styles, project, branch, wtPath, sessionName string) {
+	fmt.Printf("%s %s\n", s.Label.Render("Project:"), project)
+	fmt.Printf("%s %s\n", s.Label.Render("Branch:"), branch)
+	fmt.Printf("%s %s\n", s.Label.Render("Path:"), s.Path.Render(wtPath))
+	fmt.Printf("%s %s\n\n", s.Label.Render("Session:"), sessionName)
+}
+
+func createGitWorktree(repoPath, branch, wtPath string) error {
+	fmt.Printf("  Creating worktree...")
+	var gitCmd *exec.Cmd
+	if worktree.BranchExists(repoPath, branch) {
+		gitCmd = exec.Command("git", "worktree", "add", wtPath, branch)
+	} else {
+		gitCmd = exec.Command("git", "worktree", "add", "-b", branch, wtPath)
+	}
+	gitCmd.Dir = repoPath
+	if output, err := gitCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to create worktree: %w (output: %s)", err, strings.TrimSpace(string(output)))
+	}
+	fmt.Println(" done")
+	return nil
+}
+
+func managedWorktreeEntries(entries []worktree.Entry, managedDir string) []worktree.Entry {
+	managed := make([]worktree.Entry, 0, len(entries))
+	for i, wt := range entries {
+		if i == 0 || strings.HasPrefix(wt.Path, managedDir) {
+			managed = append(managed, wt)
+		}
+	}
+	return managed
+}
+
+func printManagedWorktreeEntries(s styles, projectName string, entries []worktree.Entry) int {
+	activeSessions := 0
+	for i, wt := range entries {
+		if i == 0 {
+			fmt.Println(formatWorktreeEntry(s.Bold.Render(wt.Branch), wt.Path, s.Dim.Render(worktreeStatusMain)))
+			continue
+		}
+		sessionName := worktree.SessionName(projectName, wt.Branch)
+		status, isActive, err := worktreeSessionStatus(s, sessionName)
+		if err != nil {
+			fmt.Printf("%s failed to check tmux session '%s': %v\n", s.Warn.Render("Warning:"), sessionName, err)
+		}
+		if isActive {
+			activeSessions++
+		}
+		fmt.Println(formatWorktreeEntry(s.Name.Render(wt.Branch), wt.Path, status))
+	}
+	return activeSessions
+}
+
+func confirmWorktreeRemoval(s styles, branch, wtPath, sessionName string) (bool, error) {
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		return true, nil
+	}
+
+	fmt.Printf("%s %s\n", s.Label.Render("Branch:"), branch)
+	fmt.Printf("%s %s\n", s.Label.Render("Path:"), s.Path.Render(wtPath))
+	fmt.Printf("%s %s\n\n", s.Label.Render("Session:"), sessionName)
+
+	confirmed, err := confirmStrict("Remove worktree, branch, and session?")
+	if err != nil || !confirmed {
+		return confirmed, err
+	}
+	return true, nil
+}
+
+func warnIfRemovingCurrentWorktree(s styles, wtPath, mainRepoPath string) {
+	cwd, err := os.Getwd()
+	if err == nil && strings.HasPrefix(cwd, wtPath) {
+		fmt.Printf("\n%s You are currently in this worktree.\n", s.Warn.Render("Note:"))
+		fmt.Printf("After removal, run: cd %s\n\n", mainRepoPath)
+	}
+}
+
+func runWorktreeNew(cmd *cobra.Command, args []string) error {
+	s := NewStyles()
+	info, err := detectWorktreeProject()
 	if err != nil {
 		return err
 	}
 
-	// Get or generate branch name
-	var branch string
-	if len(args) > 0 {
-		branch = args[0]
-		// Check if branch/worktree already exists
-		if worktree.WorktreeExists(info.MainRepoPath, branch) {
-			return fmt.Errorf("worktree for branch '%s' already exists\nUse 'overlord worktree attach %s' to attach", branch, branch)
-		}
-	} else {
-		existingBranches, err := existingBranches(info.MainRepoPath)
-		if err != nil {
-			return err
-		}
-		branch = worktree.GenerateBranchName(existingBranches)
+	branch, err := resolveBranch(args, info.MainRepoPath)
+	if err != nil {
+		return err
 	}
 
 	// Get worktree path
@@ -211,57 +403,15 @@ func runWorktreeNew(cmd *cobra.Command, args []string) error {
 	}
 
 	sessionName := worktree.SessionName(info.ProjectName, branch)
+	printWorktreeDetails(s, info.ProjectName, branch, wtPath, sessionName)
 
-	fmt.Printf("%s %s\n", s.Label.Render("Project:"), info.ProjectName)
-	fmt.Printf("%s %s\n", s.Label.Render("Branch:"), branch)
-	fmt.Printf("%s %s\n", s.Label.Render("Path:"), s.Path.Render(wtPath))
-	fmt.Printf("%s %s\n", s.Label.Render("Session:"), sessionName)
-	fmt.Println()
-
-	// Create worktree
-	fmt.Printf("  Creating worktree...")
-	var gitCmd *exec.Cmd
-	if worktree.BranchExists(info.MainRepoPath, branch) {
-		// Branch exists, create worktree from it
-		gitCmd = exec.Command("git", "worktree", "add", wtPath, branch)
-	} else {
-		// Create new branch with worktree
-		gitCmd = exec.Command("git", "worktree", "add", "-b", branch, wtPath)
-	}
-	gitCmd.Dir = info.MainRepoPath
-	if output, err := gitCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to create worktree: %w (output: %s)", err, strings.TrimSpace(string(output)))
-	}
-	fmt.Println(" done")
-
-	// Create tmux session
-	fmt.Printf("  Creating tmux session...")
-	session := tmux.NewSession(sessionName, wtPath)
-	exists := false
-	if ok, err := session.Exists(); err == nil {
-		exists = ok
-	} else {
-		fmt.Printf("\n  %s failed to check tmux session: %v\n", s.Warn.Render("Warning:"), err)
+	if err := createGitWorktree(info.MainRepoPath, branch, wtPath); err != nil {
+		return err
 	}
 
-	if exists {
-		fmt.Println(" already exists")
-	} else {
-		if err := session.Create(); err != nil {
-			// Rollback: remove worktree (best-effort)
-			rollbackCmd := exec.Command("git", "worktree", "remove", "--force", wtPath)
-			rollbackCmd.Dir = info.MainRepoPath
-			_ = rollbackCmd.Run()
-			return fmt.Errorf("failed to create tmux session: %w", err)
-		}
-
-		// Send opencode command to the base window (best-effort)
-		sendCmd := exec.Command("tmux", "send-keys", "-t", sessionName+":base", "opencode", "C-m")
-		if err := sendCmd.Run(); err != nil {
-			fmt.Printf("\n  %s failed to start opencode: %v\n", s.Warn.Render("Warning:"), err)
-		}
-
-		fmt.Println(" done")
+	session, err := createWorktreeSession(s, info, sessionName, wtPath)
+	if err != nil {
+		return err
 	}
 
 	fmt.Println()
@@ -279,14 +429,7 @@ func runWorktreeNew(cmd *cobra.Command, args []string) error {
 
 func runWorktreeList(cmd *cobra.Command, args []string) error {
 	s := NewStyles()
-
-	// Detect project
-	cwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current directory: %w", err)
-	}
-
-	info, err := worktree.DetectProject(cwd)
+	info, err := detectWorktreeProject()
 	if err != nil {
 		return err
 	}
@@ -298,59 +441,20 @@ func runWorktreeList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to list worktrees: %w", err)
 	}
-
-	worktrees := worktree.ParseWorktreeList(string(output))
+	entries := worktree.ParseWorktreeList(string(output))
 
 	// Get worktree base path
 	baseDir, err := registry.ExpandPath(defaultWorktreeBaseDir)
 	if err != nil {
 		return fmt.Errorf("failed to expand worktree base dir: %w", err)
 	}
-	projectWorktreeDir := filepath.Join(baseDir, info.ProjectName)
+	managedDir := filepath.Join(baseDir, info.ProjectName)
+	managedEntries := managedWorktreeEntries(entries, managedDir)
 
 	fmt.Printf("%s %s\n\n", s.Label.Render("Worktrees for"), s.Bold.Render(info.ProjectName))
+	activeSessions := printManagedWorktreeEntries(s, info.ProjectName, managedEntries)
 
-	// Filter to show only worktrees in our managed directory (plus main)
-	hasWorktrees := false
-	activeSessions := 0
-
-	for i, wt := range worktrees {
-		if i == 0 {
-			// Show main repo
-			status := s.Dim.Render("(main)")
-			fmt.Printf("  %-20s  %s  %s\n", s.Bold.Render(wt.Branch), fileutil.FormatPathWithTilde(wt.Path), status)
-			continue
-		}
-
-		// Only show worktrees in our managed directory
-		if !strings.HasPrefix(wt.Path, projectWorktreeDir) {
-			continue
-		}
-
-		hasWorktrees = true
-		sessionName := worktree.SessionName(info.ProjectName, wt.Branch)
-
-		// Check session status
-		var status string
-		checkSession := exec.Command("tmux", "has-session", "-t", sessionName)
-		if checkSession.Run() == nil {
-			// Check if attached; if list-sessions fails, treat as detached
-			listCmd := exec.Command("tmux", "list-sessions", "-F", "#{session_name}:#{session_attached}")
-			listOutput, err := listCmd.Output()
-			if err == nil && strings.Contains(string(listOutput), sessionName+":1") {
-				status = s.Success.Render("(attached)")
-			} else {
-				status = s.Info.Render("(detached)")
-			}
-			activeSessions++
-		} else {
-			status = s.Dim.Render("(no session)")
-		}
-
-		fmt.Printf("  %-20s  %s  %s\n", s.Name.Render(wt.Branch), fileutil.FormatPathWithTilde(wt.Path), status)
-	}
-
-	if !hasWorktrees {
+	if len(managedEntries) == 1 {
 		fmt.Printf("  %s\n", s.Dim.Render("No worktrees found"))
 	}
 
@@ -385,8 +489,11 @@ func runWorktreeAttach(cmd *cobra.Command, args []string) error {
 	sessionName := worktree.SessionName(info.ProjectName, branch)
 
 	// Check if session exists
-	checkSession := exec.Command("tmux", "has-session", "-t", sessionName)
-	if checkSession.Run() != nil {
+	sessionExists, err := tmux.NewSession(sessionName, "").Exists()
+	if err != nil {
+		return err
+	}
+	if !sessionExists {
 		// Session doesn't exist - check if worktree exists
 		if !worktree.WorktreeExists(info.MainRepoPath, branch) {
 			return fmt.Errorf("no worktree found for branch '%s'\nCreate one with: overlord worktree new %s", branch, branch)
@@ -405,7 +512,7 @@ func runWorktreeAttach(cmd *cobra.Command, args []string) error {
 		}
 
 		// Start opencode (best-effort)
-		sendCmd := exec.Command("tmux", "send-keys", "-t", sessionName+":base", "opencode", "C-m")
+		sendCmd := exec.Command("tmux", "send-keys", "-t", sessionName+":"+tmuxBaseWindow, "opencode", "C-m")
 		_ = sendCmd.Run()
 	}
 
@@ -421,14 +528,7 @@ func runWorktreeAttach(cmd *cobra.Command, args []string) error {
 
 func runWorktreeRemove(cmd *cobra.Command, args []string) error {
 	s := NewStyles()
-
-	// Detect project
-	cwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current directory: %w", err)
-	}
-
-	info, err := worktree.DetectProject(cwd)
+	info, err := detectWorktreeProject()
 	if err != nil {
 		return err
 	}
@@ -450,62 +550,22 @@ func runWorktreeRemove(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Confirm removal
-	if term.IsTerminal(int(os.Stdin.Fd())) {
-		fmt.Printf("%s %s\n", s.Label.Render("Branch:"), branch)
-		fmt.Printf("%s %s\n", s.Label.Render("Path:"), s.Path.Render(wtPath))
-		fmt.Printf("%s %s\n", s.Label.Render("Session:"), sessionName)
-		fmt.Println()
-
-		confirmed, err := confirmAction("Remove worktree, branch, and session?")
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			fmt.Println("Cancelled")
-			return nil
-		}
+	confirmed, err := confirmWorktreeRemoval(s, branch, wtPath, sessionName)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		fmt.Println("Cancelled")
+		return nil
 	}
 
-	// If we're in the worktree being removed, warn user (skip check if Getwd fails)
-	if cwd, err = os.Getwd(); err == nil && strings.HasPrefix(cwd, wtPath) {
-		fmt.Printf("\n%s You are currently in this worktree.\n", s.Warn.Render("Note:"))
-		fmt.Printf("After removal, run: cd %s\n\n", info.MainRepoPath)
+	warnIfRemovingCurrentWorktree(s, wtPath, info.MainRepoPath)
+
+	if err := removeWorktreeResources(s, info, branch, sessionName, wtPath); err != nil {
+		return err
 	}
 
-	// Kill tmux session if exists
-	fmt.Printf("  Killing tmux session...")
-	killSession := exec.Command("tmux", "kill-session", "-t", sessionName)
-	if killSession.Run() == nil {
-		fmt.Println(" done")
-	} else {
-		fmt.Println(" not running")
-	}
-
-	// Remove worktree
-	fmt.Printf("  Removing worktree...")
-	removeCmd := exec.Command("git", "worktree", "remove", "--force", wtPath)
-	removeCmd.Dir = info.MainRepoPath
-	if output, err := removeCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to remove worktree: %w (output: %s)", err, strings.TrimSpace(string(output)))
-	}
-	fmt.Println(" done")
-
-	// Delete branch
-	fmt.Printf("  Deleting branch...")
-	deleteBranch := exec.Command("git", "branch", "-D", branch)
-	deleteBranch.Dir = info.MainRepoPath
-	if output, err := deleteBranch.CombinedOutput(); err != nil {
-		fmt.Printf(" %s %s\n", s.Warn.Render("warning:"), strings.TrimSpace(string(output)))
-	} else {
-		fmt.Println(" done")
-	}
-
-	// Clean up empty directories (best-effort)
-	projectDir := filepath.Dir(wtPath)
-	if entries, err := os.ReadDir(projectDir); err == nil && len(entries) == 0 {
-		_ = os.Remove(projectDir)
-	}
+	cleanupEmptyWorktreeDir(wtPath)
 
 	fmt.Println()
 	fmt.Printf("%s\n", s.Success.Render("Worktree removed successfully!"))

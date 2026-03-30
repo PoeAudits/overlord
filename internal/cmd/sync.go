@@ -125,10 +125,12 @@ func resolveSyncProjects(args []string, reg *registry.Registry, s styles) (map[s
 
 	if len(args) > 0 {
 		// Specific project requested
-		resolvedName, project, err := resolveProject(reg, args[0])
+		result, err := reg.ResolveOne(args[0])
 		if err != nil {
-			return nil, err
+			return nil, withHintOnNoProjectMatch(err, "run 'overlord list' to see available projects")
 		}
+		resolvedName := result.Name
+		project := result.Project
 
 		// Check if project has sync enabled
 		if project.Sync.Status != registry.SyncActive {

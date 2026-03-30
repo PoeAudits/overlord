@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/PoeAudits/overlord/internal/fileutil"
+	"github.com/PoeAudits/overlord/internal/lifecycle"
 	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/registry"
 	"golang.org/x/term"
@@ -53,14 +56,9 @@ func enforceRegistryLockOwnership() error {
 		return nil
 	}
 
-	return fmt.Errorf(
-		"registry lock is owned by '%s' and this machine is '%s'\n"+
-			"Run on owner machine: overlord sync lock transfer %s\n"+
-			"If owner is offline, run: overlord sync lock claim",
-		lock.Owner,
-		localMachine,
-		localMachine,
-	)
+	return cmdError("registry",
+		fmt.Sprintf("lock is owned by '%s' and this machine is '%s'", lock.Owner, localMachine),
+		fmt.Sprintf("Run on owner machine: overlord sync lock transfer %s. If owner is offline: overlord sync lock claim", localMachine))
 }
 
 // confirmAction allows a quick "y" acknowledgement for reversible operations,
@@ -108,14 +106,83 @@ func expandBaseDir(reg *registry.Registry) (string, error) {
 	return baseDir, nil
 }
 
-// resolveProject resolves a project name using fuzzy matching.
-// Returns the resolved name and project, or an error with a helpful message.
-func resolveProject(reg *registry.Registry, name string) (string, registry.Project, error) {
-	result, err := reg.ResolveOne(name)
-	if err != nil {
-		return "", registry.Project{}, fmt.Errorf("%w\nhint: run 'overlord list' to see all projects", err)
+func buildThoughtsSettings(reg *registry.Registry, s styles) map[string]string {
+	settings := map[string]string{}
+	if reg == nil {
+		return settings
 	}
-	return result.Name, result.Project, nil
+
+	thoughtsDir := reg.Settings.ThoughtsDir
+	if thoughtsDir == "" {
+		return settings
+	}
+
+	expandedThoughtsDir, err := registry.ExpandPath(thoughtsDir)
+	if err != nil {
+		fmt.Printf("%s Failed to expand thoughts directory: %v\n", s.Warn.Render("Warning:"), err)
+		settings["thoughts_dir"] = thoughtsDir
+		return settings
+	}
+
+	settings["thoughts_dir"] = expandedThoughtsDir
+	return settings
+}
+
+func fireProjectEvent(eventType lifecycle.EventType, name, path, thoughtsDir string) error {
+	settings := map[string]string{}
+	if thoughtsDir != "" {
+		settings["thoughts_dir"] = thoughtsDir
+	}
+
+	result := lifecycle.DefaultBus.Fire(lifecycle.Event{
+		Type:        eventType,
+		ProjectName: name,
+		ProjectPath: path,
+		Settings:    settings,
+	})
+	if result.Err != nil {
+		return fmt.Errorf("failed to fire %s lifecycle event for project '%s': %w", eventType, name, result.Err)
+	}
+
+	return nil
+}
+
+func withHintOnNoProjectMatch(err error, hint string) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "no project found matching") {
+		return fmt.Errorf("%w\nhint: %s", err, hint)
+	}
+	return err
+}
+
+func resolveProjectTargets(reg *registry.Registry, args []string, all bool) ([]string, error) {
+	if all {
+		names := make([]string, 0, len(reg.Projects))
+		for name := range reg.Projects {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		return names, nil
+	}
+
+	seen := make(map[string]struct{}, len(args))
+	targets := make([]string, 0, len(args))
+	for _, arg := range args {
+		result, err := reg.ResolveOne(arg)
+		if err != nil {
+			return nil, err
+		}
+		resolved := result.Name
+		if _, ok := seen[resolved]; ok {
+			continue
+		}
+		seen[resolved] = struct{}{}
+		targets = append(targets, resolved)
+	}
+
+	return targets, nil
 }
 
 // countTrue returns the number of true boolean values in the provided flags.
@@ -157,14 +224,14 @@ func validateCategory(name string) (registry.Category, error) {
 		for _, c := range registry.ValidCategories() {
 			validCats = append(validCats, string(c))
 		}
-		return "", fmt.Errorf("invalid category '%s'\nValid categories: %s", name, strings.Join(validCats, ", "))
+		return "", cmdError("validate", fmt.Sprintf("invalid category '%s'", name), fmt.Sprintf("Valid categories: %s", strings.Join(validCats, ", ")))
 	}
 	return category, nil
 }
 
 // confirmDelete prompts the user for confirmation before deleting.
 func confirmDelete(projectName, projectPath string) (bool, error) {
-	return confirmAction(fmt.Sprintf("Delete project '%s' and all files at %s?", projectName, projectPath))
+	return confirmStrict(fmt.Sprintf("Delete project '%s' and all files at %s?", projectName, projectPath))
 }
 
 // confirmArchiveMultiple prompts the user for confirmation before archiving multiple projects.
@@ -198,32 +265,68 @@ func confirmClear(targets []clearTarget) (bool, error) {
 	fmt.Printf("%s This will permanently delete the following:\n\n", warnStyle.Render("WARNING:"))
 
 	for _, t := range targets {
-		fmt.Printf("  %s\n", nameStyle.Render(t.name))
-		fmt.Printf("    %s\n", dimStyle.Render("Registry entry"))
-
-		if t.projectExists {
-			fmt.Printf("    %s\n", pathStyle.Render(fileutil.FormatPathWithTilde(t.projectPath)))
-		} else {
-			fmt.Printf("    %s %s\n", pathStyle.Render(fileutil.FormatPathWithTilde(t.projectPath)), dimStyle.Render("(not found)"))
-		}
-
-		if t.thoughtsExists {
-			fmt.Printf("    %s\n", pathStyle.Render(fileutil.FormatPathWithTilde(t.thoughtsDir)))
-		}
-
-		if t.archiveExists {
-			fmt.Printf("    %s\n", pathStyle.Render(fileutil.FormatPathWithTilde(t.archiveDir)))
-		}
-
-		if !t.thoughtsExists && !t.archiveExists {
-			fmt.Printf("    %s\n", dimStyle.Render("No thoughts directories found"))
-		}
-
-		fmt.Println()
+		printClearTarget(t, nameStyle, pathStyle, dimStyle)
 	}
 
 	fmt.Printf("%s This cannot be undone.\n", warnStyle.Render("CAUTION:"))
 	return confirmStrict("")
+}
+
+func printClearTarget(t clearTarget, nameStyle, pathStyle, dimStyle interface{ Render(...string) string }) {
+	fmt.Printf("  %s\n", nameStyle.Render(t.name))
+	fmt.Printf("    %s\n", dimStyle.Render("Registry entry"))
+
+	projectPath := pathStyle.Render(fileutil.FormatPathWithTilde(t.projectPath))
+	if !t.projectExists {
+		fmt.Printf("    %s %s\n", projectPath, dimStyle.Render("(not found)"))
+	} else {
+		fmt.Printf("    %s\n", projectPath)
+	}
+
+	printedThoughts := false
+	if t.thoughtsExists {
+		fmt.Printf("    %s\n", pathStyle.Render(fileutil.FormatPathWithTilde(t.thoughtsDir)))
+		printedThoughts = true
+	}
+	if t.archiveExists {
+		fmt.Printf("    %s\n", pathStyle.Render(fileutil.FormatPathWithTilde(t.archiveDir)))
+		printedThoughts = true
+	}
+	if !printedThoughts {
+		fmt.Printf("    %s\n", dimStyle.Render("No thoughts directories found"))
+	}
+
+	fmt.Println()
+}
+
+// formatDuration returns a human-readable duration string for the metadata footer.
+func formatDuration(d time.Duration) string {
+	switch {
+	case d < time.Millisecond:
+		return fmt.Sprintf("%dus", d.Microseconds())
+	case d < time.Second:
+		return fmt.Sprintf("%dms", d.Milliseconds())
+	default:
+		return fmt.Sprintf("%.1fs", d.Seconds())
+	}
+}
+
+// printExitFooter writes the [exit:<code> | <duration>] metadata footer to stderr.
+func printExitFooter(code int, d time.Duration) {
+	fmt.Fprintf(os.Stderr, "[exit:%d | %s]\n", code, formatDuration(d))
+}
+
+// cmdError formats a navigational error message following the pattern:
+//
+//	[error] <command>: <problem>. <suggestion>
+//
+// The suggestion tells the caller what to do instead. Use empty suggestion
+// when the problem is self-explanatory or the corrective action is obvious.
+func cmdError(command, problem, suggestion string) error {
+	if suggestion == "" {
+		return fmt.Errorf("[error] %s: %s", command, problem)
+	}
+	return fmt.Errorf("[error] %s: %s. %s", command, problem, suggestion)
 }
 
 func formatBytes(value int64) string {

@@ -87,8 +87,8 @@ func runDetect(cmd *cobra.Command, args []string) error {
 			}
 		}
 		if len(filtered) == 0 {
-			return fmt.Errorf("unknown category: %s\nValid categories: %s, archive",
-				detectCategoryOpt, strings.Join(validCategoryNames(), ", "))
+			return cmdError("detect", fmt.Sprintf("unknown category: %s", detectCategoryOpt),
+				fmt.Sprintf("Valid categories: %s, archive", strings.Join(validCategoryNames(), ", ")))
 		}
 		targets = filtered
 	}
@@ -129,30 +129,34 @@ func runDetect(cmd *cobra.Command, args []string) error {
 func buildKnownPaths(reg *registry.Registry, expandedBase string) map[string]struct{} {
 	known := make(map[string]struct{})
 	for _, project := range reg.Projects {
-		p := project.Path
-
-		// Handle absolute paths: convert to relative
-		if filepath.IsAbs(p) {
-			rel, err := filepath.Rel(expandedBase, p)
-			if err == nil {
-				p = rel
-			}
-		}
-
-		// Handle ~ prefix paths
-		if strings.HasPrefix(p, "~/") || strings.HasPrefix(p, "~") {
-			expanded, err := registry.ExpandPath(p)
-			if err == nil {
-				rel, err := filepath.Rel(expandedBase, expanded)
-				if err == nil {
-					p = rel
-				}
-			}
-		}
-
-		known[p] = struct{}{}
+		known[normalizeKnownPath(project.Path, expandedBase)] = struct{}{}
 	}
 	return known
+}
+
+func normalizeKnownPath(path, expandedBase string) string {
+	if filepath.IsAbs(path) {
+		rel, err := filepath.Rel(expandedBase, path)
+		if err == nil {
+			path = rel
+		}
+	}
+
+	if !strings.HasPrefix(path, "~") {
+		return path
+	}
+
+	expanded, err := registry.ExpandPath(path)
+	if err != nil {
+		return path
+	}
+
+	rel, err := filepath.Rel(expandedBase, expanded)
+	if err != nil {
+		return path
+	}
+
+	return rel
 }
 
 func outputDetectHuman(projects []unregisteredProject) error {

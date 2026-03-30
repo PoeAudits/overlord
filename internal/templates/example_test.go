@@ -3,6 +3,7 @@ package templates_test
 import (
 	"fmt"
 
+	"github.com/PoeAudits/overlord/internal/registry"
 	"github.com/PoeAudits/overlord/internal/templates"
 )
 
@@ -16,7 +17,7 @@ func Example() {
 	)
 
 	// Get a rendered template
-	content, err := templates.RenderTemplate(templates.LangGo, templates.TemplateAGENTS, data)
+	content, err := templates.RenderTemplate(registry.LanguageGo, templates.TemplateAGENTS, data)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
@@ -40,7 +41,7 @@ func Example_getAllTemplates() {
 	}
 
 	// Get all templates for Python
-	allTemplates, err := templates.GetAllTemplates(templates.LangPython, data)
+	allTemplates, err := templates.GetAllTemplates(registry.LanguagePython, data)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return

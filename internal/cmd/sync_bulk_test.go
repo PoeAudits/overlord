@@ -7,7 +7,7 @@ import (
 	"github.com/PoeAudits/overlord/internal/registry"
 )
 
-func TestResolveActivateTargets(t *testing.T) {
+func TestResolveProjectTargets(t *testing.T) {
 	reg := &registry.Registry{
 		Version: 2,
 		Settings: registry.Settings{
@@ -35,80 +35,34 @@ func TestResolveActivateTargets(t *testing.T) {
 		},
 	}
 
-	t.Run("all returns sorted names", func(t *testing.T) {
-		names, err := resolveActivateTargets(reg, nil, true)
-		if err != nil {
-			t.Fatalf("resolveActivateTargets() error = %v", err)
-		}
-
-		want := []string{"api", "app"}
-		if !reflect.DeepEqual(names, want) {
-			t.Fatalf("resolveActivateTargets() = %v, want %v", names, want)
-		}
-	})
-
-	t.Run("dedupes aliases", func(t *testing.T) {
-		names, err := resolveActivateTargets(reg, []string{"app", "application"}, false)
-		if err != nil {
-			t.Fatalf("resolveActivateTargets() error = %v", err)
-		}
-
-		want := []string{"app"}
-		if !reflect.DeepEqual(names, want) {
-			t.Fatalf("resolveActivateTargets() = %v, want %v", names, want)
-		}
-	})
-}
-
-func TestResolveDeactivateTargets(t *testing.T) {
-	reg := &registry.Registry{
-		Version: 2,
-		Settings: registry.Settings{
-			BaseDir:     "~/Overlord",
-			ThoughtsDir: "~/thoughts",
+	tests := []struct {
+		name string
+		args []string
+		all  bool
+		want []string
+	}{
+		{
+			name: "all returns sorted names",
+			all:  true,
+			want: []string{"api", "app"},
 		},
-		Projects: map[string]registry.Project{
-			"worker": {
-				Path:        "projects/services/worker",
-				Category:    registry.CategoryServices,
-				Lang:        registry.LanguageGo,
-				Created:     "2026-01-01",
-				Description: "worker",
-				Aliases:     []string{"wk"},
-				Status:      registry.Status{State: registry.StateActive},
-			},
-			"frontend": {
-				Path:        "projects/web/frontend",
-				Category:    registry.CategoryWeb,
-				Lang:        registry.LanguageTypeScript,
-				Created:     "2026-01-01",
-				Description: "frontend",
-				Status:      registry.Status{State: registry.StateActive},
-			},
+		{
+			name: "dedupes aliases",
+			args: []string{"app", "application"},
+			want: []string{"app"},
 		},
 	}
 
-	t.Run("all returns sorted names", func(t *testing.T) {
-		names, err := resolveDeactivateTargets(reg, nil, true)
-		if err != nil {
-			t.Fatalf("resolveDeactivateTargets() error = %v", err)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			names, err := resolveProjectTargets(reg, tt.args, tt.all)
+			if err != nil {
+				t.Fatalf("resolveProjectTargets() error = %v", err)
+			}
 
-		want := []string{"frontend", "worker"}
-		if !reflect.DeepEqual(names, want) {
-			t.Fatalf("resolveDeactivateTargets() = %v, want %v", names, want)
-		}
-	})
-
-	t.Run("dedupes aliases", func(t *testing.T) {
-		names, err := resolveDeactivateTargets(reg, []string{"worker", "wk"}, false)
-		if err != nil {
-			t.Fatalf("resolveDeactivateTargets() error = %v", err)
-		}
-
-		want := []string{"worker"}
-		if !reflect.DeepEqual(names, want) {
-			t.Fatalf("resolveDeactivateTargets() = %v, want %v", names, want)
-		}
-	})
+			if !reflect.DeepEqual(names, tt.want) {
+				t.Fatalf("resolveProjectTargets() = %v, want %v", names, tt.want)
+			}
+		})
+	}
 }

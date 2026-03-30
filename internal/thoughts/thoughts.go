@@ -190,32 +190,51 @@ func ensureProjectSymlinkForPaths(paths Paths, projectPath string) error {
 		linkPath := filepath.Join(docsDir, name)
 		targetPath := filepath.Join(projectPath, name)
 
-		if linkInfo, lerr := os.Lstat(linkPath); lerr == nil {
-			if linkInfo.Mode()&os.ModeSymlink == 0 {
-				return fmt.Errorf("path exists and is not a symlink: %s", linkPath)
-			}
-			if rerr := os.Remove(linkPath); rerr != nil {
-				return fmt.Errorf("failed to remove existing symlink %s: %w", linkPath, rerr)
-			}
-		} else if !errors.Is(lerr, fs.ErrNotExist) {
-			return fmt.Errorf("failed to inspect symlink path %s: %w", linkPath, lerr)
+		if err := removeStaleSymlink(linkPath); err != nil {
+			return err
 		}
 
-		if _, serr := os.Stat(targetPath); errors.Is(serr, fs.ErrNotExist) {
-			continue
-		} else if serr != nil {
-			return fmt.Errorf("failed to stat symlink target %s: %w", targetPath, serr)
+		if err := createDocSymlink(linkPath, targetPath); err != nil {
+			return err
 		}
+	}
 
-		targetDir := filepath.Dir(linkPath)
-		relTarget, rerr := filepath.Rel(targetDir, targetPath)
-		if rerr != nil {
-			return fmt.Errorf("failed to calculate relative symlink target: %w", rerr)
-		}
+	return nil
+}
 
-		if serr := os.Symlink(relTarget, linkPath); serr != nil {
-			return fmt.Errorf("failed to create symlink %s -> %s: %w", linkPath, relTarget, serr)
-		}
+func removeStaleSymlink(linkPath string) error {
+	linkInfo, err := os.Lstat(linkPath)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to inspect symlink path %s: %w", linkPath, err)
+	}
+	if linkInfo.Mode()&os.ModeSymlink == 0 {
+		return fmt.Errorf("path exists and is not a symlink: %s", linkPath)
+	}
+	if err := os.Remove(linkPath); err != nil {
+		return fmt.Errorf("failed to remove existing symlink %s: %w", linkPath, err)
+	}
+	return nil
+}
+
+func createDocSymlink(linkPath, targetPath string) error {
+	_, err := os.Stat(targetPath)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to stat symlink target %s: %w", targetPath, err)
+	}
+
+	relTarget, err := filepath.Rel(filepath.Dir(linkPath), targetPath)
+	if err != nil {
+		return fmt.Errorf("failed to calculate relative symlink target: %w", err)
+	}
+
+	if err := os.Symlink(relTarget, linkPath); err != nil {
+		return fmt.Errorf("failed to create symlink %s -> %s: %w", linkPath, relTarget, err)
 	}
 
 	return nil

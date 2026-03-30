@@ -36,7 +36,7 @@ func resolveEnvProject(args []string, reg *registry.Registry, baseDir, cwdUsage 
 		// Explicit project name — resolve via fuzzy matching
 		result, err := reg.ResolveOne(args[0])
 		if err != nil {
-			return nil, fmt.Errorf("project '%s' not found in registry\nrun 'overlord list' to see all projects", args[0])
+			return nil, cmdError("env", fmt.Sprintf("project '%s' not found in registry", args[0]), "Run 'overlord list' to see all projects")
 		}
 		info.Name = result.Name
 		info.Project = result.Project
@@ -220,7 +220,7 @@ func pullFromTemplate(envPassPath, envPath, projectName, matchInfo string) error
 	}
 
 	if len(entries) == 0 {
-		return fmt.Errorf("%s is empty — add entries in the format:\n  KEY=pass:pass-entry-name\n  KEY=literal-value", envPassFile)
+		return cmdError("env", fmt.Sprintf("%s is empty", envPassFile), "Add entries in the format: KEY=pass:pass-entry-name or KEY=literal-value")
 	}
 
 	content, passCount, err := resolveEnvEntries(entries)
@@ -228,7 +228,7 @@ func pullFromTemplate(envPassPath, envPath, projectName, matchInfo string) error
 		return err
 	}
 
-	if err := atomicWriteEnvFile(envPath, content); err != nil {
+	if err := fileutil.AtomicWriteFile(envPath, content, 0o600); err != nil {
 		return err
 	}
 
@@ -246,18 +246,13 @@ func pullFromBlob(envPath, projectName, matchInfo string) error {
 	if err != nil {
 		// Check if pass is installed
 		if _, lookErr := exec.LookPath("pass"); lookErr != nil {
-			return fmt.Errorf("'pass' is not installed or not in PATH\nInstall pass: https://www.passwordstore.org/")
+			return cmdError("env", "'pass' is not installed or not in PATH", "Install pass: https://www.passwordstore.org/")
 		}
-		return fmt.Errorf(
-			"no %s file found and no pass entry at '%s': %w\n\nCreate a %s file in the project root:\n  KEY=pass:pass-entry-name\n  KEY=literal-value",
-			envPassFile,
-			passEntry,
-			err,
-			envPassFile,
-		)
+		return cmdError("env", fmt.Sprintf("no %s file found and no pass entry at '%s'", envPassFile, passEntry),
+			fmt.Sprintf("Create a %s file in the project root with: KEY=pass:pass-entry-name or KEY=literal-value", envPassFile))
 	}
 
-	if err := atomicWriteEnvFile(envPath, output); err != nil {
+	if err := fileutil.AtomicWriteFile(envPath, output, 0o600); err != nil {
 		return err
 	}
 
@@ -374,8 +369,9 @@ func resolveEnvEntries(entries []envEntry) ([]byte, int, error) {
 			cmd := exec.Command("pass", "show", entry.PassEntry)
 			output, err := cmd.Output()
 			if err != nil {
-				return nil, 0, fmt.Errorf("failed to resolve pass entry '%s' (line %d of %s)\nCreate it with: pass insert %s",
-					entry.PassEntry, entry.Line, envPassFile, entry.PassEntry)
+				return nil, 0, cmdError("env",
+					fmt.Sprintf("failed to resolve pass entry '%s' (line %d of %s)", entry.PassEntry, entry.Line, envPassFile),
+					fmt.Sprintf("Create it with: pass insert %s", entry.PassEntry))
 			}
 			// pass output may have trailing newline — trim it
 			value := strings.TrimRight(string(output), "\n")
@@ -419,7 +415,7 @@ func runEnvGenerate(cmd *cobra.Command, args []string) error {
 
 	// Check if .env.pass already exists
 	if _, err := os.Stat(envPassPath); err == nil && !envGenerateForce {
-		return fmt.Errorf(".env.pass already exists at %s\nuse --force to overwrite", envPassPath)
+		return cmdError("env generate", fmt.Sprintf(".env.pass already exists at %s", envPassPath), "Use --force to overwrite")
 	}
 
 	// Scan pass store
@@ -429,7 +425,7 @@ func runEnvGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(entries) == 0 {
-		return fmt.Errorf("no entries found in pass store\nadd entries with: pass insert <entry-name>")
+		return cmdError("env generate", "no entries found in pass store", "Add entries with: pass insert <entry-name>")
 	}
 
 	// Generate and write the template
@@ -472,7 +468,7 @@ func listPassEntries() ([]string, error) {
 	}
 
 	if _, err := os.Stat(storeDir); errors.Is(err, fs.ErrNotExist) {
-		return nil, fmt.Errorf("pass store directory does not exist: %s\ninitialize with: pass init <gpg-id>", storeDir)
+		return nil, cmdError("env", fmt.Sprintf("pass store directory does not exist: %s", storeDir), "Initialize with: pass init <gpg-id>")
 	}
 
 	var entries []string
@@ -562,25 +558,4 @@ func GenerateEnvPassFile(projectRoot string) (int, error) {
 	}
 
 	return len(entries), nil
-}
-
-// atomicWriteEnvFile writes content to the .env file atomically with 0600 permissions.
-func atomicWriteEnvFile(envPath string, content []byte) error {
-	tempPath := envPath + ".tmp"
-
-	if err := os.WriteFile(tempPath, content, 0o600); err != nil {
-		return fmt.Errorf("failed to write temp file: %w", err)
-	}
-
-	if err := os.Chmod(tempPath, 0o600); err != nil {
-		_ = os.Remove(tempPath) // Best-effort cleanup of temp file
-		return fmt.Errorf("failed to set file permissions: %w", err)
-	}
-
-	if err := os.Rename(tempPath, envPath); err != nil {
-		_ = os.Remove(tempPath) // Best-effort cleanup of temp file
-		return fmt.Errorf("failed to write .env file: %w", err)
-	}
-
-	return nil
 }

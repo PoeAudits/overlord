@@ -173,30 +173,45 @@ func expandPath(path string) (string, error) {
 		return "", fmt.Errorf("path cannot be empty")
 	}
 
-	if path[0] == '~' {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("failed to get home directory: %w", err)
-		}
-
-		if len(path) == 1 {
-			path = homeDir
-		} else if path[1] == '/' || path[1] == filepath.Separator {
-			path = filepath.Join(homeDir, path[2:])
-		} else {
-			return "", fmt.Errorf("~user expansion not supported, use absolute path")
-		}
+	expandedPath, err := expandTildePath(path)
+	if err != nil {
+		return "", err
 	}
 
-	if !filepath.IsAbs(path) {
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			return "", fmt.Errorf("failed to resolve absolute path: %w", err)
-		}
-		path = absPath
+	if filepath.IsAbs(expandedPath) {
+		return expandedPath, nil
 	}
 
-	return path, nil
+	absPath, err := filepath.Abs(expandedPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve absolute path: %w", err)
+	}
+
+	return absPath, nil
+}
+
+// expandTildePath expands leading "~" and rejects "~user" forms.
+// Only bare "~" or "~/..." are supported; callers must provide absolute
+// paths when referring to another user's home directory.
+func expandTildePath(path string) (string, error) {
+	if path[0] != '~' {
+		return path, nil
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	if len(path) == 1 {
+		return homeDir, nil
+	}
+
+	if path[1] == '/' || path[1] == filepath.Separator {
+		return filepath.Join(homeDir, path[2:]), nil
+	}
+
+	return "", fmt.Errorf("~user expansion not supported, use absolute path")
 }
 
 func isCrossDeviceErr(err error) bool {

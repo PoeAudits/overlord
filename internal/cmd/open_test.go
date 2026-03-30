@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"testing"
+
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 func TestPickerModelFilterProjects(t *testing.T) {
@@ -94,5 +96,39 @@ func TestPickerModelCursorBounds(t *testing.T) {
 	m.filterProjects()
 	if m.cursor < 0 {
 		t.Errorf("cursor went below 0: %d", m.cursor)
+	}
+}
+
+func TestArchivedProjectNames(t *testing.T) {
+	resolvedProjects := []openTarget{
+		{
+			name: "active-project",
+			project: registry.Project{
+				Status: registry.Status{State: registry.StateActive},
+			},
+		},
+		{
+			name: "archived-one",
+			project: registry.Project{
+				Status: registry.Status{State: registry.StateArchived},
+			},
+		},
+		{
+			name: "archived-two",
+			project: registry.Project{
+				Status: registry.Status{State: registry.StateArchived},
+			},
+		},
+	}
+
+	archivedNames := archivedProjectNames(resolvedProjects)
+	if len(archivedNames) != 2 {
+		t.Fatalf("archivedProjectNames() returned %d names, want 2", len(archivedNames))
+	}
+	if archivedNames[0] != "archived-one" {
+		t.Fatalf("archivedProjectNames()[0] = %q, want %q", archivedNames[0], "archived-one")
+	}
+	if archivedNames[1] != "archived-two" {
+		t.Fatalf("archivedProjectNames()[1] = %q, want %q", archivedNames[1], "archived-two")
 	}
 }

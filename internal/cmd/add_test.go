@@ -294,7 +294,7 @@ func TestGetLanguageFromFlags(t *testing.T) {
 			addOpts.langSol = tt.sol
 			addOpts.langBase = tt.base
 
-			lang, ok := getLanguageFromFlags()
+			lang, ok := languageFromFlags(addOpts.langPy, addOpts.langTs, addOpts.langGo, addOpts.langSol, addOpts.langBase)
 			if ok != tt.wantOk {
 				t.Errorf("ok = %v, want %v", ok, tt.wantOk)
 			}

@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/machine"
@@ -59,10 +58,10 @@ func runActivate(cmd *cobra.Command, args []string) error {
 	s := NewStyles()
 
 	if activateOpts.all && len(args) > 0 {
-		return fmt.Errorf("--all cannot be combined with project names")
+		return cmdError("activate", "--all cannot be combined with project names", "")
 	}
 	if !activateOpts.all && len(args) == 0 {
-		return fmt.Errorf("requires at least one project name or --all")
+		return cmdError("activate", "requires at least one project name or --all", "Usage: overlord activate <name> [name...] or --all")
 	}
 
 	// Load registry
@@ -71,7 +70,7 @@ func runActivate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	targets, err := resolveActivateTargets(reg, args, activateOpts.all)
+	targets, err := resolveProjectTargets(reg, args, activateOpts.all)
 	if err != nil {
 		return err
 	}
@@ -119,14 +118,14 @@ func runActivate(cmd *cobra.Command, args []string) error {
 	}
 
 	results := make([]string, 0, len(targets))
-	failures := make([]string, 0)
+	failures := 0
 	updated := false
 
 	for _, projectName := range targets {
 		project := reg.Projects[projectName]
 		peerProjectPath, activateErr := activateProjectSync(ctx, activateCtx, projectName, project)
 		if activateErr != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", projectName, activateErr))
+			failures++
 			results = append(results, fmt.Sprintf("%s %s - %v", s.Error.Render("✗"), projectName, activateErr))
 			continue
 		}
@@ -148,44 +147,16 @@ func runActivate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if len(failures) > 0 {
-		return fmt.Errorf("activate completed with %d failure(s)", len(failures))
+	if failures > 0 {
+		return fmt.Errorf("activate completed with %d failure(s)", failures)
 	}
 
 	if len(targets) == 1 {
-		fmt.Printf("%s sync active\n", s.Label.Render("Status:"))
+		fmt.Printf("%s sync active\n", s.Label.Render("Sync status:"))
 	}
 
 	return nil
 }
-
-func resolveActivateTargets(reg *registry.Registry, args []string, all bool) ([]string, error) {
-	if all {
-		names := make([]string, 0, len(reg.Projects))
-		for name := range reg.Projects {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		return names, nil
-	}
-
-	seen := make(map[string]struct{}, len(args))
-	targets := make([]string, 0, len(args))
-	for _, arg := range args {
-		resolved, _, err := resolveProject(reg, arg)
-		if err != nil {
-			return nil, err
-		}
-		if _, ok := seen[resolved]; ok {
-			continue
-		}
-		seen[resolved] = struct{}{}
-		targets = append(targets, resolved)
-	}
-
-	return targets, nil
-}
-
 func activateProjectSync(
 	ctx context.Context,
 	activateCtx activateContext,
@@ -193,7 +164,7 @@ func activateProjectSync(
 	project registry.Project,
 ) (string, error) {
 	if project.Status.State == registry.StateArchived {
-		return "", fmt.Errorf("archived (run 'overlord unarchive %s' first)", projectName)
+		return "", cmdError("activate", fmt.Sprintf("'%s' is archived", projectName), fmt.Sprintf("Run 'overlord unarchive %s' first", projectName))
 	}
 
 	projectPath := fileutil.ResolveProjectPath(project.Path, activateCtx.baseDir)

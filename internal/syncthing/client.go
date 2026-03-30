@@ -91,8 +91,8 @@ func (c *Client) Devices(ctx context.Context) ([]Device, error) {
 	return devices, nil
 }
 
-// Device returns a single device by ID.
-func (c *Client) Device(ctx context.Context, id string) (*Device, error) {
+// device returns a single device by ID.
+func (c *Client) device(ctx context.Context, id string) (*Device, error) {
 	var device Device
 	if err := c.getJSON(ctx, "/rest/config/devices/"+url.PathEscape(id), &device); err != nil {
 		return nil, err
@@ -100,22 +100,22 @@ func (c *Client) Device(ctx context.Context, id string) (*Device, error) {
 	return &device, nil
 }
 
-// AddDevice creates a new device entry.
-func (c *Client) AddDevice(ctx context.Context, device Device) error {
+// addDevice creates a new device entry.
+func (c *Client) addDevice(ctx context.Context, device Device) error {
 	return c.postJSON(ctx, "/rest/config/devices", device, nil)
 }
 
-// UpdateDevice updates an existing device entry.
-func (c *Client) UpdateDevice(ctx context.Context, device Device) error {
+// updateDevice updates an existing device entry.
+func (c *Client) updateDevice(ctx context.Context, device Device) error {
 	return c.putJSON(ctx, "/rest/config/devices/"+url.PathEscape(device.DeviceID), device, nil)
 }
 
 // EnsureDevice creates or updates a device configuration.
 func (c *Client) EnsureDevice(ctx context.Context, device Device) (bool, error) {
-	current, err := c.Device(ctx, device.DeviceID)
+	current, err := c.device(ctx, device.DeviceID)
 	if err != nil {
 		if IsNotFound(err) {
-			return true, c.AddDevice(ctx, device)
+			return true, c.addDevice(ctx, device)
 		}
 		return false, err
 	}
@@ -142,7 +142,7 @@ func (c *Client) EnsureDevice(ctx context.Context, device Device) (bool, error) 
 		return false, nil
 	}
 
-	return true, c.UpdateDevice(ctx, *current)
+	return true, c.updateDevice(ctx, *current)
 }
 
 // Folders returns configured folders.
@@ -154,8 +154,8 @@ func (c *Client) Folders(ctx context.Context) ([]Folder, error) {
 	return folders, nil
 }
 
-// Folder returns a folder by ID.
-func (c *Client) Folder(ctx context.Context, id string) (*Folder, error) {
+// folder returns a folder by ID.
+func (c *Client) folder(ctx context.Context, id string) (*Folder, error) {
 	var folder Folder
 	if err := c.getJSON(ctx, "/rest/config/folders/"+url.PathEscape(id), &folder); err != nil {
 		return nil, err
@@ -163,22 +163,22 @@ func (c *Client) Folder(ctx context.Context, id string) (*Folder, error) {
 	return &folder, nil
 }
 
-// AddFolder creates a new folder entry.
-func (c *Client) AddFolder(ctx context.Context, folder Folder) error {
+// addFolder creates a new folder entry.
+func (c *Client) addFolder(ctx context.Context, folder Folder) error {
 	return c.postJSON(ctx, "/rest/config/folders", folder, nil)
 }
 
-// UpdateFolder updates an existing folder entry.
-func (c *Client) UpdateFolder(ctx context.Context, folder Folder) error {
+// updateFolder updates an existing folder entry.
+func (c *Client) updateFolder(ctx context.Context, folder Folder) error {
 	return c.putJSON(ctx, "/rest/config/folders/"+url.PathEscape(folder.ID), folder, nil)
 }
 
 // EnsureFolder creates or updates a folder configuration.
 func (c *Client) EnsureFolder(ctx context.Context, folder Folder) (bool, error) {
-	current, err := c.Folder(ctx, folder.ID)
+	current, err := c.folder(ctx, folder.ID)
 	if err != nil {
 		if IsNotFound(err) {
-			return true, c.AddFolder(ctx, folder)
+			return true, c.addFolder(ctx, folder)
 		}
 		return false, err
 	}
@@ -188,7 +188,7 @@ func (c *Client) EnsureFolder(ctx context.Context, folder Folder) (bool, error) 
 		return false, nil
 	}
 
-	return true, c.UpdateFolder(ctx, *current)
+	return true, c.updateFolder(ctx, *current)
 }
 
 // DeleteFolder removes a folder entry.
@@ -324,40 +324,43 @@ func joinURL(base, endpoint string) (string, error) {
 func mergeFolder(current *Folder, desired Folder) bool {
 	updated := false
 
-	if desired.Label != "" && current.Label != desired.Label {
-		current.Label = desired.Label
-		updated = true
-	}
-	if desired.Path != "" && current.Path != desired.Path {
-		current.Path = desired.Path
-		updated = true
-	}
-	if desired.Type != "" && current.Type != desired.Type {
-		current.Type = desired.Type
-		updated = true
-	}
-	if desired.FSWatcherEnabled && current.FSWatcherEnabled != desired.FSWatcherEnabled {
-		current.FSWatcherEnabled = desired.FSWatcherEnabled
-		updated = true
-	}
-	if desired.Copiers > 0 && current.Copiers != desired.Copiers {
-		current.Copiers = desired.Copiers
-		updated = true
-	}
-	if desired.Hashers > 0 && current.Hashers != desired.Hashers {
-		current.Hashers = desired.Hashers
-		updated = true
-	}
-	if desired.CaseSensitiveFS && current.CaseSensitiveFS != desired.CaseSensitiveFS {
-		current.CaseSensitiveFS = desired.CaseSensitiveFS
-		updated = true
-	}
+	updated = updateNonEmptyString(&current.Label, desired.Label) || updated
+	updated = updateNonEmptyString(&current.Path, desired.Path) || updated
+	updated = updateNonEmptyString(&current.Type, desired.Type) || updated
+	updated = updateTrueBool(&current.FSWatcherEnabled, desired.FSWatcherEnabled) || updated
+	updated = updatePositiveInt(&current.Copiers, desired.Copiers) || updated
+	updated = updatePositiveInt(&current.Hashers, desired.Hashers) || updated
+	updated = updateTrueBool(&current.CaseSensitiveFS, desired.CaseSensitiveFS) || updated
 	if len(desired.Devices) > 0 && !folderDevicesEqual(current.Devices, desired.Devices) {
 		current.Devices = desired.Devices
 		updated = true
 	}
 
 	return updated
+}
+
+func updateNonEmptyString(current *string, desired string) bool {
+	if desired == "" || *current == desired {
+		return false
+	}
+	*current = desired
+	return true
+}
+
+func updateTrueBool(current *bool, desired bool) bool {
+	if !desired || *current == desired {
+		return false
+	}
+	*current = desired
+	return true
+}
+
+func updatePositiveInt(current *int, desired int) bool {
+	if desired <= 0 || *current == desired {
+		return false
+	}
+	*current = desired
+	return true
 }
 
 func folderDevicesEqual(a, b []FolderDevice) bool {

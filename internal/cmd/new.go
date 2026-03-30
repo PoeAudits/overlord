@@ -125,7 +125,7 @@ var nameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 // validateNewFlags validates required flags and provides helpful error messages
 func validateNewFlags(cmd *cobra.Command, args []string) error {
 	if newOpts.category == "" {
-		return fmt.Errorf("--category is required\n\n%s", formatNewUsage())
+		return cmdError("new", "--category is required", formatNewUsage())
 	}
 
 	// Validate category
@@ -135,7 +135,7 @@ func validateNewFlags(cmd *cobra.Command, args []string) error {
 
 	// Check that only one language flag is set
 	if countTrue(newOpts.langPy, newOpts.langTs, newOpts.langGo, newOpts.langSol) > 1 {
-		return fmt.Errorf("only one language flag can be set (--py, --ts, --go, or --sol)")
+		return cmdError("new", "only one language flag can be set", "Choose one of: --py, --ts, --go, --sol")
 	}
 
 	return nil
@@ -144,27 +144,18 @@ func validateNewFlags(cmd *cobra.Command, args []string) error {
 // validateName checks if the project name is valid
 func validateName(name string) error {
 	if name == "" {
-		return fmt.Errorf("project name cannot be empty")
+		return cmdError("new", "project name cannot be empty", "Usage: overlord new <name> --category=<category>")
 	}
 
 	if len(name) > maxProjectNameLen {
-		return fmt.Errorf("project name too long (max %d characters)", maxProjectNameLen)
+		return cmdError("new", fmt.Sprintf("project name too long (max %d characters)", maxProjectNameLen), "")
 	}
 
 	if !nameRegex.MatchString(name) {
-		return fmt.Errorf("invalid project name: must start with letter or number, contain only alphanumeric, dash, or underscore")
+		return cmdError("new", fmt.Sprintf("invalid project name '%s'", name), "Must start with letter or number, contain only alphanumeric, dash, or underscore")
 	}
 
 	return nil
-}
-
-// selectedLanguage determines the language from flags.
-func selectedLanguage() registry.Language {
-	lang, set := languageFromFlags(newOpts.langPy, newOpts.langTs, newOpts.langGo, newOpts.langSol, false)
-	if !set {
-		return registry.LanguageBase
-	}
-	return lang
 }
 
 // cleanup removes created directories on failure
@@ -272,7 +263,10 @@ func runNewValidate(name string) (*newProjectContext, error) {
 	}
 
 	category := registry.Category(newOpts.category)
-	lang := selectedLanguage()
+	lang, set := languageFromFlags(newOpts.langPy, newOpts.langTs, newOpts.langGo, newOpts.langSol, false)
+	if !set {
+		lang = registry.LanguageBase
+	}
 
 	reg, err := loadRegistry()
 	if err != nil {
@@ -381,16 +375,8 @@ func runNewThoughts(ctx *newProjectContext, c *cleanup, s styles) error {
 	thoughtsProjectBase := filepath.Join(ctx.thoughtsDir, "projects", ctx.name)
 	c.add(thoughtsProjectBase)
 
-	preCreateResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
-		Type:        lifecycle.ProjectCreating,
-		ProjectName: ctx.name,
-		ProjectPath: ctx.projectPath,
-		Settings: map[string]string{
-			"thoughts_dir": ctx.thoughtsDir,
-		},
-	})
-	if preCreateResult.Err != nil {
-		return fmt.Errorf("pre-create hook failed: %w", preCreateResult.Err)
+	if err := fireProjectEvent(lifecycle.ProjectCreating, ctx.name, ctx.projectPath, ctx.thoughtsDir); err != nil {
+		return fmt.Errorf("pre-create hook failed: %w", err)
 	}
 
 	if warning, err := EnsureProjectThoughtsSymlink(ctx.thoughtsDir, ctx.name, ctx.projectPath, false); err != nil {

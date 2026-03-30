@@ -10,6 +10,8 @@ import (
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 //go:embed all:templates
@@ -59,36 +61,7 @@ func ValidTemplateTypes() []TemplateType {
 }
 
 // Language represents a supported language for templates.
-type Language string
-
-// Language constants.
-const (
-	LangGo         Language = "go"
-	LangPython     Language = "python"
-	LangTypeScript Language = "typescript"
-	LangSolidity   Language = "solidity"
-	LangBase       Language = "base"
-)
-
-// ValidLanguages returns all valid language values.
-func ValidLanguages() []Language {
-	return []Language{
-		LangGo,
-		LangPython,
-		LangTypeScript,
-		LangSolidity,
-		LangBase,
-	}
-}
-
-// IsValid checks if the language is valid.
-func (l Language) IsValid() bool {
-	switch l {
-	case LangGo, LangPython, LangTypeScript, LangSolidity, LangBase:
-		return true
-	}
-	return false
-}
+type Language = registry.Language
 
 // getTemplatePath returns the path to a template file within the embedded FS.
 // It handles the fallback logic: language-specific -> base -> shared.

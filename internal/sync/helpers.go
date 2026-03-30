@@ -24,17 +24,33 @@ func ensureFileContainsLines(filePath string, requiredLines []string, checker li
 	}
 
 	text := string(content)
-	if checker == nil {
-		checker = func(content, requiredLine string) bool {
-			for _, line := range strings.Split(content, "\n") {
-				if strings.TrimSpace(line) == requiredLine {
-					return true
-				}
-			}
-			return false
-		}
+	checker = resolveLinePresenceChecker(checker)
+	missing := missingRequiredLines(text, requiredLines, checker)
+
+	if len(missing) == 0 {
+		return nil
 	}
 
+	updated := appendLines(text, missing)
+	return writeTempAndReplace(filePath, updated)
+}
+
+func resolveLinePresenceChecker(checker linePresenceChecker) linePresenceChecker {
+	if checker != nil {
+		return checker
+	}
+
+	return func(content, requiredLine string) bool {
+		for _, line := range strings.Split(content, "\n") {
+			if strings.TrimSpace(line) == requiredLine {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+func missingRequiredLines(text string, requiredLines []string, checker linePresenceChecker) []string {
 	missing := make([]string, 0, len(requiredLines))
 	for _, requiredLine := range requiredLines {
 		if requiredLine == "" {
@@ -44,25 +60,26 @@ func ensureFileContainsLines(filePath string, requiredLines []string, checker li
 			missing = append(missing, requiredLine)
 		}
 	}
+	return missing
+}
 
-	if len(missing) == 0 {
-		return nil
-	}
-
+func appendLines(existing string, lines []string) string {
 	var builder strings.Builder
-	if len(text) > 0 {
-		builder.WriteString(text)
-		if !strings.HasSuffix(text, "\n") {
+	if existing != "" {
+		builder.WriteString(existing)
+		if !strings.HasSuffix(existing, "\n") {
 			builder.WriteString("\n")
 		}
 	}
-	for _, line := range missing {
+	for _, line := range lines {
 		builder.WriteString(line)
 		builder.WriteString("\n")
 	}
+	return builder.String()
+}
 
-	dir := filepath.Dir(filePath)
-	tmpFile, err := os.CreateTemp(dir, ".stignore-*")
+func writeTempAndReplace(filePath, content string) error {
+	tmpFile, err := os.CreateTemp(filepath.Dir(filePath), ".stignore-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file for %s: %w", filePath, err)
 	}
@@ -75,7 +92,7 @@ func ensureFileContainsLines(filePath string, requiredLines []string, checker li
 		}
 	}()
 
-	if _, err := tmpFile.WriteString(builder.String()); err != nil {
+	if _, err := tmpFile.WriteString(content); err != nil {
 		_ = tmpFile.Close()
 		return fmt.Errorf("failed to write temp file for %s: %w", filePath, err)
 	}

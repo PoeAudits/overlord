@@ -27,6 +27,8 @@ const setupInitSeedTimeout = 60 * time.Second
 // DefaultConfigRepoURL is the default git remote for the registry config repository.
 const DefaultConfigRepoURL = "git@github.com:PoeAudits/overlord-config.git"
 
+var defaultRemoteBranchFallbacks = []string{"main", "master", "dev"}
+
 var setupCmd = &cobra.Command{
 	Use:   "setup [project]",
 	Short: "Set up overlord configuration or bootstrap a project",
@@ -158,10 +160,12 @@ func runProjectSetup(projectArg string) error {
 		return err
 	}
 
-	projectName, project, err := resolveProject(reg, projectArg)
+	result, err := reg.ResolveOne(projectArg)
 	if err != nil {
-		return err
+		return withHintOnNoProjectMatch(err, "run 'overlord list' to see available projects")
 	}
+	projectName := result.Name
+	project := result.Project
 
 	if project.Sync.Status != registry.SyncActive {
 		return fmt.Errorf("project '%s' is not active for sync\nRun 'overlord activate %s' to enable sync first", projectName, projectName)
@@ -348,36 +352,56 @@ func setupGitRepo(configDir string) error {
 	}
 
 	reader := bufio.NewReader(os.Stdin)
-
-	fmt.Printf("\n  Initialize git for registry sync? [y/N]: ")
-	response, err := reader.ReadString('\n')
+	remoteURL, setupRequested, err := promptGitSetup(reader)
 	if err != nil {
-		return fmt.Errorf("failed to read input: %w", err)
+		return err
 	}
-	response = strings.TrimSpace(strings.ToLower(response))
-
-	if response != "y" && response != "yes" {
+	if !setupRequested {
 		fmt.Printf("  Git:     skipped\n")
 		return nil
 	}
 
-	// Ask for remote URL (default to config repo)
+	cloned, err := cloneOrInitRepo(configDir, remoteURL)
+	if err != nil {
+		return err
+	}
+	if cloned {
+		return nil
+	}
+
+	return fetchAndSyncRemote(configDir, remoteURL)
+}
+
+func promptGitSetup(reader *bufio.Reader) (string, bool, error) {
+	fmt.Printf("\n  Initialize git for registry sync? [y/N]: ")
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return "", false, fmt.Errorf("failed to read input: %w", err)
+	}
+	response = strings.TrimSpace(strings.ToLower(response))
+
+	if response != "y" && response != "yes" {
+		return "", false, nil
+	}
+
 	fmt.Printf("  Git remote URL (enter 'none' for local-only)\n")
 	fmt.Printf("  [%s]: ", DefaultConfigRepoURL)
 	remoteURL, err := reader.ReadString('\n')
 	if err != nil {
-		return fmt.Errorf("failed to read input: %w", err)
+		return "", false, fmt.Errorf("failed to read input: %w", err)
 	}
 	remoteURL = strings.TrimSpace(remoteURL)
 
-	// Use default if empty, skip if "none"
 	if remoteURL == "" {
 		remoteURL = DefaultConfigRepoURL
 	} else if strings.ToLower(remoteURL) == "none" {
 		remoteURL = ""
 	}
 
-	// Check if config directory exists and is empty (can clone directly)
+	return remoteURL, true, nil
+}
+
+func cloneOrInitRepo(configDir, remoteURL string) (bool, error) {
 	dirExists := false
 	dirEmpty := true
 	if info, err := os.Stat(configDir); err == nil && info.IsDir() {
@@ -388,7 +412,6 @@ func setupGitRepo(configDir string) error {
 		}
 	}
 
-	// Clone if remote provided and directory doesn't exist or is empty
 	if remoteURL != "" && (!dirExists || dirEmpty) {
 		fmt.Printf("  Cloning from %s...\n", remoteURL)
 		cmd := exec.Command("git", "clone", remoteURL, configDir)
@@ -396,54 +419,56 @@ func setupGitRepo(configDir string) error {
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to clone: %w", err)
+			return false, fmt.Errorf("failed to clone: %w", err)
 		}
 		fmt.Printf("  Git:     cloned from remote\n")
-		return nil
+		return true, nil
 	}
 
-	// Directory exists with files: init in place and optionally add remote
 	if !dirExists {
 		if err := os.MkdirAll(configDir, 0o755); err != nil {
-			return fmt.Errorf("failed to create config directory: %w", err)
+			return false, fmt.Errorf("failed to create config directory: %w", err)
 		}
 	}
 
 	cmd := exec.Command("git", "init", configDir)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to init git: %w (output: %s)", err, strings.TrimSpace(string(output)))
+		return false, fmt.Errorf("failed to init git: %w (output: %s)", err, strings.TrimSpace(string(output)))
 	}
 	fmt.Printf("  Git:     initialized\n")
+	return false, nil
+}
 
-	if remoteURL != "" {
-		// Add remote
-		cmd = exec.Command("git", "-C", configDir, "remote", "add", "origin", remoteURL)
-		output, err = cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("failed to add remote: %w (output: %s)", err, strings.TrimSpace(string(output)))
-		}
+func fetchAndSyncRemote(configDir, remoteURL string) error {
+	if remoteURL == "" {
+		return nil
+	}
 
-		// Fetch from remote
-		fmt.Printf("  Fetching from remote...\n")
-		fetchCmd := exec.Command("git", "-C", configDir, "fetch", "origin")
-		fetchCmd.Stdout = os.Stdout
-		fetchCmd.Stderr = os.Stderr
-		fetchCmd.Stdin = os.Stdin
-		if err := fetchCmd.Run(); err != nil {
-			fmt.Printf("  Warning: Failed to fetch from remote: %v\n", err)
-			fmt.Printf("  You can fetch manually later with: git -C %s fetch origin\n", configDir)
+	cmd := exec.Command("git", "-C", configDir, "remote", "add", "origin", remoteURL)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to add remote: %w (output: %s)", err, strings.TrimSpace(string(output)))
+	}
+
+	fmt.Printf("  Fetching from remote...\n")
+	fetchCmd := exec.Command("git", "-C", configDir, "fetch", "origin")
+	fetchCmd.Stdout = os.Stdout
+	fetchCmd.Stderr = os.Stderr
+	fetchCmd.Stdin = os.Stdin
+	if err := fetchCmd.Run(); err != nil {
+		fmt.Printf("  Warning: Failed to fetch from remote: %v\n", err)
+		fmt.Printf("  You can fetch manually later with: git -C %s fetch origin\n", configDir)
+		return nil
+	}
+
+	for _, branch := range defaultRemoteBranchFallbacks {
+		resetCmd := exec.Command("git", "-C", configDir, "reset", "--hard", "origin/"+branch)
+		if resetOutput, resetErr := resetCmd.CombinedOutput(); resetErr == nil {
+			fmt.Printf("  Git:     synced with origin/%s\n", branch)
+			return nil
 		} else {
-			// Try to reset to remote default branch
-			for _, branch := range []string{"main", "master", "dev"} {
-				resetCmd := exec.Command("git", "-C", configDir, "reset", "--hard", "origin/"+branch)
-				if resetOutput, resetErr := resetCmd.CombinedOutput(); resetErr == nil {
-					fmt.Printf("  Git:     synced with origin/%s\n", branch)
-					break
-				} else {
-					_ = resetOutput // try next branch
-				}
-			}
+			_ = resetOutput
 		}
 	}
 
@@ -570,45 +595,10 @@ func promptSyncthingConfig(reader *bufio.Reader, interactive bool, defaults mach
 		return defaults, nil
 	}
 
-	fmt.Printf("  Syncthing API URL [%s]: ", defaults.APIURL)
-	apiURL, err := reader.ReadString('\n')
-	if err != nil {
-		return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing api url: %w", err)
-	}
-	apiURL = strings.TrimSpace(apiURL)
-	if apiURL == "" {
-		apiURL = defaults.APIURL
-	}
-
-	fmt.Printf("  Syncthing API key [%s]: ", nonEmptyMask(defaults.APIKey))
-	apiKey, err := reader.ReadString('\n')
-	if err != nil {
-		return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing api key: %w", err)
-	}
-	apiKey = strings.TrimSpace(apiKey)
-	if apiKey == "" {
-		apiKey = defaults.APIKey
-	}
-
-	fmt.Printf("  Syncthing device ID [%s]: ", defaults.DeviceID)
-	deviceID, err := reader.ReadString('\n')
-	if err != nil {
-		return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing device id: %w", err)
-	}
-	deviceID = strings.TrimSpace(deviceID)
-	if deviceID == "" {
-		deviceID = defaults.DeviceID
-	}
-
-	fmt.Printf("  Syncthing address [%s]: ", defaults.Address)
-	address, err := reader.ReadString('\n')
-	if err != nil {
-		return machine.SyncthingConfig{}, fmt.Errorf("failed to read syncthing address: %w", err)
-	}
-	address = strings.TrimSpace(address)
-	if address == "" {
-		address = defaults.Address
-	}
+	apiURL := promptField(reader, fmt.Sprintf("Syncthing API URL [%s]", defaults.APIURL), defaults.APIURL)
+	apiKey := promptField(reader, fmt.Sprintf("Syncthing API key [%s]", nonEmptyMask(defaults.APIKey)), defaults.APIKey)
+	deviceID := promptField(reader, fmt.Sprintf("Syncthing device ID [%s]", defaults.DeviceID), defaults.DeviceID)
+	address := promptField(reader, fmt.Sprintf("Syncthing address [%s]", defaults.Address), defaults.Address)
 
 	syncCfg := machine.SyncthingConfig{
 		APIURL:   apiURL,
@@ -621,6 +611,21 @@ func promptSyncthingConfig(reader *bufio.Reader, interactive bool, defaults mach
 	}
 
 	return syncCfg, nil
+}
+
+func promptField(reader *bufio.Reader, label, current string) string {
+	fmt.Printf("  %s: ", label)
+	value, err := reader.ReadString('\n')
+	if err != nil {
+		return current
+	}
+
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return current
+	}
+
+	return value
 }
 
 func handleExistingMachineConfig(machineConfigPath string, initMode bool, reader *bufio.Reader, interactive bool) (bool, error) {

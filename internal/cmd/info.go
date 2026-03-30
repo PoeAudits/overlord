@@ -50,10 +50,12 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve project using fuzzy matching
-	projectName, project, err := resolveProject(reg, name)
+	result, err := reg.ResolveOne(name)
 	if err != nil {
-		return err
+		return withHintOnNoProjectMatch(err, "run 'overlord list' to see available projects")
 	}
+	projectName := result.Name
+	project := result.Project
 
 	// Output based on format
 	if infoOpts.json {

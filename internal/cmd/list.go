@@ -396,47 +396,52 @@ func listTableStyleFunc(rows [][]string, lastCol int, showRecent bool, styles st
 		if row == table.HeaderRow {
 			return styles.TableHeader
 		}
-
-		style := styles.TableCell
-
 		if row < 0 || row >= len(rows) {
-			return style
+			return styles.TableCell
 		}
 
-		switch col {
-		case 0:
+		if col == 0 {
 			return styles.TableName
-		case 1:
-			category := rows[row][1]
-			if color, ok := categoryColors[category]; ok {
-				return style.Foreground(color)
-			}
-			return styles.TableMuted
-		case 2:
-			lang := rows[row][2]
-			if color, ok := languageColors[lang]; ok {
-				return style.Foreground(color)
-			}
-			return styles.TableMuted
-		case 3:
+		}
+		if col == 3 {
 			return styles.TableMuted
 		}
-		if col == lastCol {
-			if showRecent {
-				return styles.TableRecent
-			}
-			status := rows[row][lastCol]
-			switch status {
-			case "synced":
-				return styles.TableStatusSynced
-			case "active":
-				return styles.TableStatusActive
-			default:
-				return styles.TableStatusDefault
-			}
+		if col == 1 {
+			return listColorStyle(styles.TableCell, rows[row][1], categoryColors, styles.TableMuted)
 		}
+		if col == 2 {
+			return listColorStyle(styles.TableCell, rows[row][2], languageColors, styles.TableMuted)
+		}
+		if col != lastCol {
+			return styles.TableCell
+		}
+
+		return listStatusStyle(rows[row][lastCol], showRecent, styles)
+	}
+}
+
+func listColorStyle(base lipgloss.Style, key string, palette map[string]lipgloss.Color, fallback lipgloss.Style) lipgloss.Style {
+	if color, ok := palette[key]; ok {
+		return base.Foreground(color)
+	}
+	return fallback
+}
+
+func listStatusStyle(status string, showRecent bool, styles styles) lipgloss.Style {
+	if showRecent {
+		return styles.TableRecent
+	}
+
+	statusStyles := map[string]lipgloss.Style{
+		"synced": styles.TableStatusSynced,
+		"active": styles.TableStatusActive,
+	}
+
+	if style, ok := statusStyles[status]; ok {
 		return style
 	}
+
+	return styles.TableStatusDefault
 }
 
 // listTableHeaders returns the header strings for the list table.

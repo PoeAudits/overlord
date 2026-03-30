@@ -3,6 +3,8 @@ package templates
 import (
 	"strings"
 	"testing"
+
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 func TestLanguageIsValid(t *testing.T) {
@@ -10,11 +12,11 @@ func TestLanguageIsValid(t *testing.T) {
 		lang  Language
 		valid bool
 	}{
-		{LangGo, true},
-		{LangPython, true},
-		{LangTypeScript, true},
-		{LangSolidity, true},
-		{LangBase, true},
+		{registry.LanguageGo, true},
+		{registry.LanguagePython, true},
+		{registry.LanguageTypeScript, true},
+		{registry.LanguageSolidity, true},
+		{registry.LanguageBase, true},
 		{Language("invalid"), false},
 		{Language(""), false},
 	}
@@ -29,7 +31,7 @@ func TestLanguageIsValid(t *testing.T) {
 }
 
 func TestValidLanguages(t *testing.T) {
-	langs := ValidLanguages()
+	langs := registry.ValidLanguages()
 	if len(langs) != 5 {
 		t.Errorf("ValidLanguages() returned %d languages, want 5", len(langs))
 	}
@@ -73,56 +75,56 @@ func TestGetTemplate(t *testing.T) {
 	}{
 		{
 			name:         "go makefile",
-			lang:         LangGo,
+			lang:         registry.LanguageGo,
 			templateType: TemplateMakefile,
 			wantContains: "go build",
 			wantErr:      false,
 		},
 		{
 			name:         "python makefile",
-			lang:         LangPython,
+			lang:         registry.LanguagePython,
 			templateType: TemplateMakefile,
 			wantContains: "uv sync",
 			wantErr:      false,
 		},
 		{
 			name:         "typescript makefile",
-			lang:         LangTypeScript,
+			lang:         registry.LanguageTypeScript,
 			templateType: TemplateMakefile,
 			wantContains: "pnpm",
 			wantErr:      false,
 		},
 		{
 			name:         "solidity makefile",
-			lang:         LangSolidity,
+			lang:         registry.LanguageSolidity,
 			templateType: TemplateMakefile,
 			wantContains: "forge",
 			wantErr:      false,
 		},
 		{
 			name:         "base makefile",
-			lang:         LangBase,
+			lang:         registry.LanguageBase,
 			templateType: TemplateMakefile,
 			wantContains: "install:",
 			wantErr:      false,
 		},
 		{
 			name:         "shared tmux.local",
-			lang:         LangGo,
+			lang:         registry.LanguageGo,
 			templateType: TemplateTmuxLocal,
 			wantContains: "TMUX_SESSION",
 			wantErr:      false,
 		},
 		{
 			name:         "base readme template",
-			lang:         LangBase,
+			lang:         registry.LanguageBase,
 			templateType: TemplateREADME,
 			wantContains: "{{.ProjectName}}",
 			wantErr:      false,
 		},
 		{
 			name:         "go agents template",
-			lang:         LangGo,
+			lang:         registry.LanguageGo,
 			templateType: TemplateAGENTS,
 			wantContains: "make test",
 			wantErr:      false,
@@ -167,28 +169,28 @@ func TestRenderTemplate(t *testing.T) {
 	}{
 		{
 			name:         "render readme",
-			lang:         LangBase,
+			lang:         registry.LanguageBase,
 			templateType: TemplateREADME,
 			wantContains: "test-project",
 			wantErr:      false,
 		},
 		{
 			name:         "render agents",
-			lang:         LangGo,
+			lang:         registry.LanguageGo,
 			templateType: TemplateAGENTS,
 			wantContains: "test-project",
 			wantErr:      false,
 		},
 		{
 			name:         "render opencode",
-			lang:         LangBase,
+			lang:         registry.LanguageBase,
 			templateType: TemplateOpenCode,
 			wantContains: "{}",
 			wantErr:      false,
 		},
 		{
 			name:         "makefile not rendered",
-			lang:         LangGo,
+			lang:         registry.LanguageGo,
 			templateType: TemplateMakefile,
 			wantContains: "go build",
 			wantErr:      false,
@@ -218,7 +220,7 @@ func TestRenderTemplateVariableSubstitution(t *testing.T) {
 		Language:    "python",
 	}
 
-	content, err := RenderTemplate(LangBase, TemplateREADME, data)
+	content, err := RenderTemplate(registry.LanguageBase, TemplateREADME, data)
 	if err != nil {
 		t.Fatalf("RenderTemplate() error = %v", err)
 	}
@@ -273,7 +275,7 @@ func TestGetAllTemplates(t *testing.T) {
 		Language:    "go",
 	}
 
-	templates, err := GetAllTemplates(LangGo, data)
+	templates, err := GetAllTemplates(registry.LanguageGo, data)
 	if err != nil {
 		t.Fatalf("GetAllTemplates() error = %v", err)
 	}
@@ -341,7 +343,7 @@ func TestTemplateTypeOutputPath(t *testing.T) {
 
 func TestFallbackToBase(t *testing.T) {
 	// Go doesn't have its own README.md.tmpl, should fall back to base
-	content, err := GetTemplate(LangGo, TemplateREADME)
+	content, err := GetTemplate(registry.LanguageGo, TemplateREADME)
 	if err != nil {
 		t.Fatalf("GetTemplate() error = %v", err)
 	}
@@ -352,7 +354,7 @@ func TestFallbackToBase(t *testing.T) {
 }
 
 func TestAllLanguagesHaveMakefile(t *testing.T) {
-	for _, lang := range ValidLanguages() {
+	for _, lang := range registry.ValidLanguages() {
 		t.Run(string(lang), func(t *testing.T) {
 			content, err := GetTemplate(lang, TemplateMakefile)
 			if err != nil {

@@ -313,7 +313,8 @@ func checkConfigIgnoreFile(configDir string) doctorCheck {
 }
 
 func checkConfigFolderConsistency(ctx context.Context, client *syncthing.Client) doctorCheck {
-	if _, err := client.Folder(ctx, syncpkg.ConfigFolderID); err != nil {
+	folders, err := client.Folders(ctx)
+	if err != nil {
 		return doctorCheck{
 			name:        "Config Syncthing folder",
 			status:      doctorFail,
@@ -322,10 +323,21 @@ func checkConfigFolderConsistency(ctx context.Context, client *syncthing.Client)
 		}
 	}
 
+	for _, folder := range folders {
+		if folder.ID == syncpkg.ConfigFolderID {
+			return doctorCheck{
+				name:    "Config Syncthing folder",
+				status:  doctorPass,
+				message: fmt.Sprintf("folder '%s' configured", syncpkg.ConfigFolderID),
+			}
+		}
+	}
+
 	return doctorCheck{
-		name:    "Config Syncthing folder",
-		status:  doctorPass,
-		message: fmt.Sprintf("folder '%s' configured", syncpkg.ConfigFolderID),
+		name:        "Config Syncthing folder",
+		status:      doctorFail,
+		message:     fmt.Sprintf("folder '%s' not configured", syncpkg.ConfigFolderID),
+		remediation: "Run `overlord setup --init` to configure overlord-config folder",
 	}
 }
 
@@ -341,21 +353,25 @@ func checkFolderConsistency(ctx context.Context, client *syncthing.Client, reg *
 		}
 	}
 
+	folders, err := client.Folders(ctx)
+	if err != nil {
+		return doctorCheck{
+			name:        "Active project folders",
+			status:      doctorFail,
+			message:     err.Error(),
+			remediation: "Ensure Syncthing is running and API credentials are valid",
+		}
+	}
+	foldersByID := make(map[string]syncthing.Folder, len(folders))
+	for _, folder := range folders {
+		foldersByID[folder.ID] = folder
+	}
+
 	mismatches := make([]string, 0)
 	for name := range active {
 		project := reg.Projects[name]
-		projectPath := fileutil.ResolveProjectPath(project.Path, baseDir)
-		if _, err := os.Stat(projectPath); err != nil {
-			mismatches = append(mismatches, fmt.Sprintf("%s (missing path)", name))
-			continue
-		}
-		folder, err := client.Folder(ctx, name)
-		if err != nil {
-			mismatches = append(mismatches, fmt.Sprintf("%s (missing syncthing folder)", name))
-			continue
-		}
-		if folder.Path != projectPath {
-			mismatches = append(mismatches, fmt.Sprintf("%s (path mismatch)", name))
+		if err := validateProjectFolder(name, project, baseDir, foldersByID); err != nil {
+			mismatches = append(mismatches, fmt.Sprintf("%s (%s)", name, err.Error()))
 		}
 	}
 
@@ -373,6 +389,24 @@ func checkFolderConsistency(ctx context.Context, client *syncthing.Client, reg *
 		status:  doctorPass,
 		message: fmt.Sprintf("%d active project(s) verified", len(active)),
 	}
+}
+
+func validateProjectFolder(projectName string, project registry.Project, baseDir string, foldersByID map[string]syncthing.Folder) error {
+	projectPath := fileutil.ResolveProjectPath(project.Path, baseDir)
+	if _, err := os.Stat(projectPath); err != nil {
+		return fmt.Errorf("missing path")
+	}
+
+	folder, ok := foldersByID[projectName]
+	if !ok {
+		return fmt.Errorf("missing syncthing folder")
+	}
+
+	if folder.Path != projectPath {
+		return fmt.Errorf("path mismatch")
+	}
+
+	return nil
 }
 
 func printDoctorChecksAndExit(checks []doctorCheck, s styles) error {

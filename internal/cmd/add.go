@@ -110,7 +110,7 @@ Examples:
 func validateAddFlags(cmd *cobra.Command, args []string) error {
 	// Check that only one language flag is set
 	if countTrue(addOpts.langPy, addOpts.langTs, addOpts.langGo, addOpts.langSol, addOpts.langBase) > 1 {
-		return fmt.Errorf("only one language flag can be set (--py, --ts, --go, --sol, or --base)")
+		return cmdError("add", "only one language flag can be set", "Choose one of: --py, --ts, --go, --sol, --base")
 	}
 
 	// Warn if --name is provided with 2 args (name comes from first arg)
@@ -166,7 +166,7 @@ func detectLanguage(projectPath string) (registry.Language, error) {
 		}
 	}
 
-	return "", fmt.Errorf("could not auto-detect language in %s\nNo recognized files found (go.mod, pyproject.toml, package.json, foundry.toml)\nSpecify: --py, --ts, --go, --sol, or --base", projectPath)
+	return "", cmdError("add", fmt.Sprintf("could not auto-detect language in %s", projectPath), "No recognized files found (go.mod, pyproject.toml, package.json, foundry.toml). Specify: --py, --ts, --go, --sol, or --base")
 }
 
 // detectCategory detects the category from the project path.
@@ -175,17 +175,9 @@ func detectCategory(projectPath, baseDir string) (registry.Category, error) {
 	// Check if path is under base directory
 	relPath, err := filepath.Rel(baseDir, projectPath)
 	if err != nil || strings.HasPrefix(relPath, "..") {
-		// Build helpful error listing all category paths
-		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("cannot auto-detect category: path is not under base directory\n"))
-		sb.WriteString(fmt.Sprintf("  Path:     %s\n", projectPath))
-		sb.WriteString(fmt.Sprintf("  Base dir: %s\n\n", baseDir))
-		sb.WriteString("Projects must be under one of:\n")
-		for _, cat := range registry.ValidCategories() {
-			sb.WriteString(fmt.Sprintf("  %s%-30s → %s\n", baseDir+"/", cat.Path(), string(cat)))
-		}
-		sb.WriteString(fmt.Sprintf("\nOr specify manually: --category=<category>"))
-		return "", fmt.Errorf("%s", sb.String())
+		return "", cmdError("add",
+			fmt.Sprintf("cannot auto-detect category: path is not under base directory (%s)", baseDir),
+			"Specify manually: --category=<category>")
 	}
 
 	// Try to match category from path
@@ -197,20 +189,13 @@ func detectCategory(projectPath, baseDir string) (registry.Category, error) {
 	}
 
 	// Path is under base dir but doesn't match any known category subdirectory
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("cannot auto-detect category from path\n"))
-	sb.WriteString(fmt.Sprintf("  Path (relative): %s\n\n", relPath))
-	sb.WriteString("Expected subdirectory structure:\n")
+	catNames := make([]string, 0, len(registry.ValidCategories()))
 	for _, cat := range registry.ValidCategories() {
-		sb.WriteString(fmt.Sprintf("  %-30s → %s\n", cat.Path(), string(cat)))
+		catNames = append(catNames, string(cat))
 	}
-	sb.WriteString(fmt.Sprintf("\nOr specify manually: --category=<category>"))
-	return "", fmt.Errorf("%s", sb.String())
-}
-
-// getLanguageFromFlags determines the language from flags
-func getLanguageFromFlags() (registry.Language, bool) {
-	return languageFromFlags(addOpts.langPy, addOpts.langTs, addOpts.langGo, addOpts.langSol, addOpts.langBase)
+	return "", cmdError("add",
+		fmt.Sprintf("cannot auto-detect category from path '%s'", relPath),
+		fmt.Sprintf("Specify manually: --category=<category>. Valid categories: %s", strings.Join(catNames, ", ")))
 }
 
 // resolveAddArgs resolves the project name and path from command arguments and flags.
@@ -248,9 +233,169 @@ func resolveAddArgs(args []string) (name, projectPath string, err error) {
 	return name, projectPath, nil
 }
 
-func runAdd(cmd *cobra.Command, args []string) error {
-	// Resolve name and path from args
+// addProjectContext bundles resolved and validated inputs for the add workflow.
+type addProjectContext struct {
+	name               string
+	expandedPath       string
+	thoughtsDir        string
+	lang               registry.Language
+	languageAutoDetect bool
+	category           registry.Category
+	categoryAutoDetect bool
+	description        string
+	aliases            []string
+	registryPath       string
+	registryPathIsAbs  bool
+	reg                *registry.Registry
+}
+
+// buildAddContext validates inputs and resolves all paths needed by the add workflow.
+func buildAddContext(_ *cobra.Command, args []string) (*addProjectContext, error) {
 	name, projectPath, err := resolveAddArgs(args)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validateName(name); err != nil {
+		return nil, err
+	}
+
+	expandedPath, err := registry.ExpandPath(projectPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to expand project path: %w", err)
+	}
+
+	if _, err := os.Stat(expandedPath); errors.Is(err, fs.ErrNotExist) {
+		return nil, cmdError("add", fmt.Sprintf("project directory does not exist: %s", expandedPath), "Use 'overlord new' to create a new project")
+	}
+
+	reg, err := loadRegistry()
+	if err != nil {
+		return nil, err
+	}
+
+	if _, exists := reg.ProjectByName(name); exists {
+		return nil, cmdError("add", fmt.Sprintf("project '%s' already exists in registry", name), fmt.Sprintf("Use 'overlord info %s' to see details", name))
+	}
+
+	baseDir, err := expandBaseDir(reg)
+	if err != nil {
+		return nil, err
+	}
+
+	if existingName, _, found := reg.FindProjectByPath(expandedPath, baseDir); found {
+		return nil, cmdError("add", fmt.Sprintf("this directory is already registered as project '%s'", existingName), fmt.Sprintf("Use 'overlord info %s' to see details", existingName))
+	}
+
+	thoughtsDir, err := registry.ExpandPath(reg.Settings.ThoughtsDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to expand thoughts directory: %w", err)
+	}
+
+	var (
+		lang               registry.Language
+		languageAutoDetect bool
+	)
+	if flagLang, hasFlag := languageFromFlags(addOpts.langPy, addOpts.langTs, addOpts.langGo, addOpts.langSol, addOpts.langBase); hasFlag {
+		lang = flagLang
+	} else {
+		detected, langErr := detectLanguage(expandedPath)
+		if langErr != nil {
+			return nil, langErr
+		}
+		lang = detected
+		languageAutoDetect = true
+	}
+
+	var (
+		category           registry.Category
+		categoryAutoDetect bool
+	)
+	if addOpts.category != "" {
+		category, err = validateCategory(addOpts.category)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		detectedCat, catErr := detectCategory(expandedPath, baseDir)
+		if catErr != nil {
+			return nil, catErr
+		}
+		category = detectedCat
+		categoryAutoDetect = true
+	}
+
+	description := addOpts.description
+	if description == "" {
+		description = fmt.Sprintf("%s project", name)
+	}
+
+	registryPath := expandedPath
+	registryPathIsAbs := true
+	if relativePath, relErr := filepath.Rel(baseDir, expandedPath); relErr == nil && !strings.HasPrefix(relativePath, "..") {
+		registryPath = relativePath
+		registryPathIsAbs = false
+	}
+
+	return &addProjectContext{
+		name:               name,
+		expandedPath:       expandedPath,
+		thoughtsDir:        thoughtsDir,
+		lang:               lang,
+		languageAutoDetect: languageAutoDetect,
+		category:           category,
+		categoryAutoDetect: categoryAutoDetect,
+		description:        description,
+		aliases:            addOpts.aliases,
+		registryPath:       registryPath,
+		registryPathIsAbs:  registryPathIsAbs,
+		reg:                reg,
+	}, nil
+}
+
+// runAddRegister adds the project to the registry and fires lifecycle hooks.
+func runAddRegister(ctx *addProjectContext, s styles) error {
+	fmt.Printf("  Registering project...")
+	if ctx.registryPathIsAbs {
+		fmt.Printf("  %s Project is not under base directory, storing absolute path\n", s.Warn.Render("Note:"))
+	}
+
+	project := registry.Project{
+		Path:        ctx.registryPath,
+		Category:    ctx.category,
+		Lang:        ctx.lang,
+		Created:     time.Now().Format("2006-01-02"),
+		Description: ctx.description,
+		Aliases:     ctx.aliases,
+		Tags:        []string{},
+		Status:      registry.Status{State: registry.StateActive},
+	}
+
+	if ctx.reg.Projects == nil {
+		ctx.reg.Projects = make(map[string]registry.Project)
+	}
+	ctx.reg.Projects[ctx.name] = project
+
+	if err := saveRegistry(ctx.reg); err != nil {
+		return err
+	}
+
+	postCreateResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
+		Type:        lifecycle.ProjectCreated,
+		ProjectName: ctx.name,
+		ProjectPath: ctx.expandedPath,
+		Settings:    buildThoughtsSettings(ctx.reg, s),
+	})
+	for _, warning := range postCreateResult.Warnings {
+		fmt.Fprintf(os.Stderr, "warning: %s\n", warning)
+	}
+
+	fmt.Println(" done")
+	return nil
+}
+
+func runAdd(cmd *cobra.Command, args []string) error {
+	ctx, err := buildAddContext(cmd, args)
 	if err != nil {
 		return err
 	}
@@ -262,170 +407,43 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	warnStyle := s.Warn
 	pathStyle := s.Path
 
-	// Validate name
-	if err := validateName(name); err != nil {
-		return err
+	if ctx.languageAutoDetect {
+		fmt.Printf("%s %s\n", warnStyle.Render("Auto-detected language:"), string(ctx.lang))
 	}
 
-	// Expand and validate project path
-	expandedPath, err := registry.ExpandPath(projectPath)
-	if err != nil {
-		return fmt.Errorf("failed to expand project path: %w", err)
-	}
-
-	// Check if directory exists
-	if _, err := os.Stat(expandedPath); errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("project directory does not exist: %s\nUse 'overlord new' to create a new project", expandedPath)
-	}
-
-	// Load registry
-	reg, err := loadRegistry()
-	if err != nil {
-		return err
-	}
-
-	// Check if project name already exists
-	if _, exists := reg.ProjectByName(name); exists {
-		return fmt.Errorf("project '%s' already exists in registry\nUse 'overlord info %s' to see details", name, name)
-	}
-
-	// Expand base directory
-	baseDir, err := expandBaseDir(reg)
-	if err != nil {
-		return err
-	}
-
-	// Check if this path is already registered under a different name
-	if existingName, _, found := reg.FindProjectByPath(expandedPath, baseDir); found {
-		return fmt.Errorf("this directory is already registered as project '%s'\nUse 'overlord info %s' to see details", existingName, existingName)
-	}
-
-	// Expand thoughts directory
-	thoughtsDir, err := registry.ExpandPath(reg.Settings.ThoughtsDir)
-	if err != nil {
-		return fmt.Errorf("failed to expand thoughts directory: %w", err)
-	}
-
-	// Determine language (flag takes precedence over auto-detection)
-	var lang registry.Language
-	if flagLang, hasFlag := getLanguageFromFlags(); hasFlag {
-		lang = flagLang
-	} else {
-		detected, langErr := detectLanguage(expandedPath)
-		if langErr != nil {
-			return langErr
-		}
-		lang = detected
-		fmt.Printf("%s %s\n", warnStyle.Render("Auto-detected language:"), string(lang))
-	}
-
-	// Determine category (flag takes precedence over auto-detection)
-	var category registry.Category
-	if addOpts.category != "" {
-		var err error
-		category, err = validateCategory(addOpts.category)
-		if err != nil {
-			return err
-		}
-	} else {
-		detectedCat, catErr := detectCategory(expandedPath, baseDir)
-		if catErr != nil {
-			return catErr
-		}
-		category = detectedCat
-		fmt.Printf("%s %s\n", warnStyle.Render("Auto-detected category:"), string(category))
-	}
-
-	// Set description default if not provided
-	description := addOpts.description
-	if description == "" {
-		description = fmt.Sprintf("%s project", name)
+	if ctx.categoryAutoDetect {
+		fmt.Printf("%s %s\n", warnStyle.Render("Auto-detected category:"), string(ctx.category))
 	}
 
 	fmt.Println()
-	fmt.Printf("%s %s\n", labelStyle.Render("Adding project:"), name)
-	fmt.Printf("%s %s\n", labelStyle.Render("Category:"), string(category))
-	fmt.Printf("%s %s\n", labelStyle.Render("Language:"), string(lang))
-	fmt.Printf("%s %s\n", labelStyle.Render("Path:"), pathStyle.Render(expandedPath))
+	fmt.Printf("%s %s\n", labelStyle.Render("Adding project:"), ctx.name)
+	fmt.Printf("%s %s\n", labelStyle.Render("Category:"), string(ctx.category))
+	fmt.Printf("%s %s\n", labelStyle.Render("Language:"), string(ctx.lang))
+	fmt.Printf("%s %s\n", labelStyle.Render("Path:"), pathStyle.Render(ctx.expandedPath))
 	fmt.Println()
 
-	// Create thoughts structure
 	fmt.Printf("  Creating thoughts structure...")
-	preCreateResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
-		Type:        lifecycle.ProjectCreating,
-		ProjectName: name,
-		ProjectPath: expandedPath,
-		Settings: map[string]string{
-			"thoughts_dir": thoughtsDir,
-		},
-	})
-	if preCreateResult.Err != nil {
-		return fmt.Errorf("pre-create hook failed: %w", preCreateResult.Err)
+	if err := fireProjectEvent(lifecycle.ProjectCreating, ctx.name, ctx.expandedPath, ctx.thoughtsDir); err != nil {
+		return fmt.Errorf("pre-create hook failed: %w", err)
 	}
-	if warning, err := EnsureProjectThoughtsSymlink(thoughtsDir, name, expandedPath, false); err != nil {
+	if warning, err := EnsureProjectThoughtsSymlink(ctx.thoughtsDir, ctx.name, ctx.expandedPath, false); err != nil {
 		return err
 	} else if warning != "" {
 		fmt.Printf("\n  %s %s", warnStyle.Render("Warning:"), warning)
 	}
 	fmt.Println(" done")
 
-	// Calculate relative path from base_dir (or use absolute if not under base_dir)
-	var registryPath string
-	relativePath, err := filepath.Rel(baseDir, expandedPath)
-	if err != nil || strings.HasPrefix(relativePath, "..") {
-		// Path is not under base directory, use absolute path
-		registryPath = expandedPath
-		fmt.Printf("  %s Project is not under base directory, storing absolute path\n", warnStyle.Render("Note:"))
-	} else {
-		registryPath = relativePath
-	}
-
-	// Register project in registry
-	fmt.Printf("  Registering project...")
-
-	project := registry.Project{
-		Path:        registryPath,
-		Category:    category,
-		Lang:        lang,
-		Created:     time.Now().Format("2006-01-02"),
-		Description: description,
-		Aliases:     addOpts.aliases,
-		Tags:        []string{},
-		Status:      registry.Status{State: registry.StateActive},
-	}
-
-	// Add to registry
-	if reg.Projects == nil {
-		reg.Projects = make(map[string]registry.Project)
-	}
-	reg.Projects[name] = project
-
-	// Save registry
-	if err := saveRegistry(reg); err != nil {
+	if err := runAddRegister(ctx, s); err != nil {
 		return err
 	}
-
-	postCreateResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
-		Type:        lifecycle.ProjectCreated,
-		ProjectName: name,
-		ProjectPath: expandedPath,
-		Settings: map[string]string{
-			"thoughts_dir": thoughtsDir,
-		},
-	})
-	for _, warning := range postCreateResult.Warnings {
-		fmt.Fprintf(os.Stderr, "warning: %s\n", warning)
-	}
-
-	fmt.Println(" done")
 
 	fmt.Println()
 	fmt.Printf("%s\n", successStyle.Render("Project added successfully!"))
 	fmt.Println()
-	fmt.Printf("%s %s\n", labelStyle.Render("Project path:"), pathStyle.Render(expandedPath))
-	fmt.Printf("%s %s\n", labelStyle.Render("Thoughts:"), pathStyle.Render(filepath.Join(thoughtsDir, "projects", name)))
-	if len(addOpts.aliases) > 0 {
-		fmt.Printf("%s %s\n", labelStyle.Render("Aliases:"), strings.Join(addOpts.aliases, ", "))
+	fmt.Printf("%s %s\n", labelStyle.Render("Project path:"), pathStyle.Render(ctx.expandedPath))
+	fmt.Printf("%s %s\n", labelStyle.Render("Thoughts:"), pathStyle.Render(filepath.Join(ctx.thoughtsDir, "projects", ctx.name)))
+	if len(ctx.aliases) > 0 {
+		fmt.Printf("%s %s\n", labelStyle.Render("Aliases:"), strings.Join(ctx.aliases, ", "))
 	}
 	fmt.Println()
 

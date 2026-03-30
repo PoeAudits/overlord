@@ -161,23 +161,36 @@ func (m *pickerModel) filterProjects() {
 }
 
 func (m pickerModel) View() string {
+	s := NewStyles()
 	var b strings.Builder
 
-	// Styles
-	s := NewStyles()
-	promptStyle := s.Prompt
-	selectedStyle := s.Selected
-	nameStyle := s.Name
-	categoryStyle := s.Category
-	descStyle := s.Desc
-	cursorStyle := s.Cursor
+	m.renderPickerHeader(&b, s)
+	m.renderPickerItems(&b, s)
+	m.renderPickerFooter(&b, s)
 
-	// Header
-	b.WriteString(promptStyle.Render("Find project: "))
+	return b.String()
+}
+
+func (m pickerModel) renderPickerHeader(b *strings.Builder, s styles) {
+	b.WriteString(s.Prompt.Render("Find project: "))
 	b.WriteString(m.textInput.View())
 	b.WriteString("\n\n")
+}
 
-	// Calculate visible items (limit to terminal height minus header/footer)
+func (m pickerModel) renderPickerItems(b *strings.Builder, s styles) {
+	if len(m.filtered) == 0 {
+		b.WriteString(s.Desc.Render("  No matching projects"))
+		b.WriteString("\n")
+		return
+	}
+
+	startIdx, endIdx := m.visibleRange()
+	for i := startIdx; i < endIdx; i++ {
+		b.WriteString(m.renderPickerItem(i, s))
+	}
+}
+
+func (m pickerModel) visibleRange() (int, int) {
 	maxVisible := maxPickerVisibleItems
 	if m.height > 0 {
 		maxVisible = m.height - pickerHeaderFooterLines
@@ -186,61 +199,48 @@ func (m pickerModel) View() string {
 		}
 	}
 
-	// Calculate scroll offset
 	startIdx := 0
 	if m.cursor >= maxVisible {
 		startIdx = m.cursor - maxVisible + 1
 	}
+
 	endIdx := startIdx + maxVisible
 	if endIdx > len(m.filtered) {
 		endIdx = len(m.filtered)
 	}
 
-	// Show filtered projects
-	if len(m.filtered) == 0 {
-		b.WriteString(descStyle.Render("  No matching projects"))
-		b.WriteString("\n")
-	} else {
-		for i := startIdx; i < endIdx; i++ {
-			p := m.filtered[i]
+	return startIdx, endIdx
+}
 
-			// Cursor indicator
-			if i == m.cursor {
-				b.WriteString(cursorStyle.Render("> "))
-			} else {
-				b.WriteString("  ")
-			}
-
-			// Format: name (padded) | category (padded) | description (truncated)
-			name := p.name
-			aliasStr := ""
-			if len(p.aliases) > 0 {
-				aliasStr = " (" + strings.Join(p.aliases, ", ") + ")"
-			}
-			if i == m.cursor {
-				name = selectedStyle.Render(padRight(name, m.maxNameLen)) + descStyle.Render(aliasStr)
-			} else {
-				name = nameStyle.Render(padRight(name, m.maxNameLen)) + descStyle.Render(aliasStr)
-			}
-
-			category := categoryStyle.Render(padRight(p.category, m.maxCatLen))
-
-			// Truncate description
-			desc := p.description
-			if len(desc) > maxDescDisplayLen {
-				desc = desc[:maxDescDisplayLen-3] + "..."
-			}
-			desc = descStyle.Render(desc)
-
-			b.WriteString(fmt.Sprintf("%s  %s  %s\n", name, category, desc))
-		}
+func (m pickerModel) renderPickerItem(idx int, s styles) string {
+	p := m.filtered[idx]
+	cursor := "  "
+	if idx == m.cursor {
+		cursor = s.Cursor.Render("> ")
 	}
 
-	// Footer with help
-	b.WriteString("\n")
-	b.WriteString(descStyle.Render("↑/↓ navigate • enter select • esc cancel"))
+	name := s.Name.Render(padRight(p.name, m.maxNameLen))
+	if idx == m.cursor {
+		name = s.Selected.Render(padRight(p.name, m.maxNameLen))
+	}
 
-	return b.String()
+	aliasStr := ""
+	if len(p.aliases) > 0 {
+		aliasStr = " (" + strings.Join(p.aliases, ", ") + ")"
+	}
+
+	category := s.Category.Render(padRight(p.category, m.maxCatLen))
+	desc := p.description
+	if len(desc) > maxDescDisplayLen {
+		desc = desc[:maxDescDisplayLen-3] + "..."
+	}
+
+	return fmt.Sprintf("%s%s%s  %s  %s\n", cursor, name, s.Desc.Render(aliasStr), category, s.Desc.Render(desc))
+}
+
+func (m pickerModel) renderPickerFooter(b *strings.Builder, s styles) {
+	b.WriteString("\n")
+	b.WriteString(s.Desc.Render("↑/↓ navigate • enter select • esc cancel"))
 }
 
 // padRight pads a string to the specified width
@@ -253,19 +253,20 @@ func padRight(s string, width int) string {
 
 // openCmd represents the open command
 var openCmd = &cobra.Command{
-	Use:   "open [name]",
+	Use:   "open [name...]",
 	Short: "Open a project workspace in tmux",
-	Long: `Open a project workspace in tmux. If the session exists, attach to it.
+	Long: `Open one or more project workspaces in tmux. If the session exists, attach to it.
 If not, create a new session and optionally source .tmux.local.
 
 If no name is provided, or multiple projects match, an interactive
 fuzzy finder is shown.
 
 Examples:
-  overlord open dispatch       # Open project by name
-  overlord open                # Interactive picker
-  overlord dispatch            # Shorthand (same as 'overlord open dispatch')`,
-	Args: cobra.MaximumNArgs(1),
+	  overlord open dispatch       # Open project by name
+	  overlord open agents prompt-lab opencode
+	  overlord open                # Interactive picker
+	  overlord dispatch            # Shorthand (same as 'overlord open dispatch')`,
+	Args: cobra.ArbitraryArgs,
 	RunE: runOpen,
 }
 
@@ -274,102 +275,172 @@ func init() {
 }
 
 func runOpen(cmd *cobra.Command, args []string) error {
-	// Load registry
 	reg, err := loadRegistry()
 	if err != nil {
 		return err
 	}
 
-	var projectName string
-	var project registry.Project
-
 	if len(args) == 0 {
-		// No name provided - show picker with all active projects
-		projectName, project, err = showPicker(reg, "")
+		projectName, project, err := openWithPicker(cmd, reg)
+		if err != nil || projectName == "" {
+			return err
+		}
+		return openResolvedProject(projectName, project, reg)
+	}
+
+	if len(args) > 1 {
+		return openMultipleProjects(cmd, reg, args)
+	}
+
+	projectName, project, err := resolveOpenMatch(cmd, reg, args[0])
+	if err != nil || projectName == "" {
+		return err
+	}
+
+	return openResolvedProject(projectName, project, reg)
+}
+
+type openTarget struct {
+	name    string
+	project registry.Project
+}
+
+func openMultipleProjects(cmd *cobra.Command, reg *registry.Registry, queries []string) error {
+	resolvedProjects := make([]openTarget, 0, len(queries))
+	for _, query := range queries {
+		projectName, project, err := resolveOpenMatch(cmd, reg, query)
 		if err != nil {
 			return err
 		}
 		if projectName == "" {
-			// User cancelled
 			return nil
 		}
-	} else {
-		// Name provided - try to resolve
-		query := args[0]
-		// Use Resolve (multi-result) instead of ResolveOne so ambiguous matches can
-		// flow into the interactive picker instead of returning an ambiguity error.
-		results := reg.Resolve(query)
 
-		if len(results) == 0 {
-			// Check if query looks like a command that doesn't exist
-			commonCommands := map[string]string{
-				"create":   "Use 'overlord new <name>' to create a project",
-				"delete":   "Use 'overlord rm <name>' to remove from registry",
-				"remove":   "Use 'overlord rm <name>' to remove from registry",
-				"status":   "Use 'overlord list' to see projects or 'overlord info <name>' for details",
-				"show":     "Use 'overlord info <name>' to see project details",
-				"get":      "Use 'overlord info <name>' to see project details",
-				"start":    "Use 'overlord open <name>' to open a project workspace",
-				"run":      "Use 'overlord open <name>' to open a project workspace",
-				"enter":    "Use 'overlord open <name>' to open a project workspace",
-				"ls":       "Use 'overlord list' to see projects",
-				"projects": "Use 'overlord list' to see projects",
-				"register": "Use 'overlord add <path>' to register an existing project",
-				"restore":  "Use 'overlord unarchive <name>' to restore a project",
-			}
-			if suggestion, ok := commonCommands[strings.ToLower(query)]; ok {
-				return fmt.Errorf("'%s' is not a command.\n%s\n\nRun 'overlord help' for available commands", query, suggestion)
-			}
-			return fmt.Errorf("no project found matching '%s'\n\nRun 'overlord list' to see all projects\nRun 'overlord help' for available commands", query)
-		}
+		resolvedProjects = append(resolvedProjects, openTarget{
+			name:    projectName,
+			project: project,
+		})
+	}
 
-		if len(results) == 1 {
-			// Single match - use it
-			projectName = results[0].Name
-			project = results[0].Project
-		} else {
-			// Multiple matches - show picker with filtered results
-			projectName, project, err = showPickerWithResults(results)
-			if err != nil {
+	archivedProjectNames := archivedProjectNames(resolvedProjects)
+	if len(archivedProjectNames) > 0 {
+		return cmdError("open", fmt.Sprintf("archived projects cannot be opened: %s", strings.Join(archivedProjectNames, ", ")), "Restore them first with 'overlord unarchive <name>'")
+	}
+
+	lastProjectIdx := len(resolvedProjects) - 1
+	for idx, resolved := range resolvedProjects {
+		recordLastOpened(resolved.name, resolved.project, reg)
+
+		if idx == lastProjectIdx {
+			if err := openProject(resolved.name, resolved.project, reg); err != nil {
 				return err
 			}
-			if projectName == "" {
-				// User cancelled
-				return nil
-			}
+			continue
+		}
+
+		if err := ensureProjectSession(resolved.name, resolved.project, reg); err != nil {
+			return err
 		}
 	}
 
-	// Check if project is archived
-	if project.Status.State == registry.StateArchived {
-		return fmt.Errorf("'%s' is archived\nRestore it first: overlord unarchive %s --category=%s",
-			projectName, projectName, project.Category)
+	return nil
+}
+
+func archivedProjectNames(resolvedProjects []openTarget) []string {
+	archivedProjectNames := make([]string, 0)
+	for _, resolved := range resolvedProjects {
+		if resolved.project.Status.State != registry.StateArchived {
+			continue
+		}
+		archivedProjectNames = append(archivedProjectNames, resolved.name)
 	}
 
-	// Record last opened timestamp (save only, no commit+push)
+	return archivedProjectNames
+}
+
+func resolveOpenMatch(cmd *cobra.Command, reg *registry.Registry, query string) (string, registry.Project, error) {
+	results := reg.Resolve(query)
+	if len(results) == 0 {
+		return "", registry.Project{}, openNoMatchError(cmd, query)
+	}
+
+	if len(results) == 1 {
+		return openSingleMatch(cmd, results[0])
+	}
+
+	return openAmbiguousMatch(cmd, results)
+}
+
+func openWithPicker(cmd *cobra.Command, reg *registry.Registry) (string, registry.Project, error) {
+	_ = cmd
+	return showPicker(reg, "")
+}
+
+func openSingleMatch(cmd *cobra.Command, match registry.ResolveResult) (string, registry.Project, error) {
+	_ = cmd
+	return match.Name, match.Project, nil
+}
+
+func openAmbiguousMatch(cmd *cobra.Command, matches []registry.ResolveResult) (string, registry.Project, error) {
+	_ = cmd
+	return showPickerWithResults(matches)
+}
+
+func openNoMatchError(cmd *cobra.Command, query string) error {
+	commonCommands := map[string]string{
+		"create":   "Use 'overlord new <name>' to create a project",
+		"delete":   "Use 'overlord rm <name>' to remove from registry",
+		"remove":   "Use 'overlord rm <name>' to remove from registry",
+		"status":   "Use 'overlord list' to see projects or 'overlord info <name>' for details",
+		"show":     "Use 'overlord info <name>' to see project details",
+		"get":      "Use 'overlord info <name>' to see project details",
+		"start":    "Use 'overlord open <name>' to open a project workspace",
+		"run":      "Use 'overlord open <name>' to open a project workspace",
+		"enter":    "Use 'overlord open <name>' to open a project workspace",
+		"ls":       "Use 'overlord list' to see projects",
+		"projects": "Use 'overlord list' to see projects",
+		"register": "Use 'overlord add <path>' to register an existing project",
+		"restore":  "Use 'overlord unarchive <name>' to restore a project",
+	}
+
+	if suggestion, ok := commonCommands[strings.ToLower(query)]; ok {
+		return cmdError("open", fmt.Sprintf("'%s' is not a project or command", query), suggestion)
+	}
+
+	return cmdError("open", fmt.Sprintf("no project found matching '%s'", query), "Run 'overlord list' to see all projects")
+}
+
+func openResolvedProject(projectName string, project registry.Project, reg *registry.Registry) error {
+	// Check if project is archived
+	if project.Status.State == registry.StateArchived {
+		return cmdError("open", fmt.Sprintf("'%s' is archived", projectName), fmt.Sprintf("Restore it first: overlord unarchive %s --category=%s", projectName, project.Category))
+	}
+
+	recordLastOpened(projectName, project, reg)
+
+	return openProject(projectName, project, reg)
+}
+
+func recordLastOpened(projectName string, project registry.Project, reg *registry.Registry) {
 	project.LastOpened = time.Now().UTC().Format(time.RFC3339)
 	reg.Projects[projectName] = project
 	if err := saveRegistry(reg); err != nil {
-		// Warn but don't fail - opening the project is more important
 		s := NewStyles()
 		fmt.Printf("%s failed to record open time: %v\n", s.Warn.Render("Warning:"), err)
 	}
-
-	// Open the project
-	return openProject(projectName, project, reg)
 }
 
 // showPicker shows the interactive picker with all active projects
 func showPicker(reg *registry.Registry, initialQuery string) (string, registry.Project, error) {
 	// Check if we're in a terminal
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		return "", registry.Project{}, fmt.Errorf("interactive picker requires a terminal\nProvide a project name: overlord open <name>")
+		return "", registry.Project{}, cmdError("open", "interactive picker requires a terminal", "Provide a project name: overlord open <name>")
 	}
 
 	// Get active projects
 	activeProjects := reg.ActiveProjects()
 	if len(activeProjects) == 0 {
-		return "", registry.Project{}, fmt.Errorf("no active projects found\nRun 'overlord list --all' to see all projects")
+		return "", registry.Project{}, cmdError("open", "no active projects found", "Run 'overlord list --all' to see all projects")
 	}
 
 	// Convert to picker items
@@ -416,7 +487,7 @@ func showPickerWithResults(results []registry.ResolveResult) (string, registry.P
 		for i, result := range results {
 			names[i] = result.Name
 		}
-		return "", registry.Project{}, fmt.Errorf("multiple projects match: %s\nProvide a more specific name", strings.Join(names, ", "))
+		return "", registry.Project{}, cmdError("open", fmt.Sprintf("multiple projects match: %s", strings.Join(names, ", ")), "Provide a more specific name")
 	}
 
 	// Convert to picker items
@@ -475,6 +546,22 @@ func runPicker(items []projectItem, initialQuery string) (*projectItem, error) {
 
 // openProject opens a project in tmux
 func openProject(name string, project registry.Project, reg *registry.Registry) error {
+	if err := ensureProjectSession(name, project, reg); err != nil {
+		return err
+	}
+
+	// Attach to session (or switch if already in tmux)
+	session := tmux.NewSession(name, "")
+	if err := session.AttachOrSwitch(); err != nil {
+		s := NewStyles()
+		fmt.Printf("%s %v\n", s.Warn.Render("Warning:"), err)
+		fmt.Printf("Attach manually: tmux attach -t %s\n", name)
+	}
+
+	return nil
+}
+
+func ensureProjectSession(name string, project registry.Project, reg *registry.Registry) error {
 	// Expand base directory
 	baseDir, err := expandBaseDir(reg)
 	if err != nil {
@@ -487,7 +574,7 @@ func openProject(name string, project registry.Project, reg *registry.Registry) 
 
 	// Check if directory exists
 	if _, err := os.Stat(projectPath); errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("project directory not found\nExpected location: %s", projectPath)
+		return cmdError("open", fmt.Sprintf("project directory not found at %s", projectPath), "Check the path in 'overlord info <name>' or re-register with 'overlord add'")
 	}
 
 	openResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
@@ -511,7 +598,7 @@ func openProject(name string, project registry.Project, reg *registry.Registry) 
 
 	// Check if tmux is available
 	if _, err := exec.LookPath("tmux"); err != nil {
-		return fmt.Errorf("tmux not found in PATH\nInstall tmux to use workspace features")
+		return cmdError("open", "tmux not found in PATH", "Install tmux to use workspace features")
 	}
 
 	// Create tmux session helper
@@ -539,12 +626,6 @@ func openProject(name string, project registry.Project, reg *registry.Registry) 
 		}
 
 		fmt.Printf("%s\n", successStyle.Render("Session created!"))
-	}
-
-	// Attach to session (or switch if already in tmux)
-	if err := session.AttachOrSwitch(); err != nil {
-		fmt.Printf("%s %v\n", warnStyle.Render("Warning:"), err)
-		fmt.Printf("Attach manually: tmux attach -t %s\n", name)
 	}
 
 	return nil

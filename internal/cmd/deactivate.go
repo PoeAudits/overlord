@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/registry"
@@ -57,10 +56,10 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 	s := NewStyles()
 
 	if deactivateOpts.all && len(args) > 0 {
-		return fmt.Errorf("--all cannot be combined with project names")
+		return cmdError("deactivate", "--all cannot be combined with project names", "")
 	}
 	if !deactivateOpts.all && len(args) == 0 {
-		return fmt.Errorf("requires at least one project name or --all")
+		return cmdError("deactivate", "requires at least one project name or --all", "Usage: overlord deactivate <name> [name...] or --all")
 	}
 
 	// 1. Load machine config
@@ -74,24 +73,13 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if deactivateOpts.removeRemote {
-		peersConfig, loadErr := machine.LoadPeers(machine.DefaultPeersPath)
-		if loadErr != nil {
-			return fmt.Errorf("failed to load peers config: %w", loadErr)
-		}
-		_, err = syncpkg.ResolvePeer(peersConfig, deactivateOpts.peer)
-		if err != nil {
-			return err
-		}
-	}
-
 	// 2. Load registry
 	reg, err := loadRegistry()
 	if err != nil {
 		return err
 	}
 
-	targets, err := resolveDeactivateTargets(reg, args, deactivateOpts.all)
+	targets, err := resolveProjectTargets(reg, args, deactivateOpts.all)
 	if err != nil {
 		return err
 	}
@@ -100,10 +88,8 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if len(targets) > 1 {
-		if err := enforceRegistryLockOwnership(); err != nil {
-			return err
-		}
+	if err := enforceRegistryLockOwnership(); err != nil {
+		return err
 	}
 
 	results := make([]string, 0, len(targets))
@@ -155,37 +141,9 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-
-func resolveDeactivateTargets(reg *registry.Registry, args []string, all bool) ([]string, error) {
-	if all {
-		names := make([]string, 0, len(reg.Projects))
-		for name := range reg.Projects {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		return names, nil
-	}
-
-	seen := make(map[string]struct{}, len(args))
-	targets := make([]string, 0, len(args))
-	for _, arg := range args {
-		resolved, _, err := resolveProject(reg, arg)
-		if err != nil {
-			return nil, err
-		}
-		if _, ok := seen[resolved]; ok {
-			continue
-		}
-		seen[resolved] = struct{}{}
-		targets = append(targets, resolved)
-	}
-
-	return targets, nil
-}
-
 func deactivateProjectSync(ctx context.Context, localClient *syncthing.Client, projectName string, project registry.Project) (bool, error) {
 	if project.Status.State == registry.StateArchived {
-		return false, fmt.Errorf("archived projects cannot be deactivated from sync")
+		return false, cmdError("deactivate", "archived projects cannot be deactivated from sync", "Unarchive first with 'overlord unarchive <name>'")
 	}
 
 	if project.Sync.Status != registry.SyncActive {

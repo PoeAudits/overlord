@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/PoeAudits/overlord/internal/fileutil"
 	"gopkg.in/yaml.v3"
 
 	"github.com/PoeAudits/overlord/internal/registry"
@@ -147,14 +148,8 @@ func SavePeers(path string, config *PeersConfig) error {
 		}
 	}
 
-	tempPath := expandedPath + ".tmp"
-	if err := os.WriteFile(tempPath, data, 0o644); err != nil {
-		return fmt.Errorf("failed to write temp file: %w", err)
-	}
-
-	if err := os.Rename(tempPath, expandedPath); err != nil {
-		_ = os.Remove(tempPath)
-		return fmt.Errorf("failed to rename temp file: %w", err)
+	if err := fileutil.AtomicWriteFile(expandedPath, data, 0o644); err != nil {
+		return err
 	}
 
 	return nil

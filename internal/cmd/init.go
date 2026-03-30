@@ -73,22 +73,6 @@ func init() {
 	initCmd.Flags().BoolVar(&initOpts.langSol, "sol", false, "Use Solidity templates")
 }
 
-// getInitLanguage determines the language from init flags
-func getInitLanguage() (registry.Language, bool) {
-	switch {
-	case initOpts.langPy:
-		return registry.LanguagePython, true
-	case initOpts.langTs:
-		return registry.LanguageTypeScript, true
-	case initOpts.langGo:
-		return registry.LanguageGo, true
-	case initOpts.langSol:
-		return registry.LanguageSolidity, true
-	default:
-		return "", false
-	}
-}
-
 func runInitCmd(cmd *cobra.Command, args []string) error {
 	// Determine target path
 	targetPath := "."
@@ -105,13 +89,13 @@ func runInitCmd(cmd *cobra.Command, args []string) error {
 	// Check directory exists
 	info, err := os.Stat(absPath)
 	if errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("directory does not exist: %s", absPath)
+		return cmdError("init", fmt.Sprintf("directory does not exist: %s", absPath), "Create it first or provide a valid path")
 	}
 	if err != nil {
 		return fmt.Errorf("failed to stat path: %w", err)
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("not a directory: %s", absPath)
+		return cmdError("init", fmt.Sprintf("not a directory: %s", absPath), "Provide a directory path")
 	}
 
 	// Determine project name
@@ -122,7 +106,7 @@ func runInitCmd(cmd *cobra.Command, args []string) error {
 
 	// Determine language
 	var lang registry.Language
-	if flagLang, hasFlag := getInitLanguage(); hasFlag {
+	if flagLang, hasFlag := languageFromFlags(initOpts.langPy, initOpts.langTs, initOpts.langGo, initOpts.langSol, false); hasFlag {
 		lang = flagLang
 	} else {
 		detected, err := detectLanguage(absPath)
@@ -209,16 +193,8 @@ func runInitCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("  Creating thoughts structure... ")
-	preInitResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
-		Type:        lifecycle.ProjectInitializing,
-		ProjectName: name,
-		ProjectPath: absPath,
-		Settings: map[string]string{
-			"thoughts_dir": thoughtsDir,
-		},
-	})
-	if preInitResult.Err != nil {
-		return fmt.Errorf("pre-init hook failed: %w", preInitResult.Err)
+	if err := fireProjectEvent(lifecycle.ProjectInitializing, name, absPath, thoughtsDir); err != nil {
+		return fmt.Errorf("pre-init hook failed: %w", err)
 	}
 	if warning, err := EnsureProjectThoughtsSymlink(thoughtsDir, name, absPath, false); err != nil {
 		return err

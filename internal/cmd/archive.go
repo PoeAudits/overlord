@@ -193,22 +193,10 @@ func archiveOneProject(reg *registry.Registry, rp resolvedProject) error {
 
 	// Prepare lifecycle settings
 	thoughtsDir := reg.Settings.ThoughtsDir
-	settings := map[string]string{}
-	if expandedThoughtsDir, err := registry.ExpandPath(thoughtsDir); err != nil {
-		fmt.Printf("%s Failed to expand thoughts directory for '%s': %v\n", s.StrongWarn.Render("Warning:"), rp.name, err)
-	} else {
-		settings["thoughts_dir"] = expandedThoughtsDir
-	}
+	settings := buildThoughtsSettings(reg, s)
 
-	preArchiveResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
-		Type:        lifecycle.ProjectArchiving,
-		ProjectName: rp.name,
-		ProjectPath: rp.sourcePath,
-		DestPath:    rp.destPath,
-		Settings:    settings,
-	})
-	if preArchiveResult.Err != nil {
-		return fmt.Errorf("pre-archive hook failed: %w", preArchiveResult.Err)
+	if err := fireProjectEvent(lifecycle.ProjectArchiving, rp.name, rp.sourcePath, settings["thoughts_dir"]); err != nil {
+		return fmt.Errorf("pre-archive hook failed: %w", err)
 	}
 
 	// Move directory

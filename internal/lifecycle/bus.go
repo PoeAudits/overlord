@@ -47,14 +47,7 @@ func (b *Bus) Fire(event Event) HandlerResult {
 		if err == nil {
 			continue
 		}
-
-		wrappedErr := fmt.Errorf("handler %d for %s failed: %w", i+1, event.Type, err)
-		if event.Type.IsPost() {
-			result.Warnings = append(result.Warnings, wrappedErr.Error())
-			continue
-		}
-
-		fatalErrors = append(fatalErrors, wrappedErr)
+		recordHandlerError(&result, &fatalErrors, event.Type, i, err)
 	}
 
 	if len(fatalErrors) > 0 {
@@ -62,6 +55,15 @@ func (b *Bus) Fire(event Event) HandlerResult {
 	}
 
 	return result
+}
+
+func recordHandlerError(result *HandlerResult, fatalErrors *[]error, eventType EventType, handlerIndex int, err error) {
+	wrappedErr := fmt.Errorf("handler %d for %s failed: %w", handlerIndex+1, eventType, err)
+	if eventType.IsPost() {
+		result.Warnings = append(result.Warnings, wrappedErr.Error())
+		return
+	}
+	*fatalErrors = append(*fatalErrors, wrappedErr)
 }
 
 func callHandler(handler Handler, event Event) (err error) {

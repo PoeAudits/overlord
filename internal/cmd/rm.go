@@ -55,6 +55,7 @@ func runRm(cmd *cobra.Command, args []string) error {
 
 	// Resolve all projects first before making any changes
 	s := NewStyles()
+	settings := buildThoughtsSettings(reg, s)
 	type resolvedProject struct {
 		name string
 		path string
@@ -85,29 +86,33 @@ func runRm(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(resolved) == 0 {
-		return fmt.Errorf("no valid projects to remove")
+		return cmdError("rm", "no valid projects to remove", "Run 'overlord list' to see available projects")
 	}
 
 	// Handle force mode (delete files)
 	if rmOpts.force {
 		for _, p := range resolved {
-			if _, err := os.Stat(p.path); errors.Is(err, fs.ErrNotExist) {
+			_, err := os.Stat(p.path)
+			if errors.Is(err, fs.ErrNotExist) {
 				fmt.Printf("Warning: Project directory does not exist: %s\n", p.path)
 				fmt.Println("Removing from registry only...")
-			} else if err != nil {
+				continue
+			}
+
+			if err != nil {
 				return fmt.Errorf("failed to check project directory '%s': %w", p.name, err)
-			} else {
-				confirmed, err := confirmDelete(p.name, p.path)
-				if err != nil {
-					return fmt.Errorf("failed to read confirmation: %w", err)
-				}
-				if !confirmed {
-					fmt.Printf("Skipping '%s'\n", p.name)
-					continue
-				}
-				if err := os.RemoveAll(p.path); err != nil {
-					return fmt.Errorf("failed to delete project directory '%s': %w", p.name, err)
-				}
+			}
+
+			confirmed, err := confirmDelete(p.name, p.path)
+			if err != nil {
+				return fmt.Errorf("failed to read confirmation: %w", err)
+			}
+			if !confirmed {
+				fmt.Printf("Skipping '%s'\n", p.name)
+				continue
+			}
+			if err := os.RemoveAll(p.path); err != nil {
+				return fmt.Errorf("failed to delete project directory '%s': %w", p.name, err)
 			}
 		}
 	}
@@ -118,9 +123,7 @@ func runRm(cmd *cobra.Command, args []string) error {
 			Type:        lifecycle.ProjectRemoving,
 			ProjectName: p.name,
 			ProjectPath: p.path,
-			Settings: map[string]string{
-				"thoughts_dir": reg.Settings.ThoughtsDir,
-			},
+			Settings:    settings,
 		})
 		if preRemoveResult.Err != nil {
 			return fmt.Errorf("pre-remove hook failed for '%s': %w", p.name, preRemoveResult.Err)
@@ -139,9 +142,7 @@ func runRm(cmd *cobra.Command, args []string) error {
 			Type:        lifecycle.ProjectRemoved,
 			ProjectName: p.name,
 			ProjectPath: p.path,
-			Settings: map[string]string{
-				"thoughts_dir": reg.Settings.ThoughtsDir,
-			},
+			Settings:    settings,
 		})
 		for _, warning := range postRemoveResult.Warnings {
 			fmt.Fprintf(os.Stderr, "warning: %s\n", warning)

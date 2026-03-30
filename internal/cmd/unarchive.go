@@ -132,95 +132,124 @@ func init() {
 
 func runUnarchive(cmd *cobra.Command, args []string) error {
 	projectName := args[0]
-
-	// Load registry
 	reg, err := loadRegistry()
 	if err != nil {
 		return err
 	}
 
-	// Resolve project name (support aliases)
-	resolvedName := projectName
-	project, ok := reg.ProjectByName(projectName)
-	if !ok {
-		// Try alias
-		name, proj, found := reg.ProjectByAlias(projectName)
-		if !found {
-			return fmt.Errorf("project '%s' not found\nRun 'overlord list --all' to see all projects", projectName)
-		}
-		resolvedName = name
-		project = proj
+	resolvedName, project, err := resolveArchivedProject(reg, projectName)
+	if err != nil {
+		return err
 	}
 
-	// Check if project is archived
-	if project.Status.State != registry.StateArchived {
-		return fmt.Errorf("project '%s' is not archived\nCurrent state: %s", resolvedName, project.Status.State)
+	targetCategory, cancelled, err := resolveUnarchiveCategory()
+	if err != nil {
+		return err
+	}
+	if cancelled {
+		return nil
 	}
 
-	// Get or prompt for category
-	var targetCategory registry.Category
+	sourcePath, targetPath, err := validateUnarchiveTarget(reg, resolvedName, targetCategory)
+	if err != nil {
+		return err
+	}
+
+	s := NewStyles()
+	settings := buildThoughtsSettings(reg, s)
+	thoughtsRestored := thoughtsArchiveExists(settings, resolvedName)
+
+	if err := firePreUnarchiveEvent(resolvedName, sourcePath, targetPath, settings); err != nil {
+		return err
+	}
+
+	thoughtsWarnings, err := performUnarchive(resolvedName, sourcePath, targetPath, settings)
+	if err != nil {
+		return err
+	}
+
+	if err := updateRegistryForUnarchive(reg, resolvedName, project, targetCategory, s); err != nil {
+		return err
+	}
+
+	thoughtsWarnings = append(thoughtsWarnings, firePostUnarchiveEvent(resolvedName, targetPath, settings)...)
+	printUnarchiveSuccess(s, resolvedName, targetCategory, sourcePath, targetPath, reg.Settings.ThoughtsDir, thoughtsRestored, thoughtsWarnings)
+
+	return nil
+}
+
+func resolveArchivedProject(reg *registry.Registry, projectName string) (string, registry.Project, error) {
+	result, err := reg.ResolveOne(projectName)
+	if err != nil {
+		return "", registry.Project{}, withHintOnNoProjectMatch(err, "run 'overlord list --all' to see all projects")
+	}
+
+	if result.Project.Status.State != registry.StateArchived {
+		return "", registry.Project{}, cmdError("unarchive", fmt.Sprintf("project '%s' is not archived (current state: %s)", result.Name, result.Project.Status.State), "Use 'overlord archive <name>' to archive it first")
+	}
+
+	return result.Name, result.Project, nil
+}
+
+func resolveUnarchiveCategory() (registry.Category, bool, error) {
 	if unarchiveCategoryFlag != "" {
-		var err error
-		targetCategory, err = validateCategory(unarchiveCategoryFlag)
+		category, err := validateCategory(unarchiveCategoryFlag)
 		if err != nil {
-			return err
+			return "", false, err
 		}
-	} else {
-		// Show interactive picker
-		cat, err := showCategoryPicker()
-		if err != nil {
-			return err
-		}
-		if cat == nil {
-			// User cancelled
-			return nil
-		}
-		targetCategory = *cat
+		return category, false, nil
 	}
 
-	// Calculate paths
+	category, err := showCategoryPicker()
+	if err != nil {
+		return "", false, err
+	}
+	if category == nil {
+		return "", true, nil
+	}
+
+	return *category, false, nil
+}
+
+func validateUnarchiveTarget(reg *registry.Registry, resolvedName string, targetCategory registry.Category) (string, string, error) {
 	sourcePath, err := fileutil.ExpandProjectPath(filepath.Join("archive", resolvedName), reg.Settings.BaseDir)
 	if err != nil {
-		return fmt.Errorf("failed to expand source path: %w", err)
+		return "", "", fmt.Errorf("failed to expand source path: %w", err)
 	}
 
 	targetPath, err := fileutil.ExpandProjectPath(filepath.Join(targetCategory.Path(), resolvedName), reg.Settings.BaseDir)
 	if err != nil {
-		return fmt.Errorf("failed to expand target path: %w", err)
+		return "", "", fmt.Errorf("failed to expand target path: %w", err)
 	}
 
-	// Check if source exists
 	if _, err := os.Stat(sourcePath); errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("project directory not found\nExpected location: %s", sourcePath)
+		return "", "", fmt.Errorf("project directory not found\nExpected location: %s", sourcePath)
 	}
 
-	// Check if target already exists
 	if _, err := os.Stat(targetPath); err == nil {
-		return fmt.Errorf("target directory already exists\nLocation: %s\nRemove it first or choose a different category", targetPath)
+		return "", "", cmdError("unarchive", fmt.Sprintf("target directory already exists: %s", targetPath), "Remove it first or choose a different category")
 	}
 
-	// Create target parent directory if needed
 	targetParent := filepath.Dir(targetPath)
 	if err := os.MkdirAll(targetParent, 0o755); err != nil {
-		return fmt.Errorf("failed to create target directory: %w", err)
+		return "", "", fmt.Errorf("failed to create target directory: %w", err)
 	}
 
-	// Define styles for output
-	s := NewStyles()
+	return sourcePath, targetPath, nil
+}
 
-	thoughtsDir := reg.Settings.ThoughtsDir
-	settings := map[string]string{}
-	thoughtsRestored := false
-	if expandedThoughtsDir, err := registry.ExpandPath(thoughtsDir); err != nil {
-		fmt.Printf("%s Failed to expand thoughts directory: %v\n", s.StrongWarn.Render("Warning:"), err)
-	} else {
-		settings["thoughts_dir"] = expandedThoughtsDir
-		archiveThoughtsBase := filepath.Join(expandedThoughtsDir, "archive", resolvedName)
-		if _, err := os.Stat(archiveThoughtsBase); err == nil {
-			thoughtsRestored = true
-		}
+func thoughtsArchiveExists(settings map[string]string, projectName string) bool {
+	thoughtsSetting, ok := settings["thoughts_dir"]
+	if !ok {
+		return false
 	}
 
+	archiveThoughtsBase := filepath.Join(thoughtsSetting, "archive", projectName)
+	_, err := os.Stat(archiveThoughtsBase)
+	return err == nil
+}
+
+func firePreUnarchiveEvent(resolvedName, sourcePath, targetPath string, settings map[string]string) error {
 	preUnarchiveResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
 		Type:        lifecycle.ProjectUnarchiving,
 		ProjectName: resolvedName,
@@ -232,33 +261,43 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("pre-unarchive hook failed: %w", preUnarchiveResult.Err)
 	}
 
-	// Move directory
+	return nil
+}
+
+func performUnarchive(projectName, sourcePath, targetPath string, settings map[string]string) ([]string, error) {
 	if err := fileutil.MoveDirectory(sourcePath, targetPath); err != nil {
-		return fmt.Errorf("failed to move directory: %w", err)
+		return nil, fmt.Errorf("failed to move directory: %w", err)
 	}
-	var thoughtsWarnings []string
 
 	if thoughtsSetting, ok := settings["thoughts_dir"]; ok {
-		if warning, err := EnsureProjectThoughtsSymlink(thoughtsSetting, resolvedName, targetPath, false); err != nil {
-			thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to update project thoughts symlink: %v", err))
-		} else if warning != "" {
-			thoughtsWarnings = append(thoughtsWarnings, warning)
+		warning, err := EnsureProjectThoughtsSymlink(thoughtsSetting, projectName, targetPath, false)
+		if err != nil {
+			return []string{fmt.Sprintf("failed to update project thoughts symlink: %v", err)}, nil
+		}
+		if warning != "" {
+			return []string{warning}, nil
 		}
 	}
 
-	// Update registry
+	return nil, nil
+}
+
+func updateRegistryForUnarchive(reg *registry.Registry, resolvedName string, project registry.Project, targetCategory registry.Category, s styles) error {
 	project.Path = filepath.Join(targetCategory.Path(), resolvedName)
 	project.Category = targetCategory
 	project.Status.State = registry.StateActive
 	reg.Projects[resolvedName] = project
 
-	// Save registry
 	if err := saveRegistry(reg); err != nil {
 		fmt.Printf("%s Registry save failed after directory move; filesystem and registry may be out of sync: %v\n",
 			s.StrongWarn.Render("Warning:"), err)
 		return err
 	}
 
+	return nil
+}
+
+func firePostUnarchiveEvent(resolvedName, targetPath string, settings map[string]string) []string {
 	postUnarchiveResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
 		Type:        lifecycle.ProjectUnarchived,
 		ProjectName: resolvedName,
@@ -266,13 +305,24 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 		DestPath:    targetPath,
 		Settings:    settings,
 	})
-	thoughtsWarnings = append(thoughtsWarnings, postUnarchiveResult.Warnings...)
 
+	return postUnarchiveResult.Warnings
+}
+
+func printUnarchiveSuccess(
+	s styles,
+	resolvedName string,
+	targetCategory registry.Category,
+	sourcePath string,
+	targetPath string,
+	thoughtsDir string,
+	thoughtsRestored bool,
+	thoughtsWarnings []string,
+) {
 	labelStyle := s.Label
 	successStyle := s.Success
 	pathStyle := s.Path
 
-	// Print success message
 	fmt.Printf("%s '%s' to category '%s'\n",
 		successStyle.Render("Unarchived"),
 		resolvedName,
@@ -280,28 +330,24 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  %s %s\n", labelStyle.Render("From:"), pathStyle.Render(fileutil.FormatPathWithTilde(sourcePath)))
 	fmt.Printf("  %s %s\n", labelStyle.Render("To:"), pathStyle.Render(fileutil.FormatPathWithTilde(targetPath)))
 
-	// Print thoughts status
 	if thoughtsRestored {
 		fmt.Printf("  %s restored from %s/archive/%s/\n", labelStyle.Render("Thoughts:"), thoughtsDir, resolvedName)
 	}
 	fmt.Println()
 
-	// Print any warnings from thoughts restore
 	if len(thoughtsWarnings) > 0 {
 		for _, warning := range thoughtsWarnings {
 			fmt.Printf("%s %s\n", s.StrongWarn.Render("Warning:"), warning)
 		}
 		fmt.Println()
 	}
-
-	return nil
 }
 
 // showCategoryPicker shows the interactive category picker
 func showCategoryPicker() (*registry.Category, error) {
 	// Check if we're in a terminal
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		return nil, fmt.Errorf("interactive picker requires a terminal\nProvide a category: overlord unarchive <name> --category=<cat>")
+		return nil, cmdError("unarchive", "interactive picker requires a terminal", "Provide a category: overlord unarchive <name> --category=<cat>")
 	}
 
 	categories := registry.ValidCategories()
