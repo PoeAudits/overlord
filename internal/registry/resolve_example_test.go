@@ -10,8 +10,7 @@ func ExampleRegistry_Resolve_exactName() {
 	reg := &registry.Registry{
 		Version: 2,
 		Settings: registry.Settings{
-			BaseDir:     "/home/user/projects",
-			ThoughtsDir: "/home/user/thoughts",
+			BaseDir: "/home/user/projects",
 		},
 		Projects: map[string]registry.Project{
 			"overlord": {
@@ -40,8 +39,7 @@ func ExampleRegistry_Resolve_exactAlias() {
 	reg := &registry.Registry{
 		Version: 2,
 		Settings: registry.Settings{
-			BaseDir:     "/home/user/projects",
-			ThoughtsDir: "/home/user/thoughts",
+			BaseDir: "/home/user/projects",
 		},
 		Projects: map[string]registry.Project{
 			"overlord": {
@@ -70,8 +68,7 @@ func ExampleRegistry_Resolve_fuzzy() {
 	reg := &registry.Registry{
 		Version: 2,
 		Settings: registry.Settings{
-			BaseDir:     "/home/user/projects",
-			ThoughtsDir: "/home/user/thoughts",
+			BaseDir: "/home/user/projects",
 		},
 		Projects: map[string]registry.Project{
 			"overlord": {
@@ -111,8 +108,7 @@ func ExampleRegistry_ResolveOne_success() {
 	reg := &registry.Registry{
 		Version: 2,
 		Settings: registry.Settings{
-			BaseDir:     "/home/user/projects",
-			ThoughtsDir: "/home/user/thoughts",
+			BaseDir: "/home/user/projects",
 		},
 		Projects: map[string]registry.Project{
 			"overlord": {
@@ -145,8 +141,7 @@ func ExampleRegistry_ResolveOne_notFound() {
 	reg := &registry.Registry{
 		Version: 2,
 		Settings: registry.Settings{
-			BaseDir:     "/home/user/projects",
-			ThoughtsDir: "/home/user/thoughts",
+			BaseDir: "/home/user/projects",
 		},
 		Projects: map[string]registry.Project{},
 	}
@@ -164,8 +159,7 @@ func ExampleRegistry_Resolve_multipleMatches() {
 	reg := &registry.Registry{
 		Version: 2,
 		Settings: registry.Settings{
-			BaseDir:     "/home/user/projects",
-			ThoughtsDir: "/home/user/thoughts",
+			BaseDir: "/home/user/projects",
 		},
 		Projects: map[string]registry.Project{
 			"service-gateway": {

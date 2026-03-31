@@ -116,35 +116,6 @@ func (s State) IsValid() bool {
 	return s == StateActive || s == StateArchived
 }
 
-// SyncStatus represents the project sync status
-type SyncStatus string
-
-// SyncStatus constants
-const (
-	SyncActive   SyncStatus = "active"
-	SyncInactive SyncStatus = "inactive"
-)
-
-// IsValid checks if the sync status is valid
-// Empty string is valid for backward compatibility (treated as inactive)
-func (s SyncStatus) IsValid() bool {
-	return s == SyncActive || s == SyncInactive || s == ""
-}
-
-// SyncMethod represents the sync mechanism used for a project.
-type SyncMethod string
-
-// SyncMethod constants
-const (
-	SyncMethodSyncthing SyncMethod = "syncthing"
-)
-
-// IsValid checks if the sync method is valid
-// Empty string is valid for backward compatibility.
-func (m SyncMethod) IsValid() bool {
-	return m == SyncMethodSyncthing || m == ""
-}
-
 // Status represents the project status
 type Status struct {
 	State State `yaml:"state"`
@@ -154,23 +125,6 @@ type Status struct {
 func (s *Status) Validate() error {
 	if !s.State.IsValid() {
 		return fmt.Errorf("invalid state: %s (must be 'active' or 'archived')", s.State)
-	}
-	return nil
-}
-
-// ProjectSync represents per-project sync configuration
-type ProjectSync struct {
-	Status SyncStatus `yaml:"status,omitempty"`
-	Method SyncMethod `yaml:"method,omitempty"`
-}
-
-// Validate validates the project sync configuration
-func (ps *ProjectSync) Validate() error {
-	if !ps.Status.IsValid() {
-		return fmt.Errorf("invalid sync status: %s (must be 'active', 'inactive', or empty)", ps.Status)
-	}
-	if !ps.Method.IsValid() {
-		return fmt.Errorf("invalid sync method: %s (must be 'syncthing' or empty)", ps.Method)
 	}
 	return nil
 }
@@ -185,7 +139,6 @@ type Project struct {
 	Aliases     []string    `yaml:"aliases,omitempty"`
 	Tags        []string    `yaml:"tags,omitempty"`
 	Status      Status      `yaml:"status"`
-	Sync        ProjectSync `yaml:"sync,omitempty"`
 	LastOpened  string      `yaml:"last_opened,omitempty"`
 }
 
@@ -224,11 +177,6 @@ func (p *Project) Validate() error {
 		errs = append(errs, err.Error())
 	}
 
-	// Validate sync if present
-	if err := p.Sync.Validate(); err != nil {
-		errs = append(errs, err.Error())
-	}
-
 	// Validate last_opened if present (must be RFC3339)
 	if p.LastOpened != "" {
 		if _, err := time.Parse(time.RFC3339, p.LastOpened); err != nil {
@@ -245,26 +193,14 @@ func (p *Project) Validate() error {
 
 // Settings represents the registry settings
 type Settings struct {
-	BaseDir     string `yaml:"base_dir"`
-	ThoughtsDir string `yaml:"thoughts_dir"`
+	BaseDir string `yaml:"base_dir"`
 }
 
 // Validate validates the settings
 func (s *Settings) Validate() error {
-	var errs []string
-
 	if s.BaseDir == "" {
-		errs = append(errs, "base_dir is required")
+		return fmt.Errorf("settings validation failed: base_dir is required")
 	}
-
-	if s.ThoughtsDir == "" {
-		errs = append(errs, "thoughts_dir is required")
-	}
-
-	if len(errs) > 0 {
-		return fmt.Errorf("settings validation failed: %s", strings.Join(errs, "; "))
-	}
-
 	return nil
 }
 

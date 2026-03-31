@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/registry"
@@ -13,9 +12,9 @@ import (
 // clearCmd represents the clear command
 var clearCmd = &cobra.Command{
 	Use:   "clear <name> [name...]",
-	Short: "Permanently remove projects, their files, and thoughts directories",
-	Long: `Permanently remove one or more projects from the registry, delete their project
-directories, and delete their thoughts directories.
+	Short: "Permanently remove projects and their files",
+	Long: `Permanently remove one or more projects from the registry and delete their
+project directories.
 
 This is a destructive operation that cannot be undone. A confirmation prompt will
 list everything that will be removed before proceeding.
@@ -27,8 +26,6 @@ Name arguments can be project names or aliases.
 What gets removed:
   - Registry entry
   - Project directory (e.g. ~/Overlord/web/myproject/)
-  - Thoughts directories (~/thoughts/projects/myproject/)
-  - Archived thoughts (~/thoughts/archive/myproject/)
 
 Examples:
   overlord clear myproject              # Clear a single project
@@ -45,13 +42,9 @@ func init() {
 type clearTarget struct {
 	name        string
 	projectPath string // expanded absolute path to project directory
-	thoughtsDir string // expanded absolute path to ~/thoughts/projects/<name>
-	archiveDir  string // expanded absolute path to ~/thoughts/archive/<name>
 
 	// existence flags (checked during resolution)
-	projectExists  bool
-	thoughtsExists bool
-	archiveExists  bool
+	projectExists bool
 }
 
 func runClear(cmd *cobra.Command, args []string) error {
@@ -66,12 +59,6 @@ func runClear(cmd *cobra.Command, args []string) error {
 	var targets []clearTarget
 	var resolveErrors []string
 
-	// Expand thoughts directory once
-	expandedThoughtsDir, err := registry.ExpandPath(reg.Settings.ThoughtsDir)
-	if err != nil {
-		return fmt.Errorf("failed to expand thoughts directory: %w", err)
-	}
-
 	for _, name := range args {
 		result, err := reg.ResolveOne(name)
 		if err != nil {
@@ -85,25 +72,14 @@ func runClear(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		thoughtsDir := filepath.Join(expandedThoughtsDir, "projects", result.Name)
-		archiveDir := filepath.Join(expandedThoughtsDir, "archive", result.Name)
-
 		target := clearTarget{
 			name:        result.Name,
 			projectPath: projectPath,
-			thoughtsDir: thoughtsDir,
-			archiveDir:  archiveDir,
 		}
 
 		// Check what exists on disk
 		if _, err := os.Stat(projectPath); err == nil {
 			target.projectExists = true
-		}
-		if _, err := os.Stat(thoughtsDir); err == nil {
-			target.thoughtsExists = true
-		}
-		if _, err := os.Stat(archiveDir); err == nil {
-			target.archiveExists = true
 		}
 
 		targets = append(targets, target)
@@ -161,7 +137,7 @@ func runClear(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// clearOneProject removes a single project's files, thoughts, and registry entry.
+// clearOneProject removes a single project's files and registry entry.
 func clearOneProject(reg *registry.Registry, t clearTarget) error {
 	// Define styles (red success style intentional - destructive operation)
 	s := NewStyles()
@@ -176,22 +152,6 @@ func clearOneProject(reg *registry.Registry, t clearTarget) error {
 		}
 	}
 
-	// Delete thoughts directory (active location)
-	if t.thoughtsExists {
-		if err := os.RemoveAll(t.thoughtsDir); err != nil {
-			// Warn but continue — thoughts are secondary
-			fmt.Printf("%s Failed to delete thoughts directory for '%s': %v\n", s.StrongWarn.Render("Warning:"), t.name, err)
-		}
-	}
-
-	// Delete thoughts directory (archive location)
-	if t.archiveExists {
-		if err := os.RemoveAll(t.archiveDir); err != nil {
-			// Warn but continue — thoughts are secondary
-			fmt.Printf("%s Failed to delete archived thoughts for '%s': %v\n", s.StrongWarn.Render("Warning:"), t.name, err)
-		}
-	}
-
 	// Remove from registry
 	delete(reg.Projects, t.name)
 
@@ -199,12 +159,6 @@ func clearOneProject(reg *registry.Registry, t clearTarget) error {
 	fmt.Printf("%s '%s'\n", successStyle.Render("Cleared"), t.name)
 	if t.projectExists {
 		fmt.Printf("  %s %s\n", labelStyle.Render("Project:"), pathStyle.Render(fileutil.FormatPathWithTilde(t.projectPath)))
-	}
-	if t.thoughtsExists {
-		fmt.Printf("  %s %s\n", labelStyle.Render("Thoughts:"), pathStyle.Render(fileutil.FormatPathWithTilde(t.thoughtsDir)))
-	}
-	if t.archiveExists {
-		fmt.Printf("  %s %s\n", labelStyle.Render("Archived:"), pathStyle.Render(fileutil.FormatPathWithTilde(t.archiveDir)))
 	}
 	fmt.Println()
 

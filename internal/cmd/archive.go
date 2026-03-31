@@ -29,12 +29,6 @@ updating their status to 'archived' in the registry.
 
 Name arguments can be project names or aliases.
 
-Thoughts directories are also moved to archive:
-  From: ~/thoughts/projects/<project>/{briefs,research,plans,logs,docs}/
-  To:   ~/thoughts/archive/<project>/{briefs,research,plans,logs,docs}/
-
-Symlinks in docs/ and project-root thoughts symlink are updated.
-
 Examples:
   overlord archive myproject              # Archive a single project
   overlord archive foo bar baz            # Archive multiple projects
@@ -191,27 +185,13 @@ func archiveOneProject(reg *registry.Registry, rp resolvedProject) error {
 		return fmt.Errorf("failed to create archive directory: %w", err)
 	}
 
-	// Prepare lifecycle settings
-	thoughtsDir := reg.Settings.ThoughtsDir
-	settings := buildThoughtsSettings(reg, s)
-
-	if err := fireProjectEvent(lifecycle.ProjectArchiving, rp.name, rp.sourcePath, settings["thoughts_dir"]); err != nil {
+	if err := fireProjectEvent(lifecycle.ProjectArchiving, rp.name, rp.sourcePath); err != nil {
 		return fmt.Errorf("pre-archive hook failed: %w", err)
 	}
 
 	// Move directory
 	if err := fileutil.MoveDirectory(rp.sourcePath, rp.destPath); err != nil {
 		return fmt.Errorf("failed to move directory: %w", err)
-	}
-
-	var thoughtsWarnings []string
-
-	if thoughtsSetting, ok := settings["thoughts_dir"]; ok {
-		if warning, err := EnsureProjectThoughtsSymlink(thoughtsSetting, rp.name, rp.destPath, true); err != nil {
-			thoughtsWarnings = append(thoughtsWarnings, fmt.Sprintf("failed to update project thoughts symlink: %v", err))
-		} else if warning != "" {
-			thoughtsWarnings = append(thoughtsWarnings, warning)
-		}
 	}
 
 	// Update registry
@@ -226,24 +206,18 @@ func archiveOneProject(reg *registry.Registry, rp resolvedProject) error {
 		ProjectName: rp.name,
 		ProjectPath: rp.destPath,
 		DestPath:    rp.destPath,
-		Settings:    settings,
+		Settings:    nil,
 	})
-	thoughtsWarnings = append(thoughtsWarnings, postArchiveResult.Warnings...)
 
 	// Print success message
 	fmt.Printf("%s '%s'\n", successStyle.Render("Archived"), rp.name)
 	fmt.Printf("  %s %s\n", labelStyle.Render("From:"), pathStyle.Render(fileutil.FormatPathWithTilde(rp.sourcePath)))
 	fmt.Printf("  %s %s\n", labelStyle.Render("To:"), pathStyle.Render(fileutil.FormatPathWithTilde(rp.destPath)))
-
-	// Print thoughts status
-	if _, ok := settings["thoughts_dir"]; ok {
-		fmt.Printf("  %s %s/archive/%s/\n", labelStyle.Render("Thoughts:"), thoughtsDir, rp.name)
-	}
 	fmt.Println()
 
-	// Print any warnings from thoughts move
-	if len(thoughtsWarnings) > 0 {
-		for _, warning := range thoughtsWarnings {
+	// Print any warnings from hooks
+	if len(postArchiveResult.Warnings) > 0 {
+		for _, warning := range postArchiveResult.Warnings {
 			fmt.Printf("%s %s\n", s.StrongWarn.Render("Warning:"), warning)
 		}
 		fmt.Println()

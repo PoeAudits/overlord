@@ -16,8 +16,6 @@ const (
 	DefaultRegistryPath = "~/.config/overlord/registry.yaml"
 	// DefaultBaseDir is the default base directory for project worktrees.
 	DefaultBaseDir = "~/Overlord"
-	// DefaultThoughtsDir is the default root directory for thoughts files.
-	DefaultThoughtsDir = "~/thoughts"
 )
 
 // Load reads the registry from the specified path.
@@ -141,8 +139,7 @@ func defaultRegistry() *Registry {
 	return &Registry{
 		Version: 2,
 		Settings: Settings{
-			BaseDir:     DefaultBaseDir,
-			ThoughtsDir: DefaultThoughtsDir,
+			BaseDir: DefaultBaseDir,
 		},
 		Projects: make(map[string]Project),
 	}

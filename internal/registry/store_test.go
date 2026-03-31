@@ -32,10 +32,6 @@ func TestLoad_NonExistentFile(t *testing.T) {
 		t.Errorf("registry.Settings.BaseDir = %s, want ~/Overlord", registry.Settings.BaseDir)
 	}
 
-	if registry.Settings.ThoughtsDir != "~/thoughts" {
-		t.Errorf("registry.Settings.ThoughtsDir = %s, want ~/thoughts", registry.Settings.ThoughtsDir)
-	}
-
 	if registry.Projects == nil {
 		t.Error("registry.Projects is nil, want empty map")
 	}
@@ -230,8 +226,7 @@ func TestSave_InvalidRegistry(t *testing.T) {
 	registry := &Registry{
 		Version: 1,
 		Settings: Settings{
-			BaseDir:     "~/Overlord",
-			ThoughtsDir: "~/thoughts",
+			BaseDir: "~/Overlord",
 		},
 		Projects: make(map[string]Project),
 	}

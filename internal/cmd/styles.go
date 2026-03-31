@@ -36,7 +36,6 @@ type styles struct {
 	Dim     lipgloss.Style
 
 	// Info display styles
-	Section  lipgloss.Style
 	Value    lipgloss.Style
 	Category lipgloss.Style
 	Lang     lipgloss.Style
@@ -58,7 +57,6 @@ type styles struct {
 	TableName          lipgloss.Style
 	TableMuted         lipgloss.Style
 	TableRecent        lipgloss.Style
-	TableStatusSynced  lipgloss.Style
 	TableStatusActive  lipgloss.Style
 	TableStatusDefault lipgloss.Style
 }
@@ -77,7 +75,6 @@ func NewStyles() styles {
 		Dim:     lipgloss.NewStyle().Foreground(colorGray),
 
 		// Info display styles
-		Section:  lipgloss.NewStyle().Foreground(colorCyan).Bold(true),
 		Value:    lipgloss.NewStyle().Foreground(colorWhite),
 		Category: lipgloss.NewStyle().Foreground(colorPurple),
 		Lang:     lipgloss.NewStyle().Foreground(colorYellow),
@@ -99,7 +96,6 @@ func NewStyles() styles {
 		TableName:          lipgloss.NewStyle().Foreground(colorWhite).Bold(true).Padding(0, 1),
 		TableMuted:         lipgloss.NewStyle().Foreground(colorGray).Padding(0, 1),
 		TableRecent:        lipgloss.NewStyle().Foreground(colorCyan).Padding(0, 1),
-		TableStatusSynced:  lipgloss.NewStyle().Foreground(colorPink).Padding(0, 1),
 		TableStatusActive:  lipgloss.NewStyle().Foreground(colorGreen).Padding(0, 1),
 		TableStatusDefault: lipgloss.NewStyle().Foreground(colorGray).Padding(0, 1),
 	}

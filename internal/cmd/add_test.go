@@ -238,10 +238,6 @@ func TestDetectCategory(t *testing.T) {
 		if !strings.Contains(errMsg, "--category") {
 			t.Errorf("error should suggest --category flag, got: %v", err)
 		}
-		// Should list valid categories
-		if !strings.Contains(errMsg, "contracts") {
-			t.Errorf("error should list categories, got: %v", err)
-		}
 	})
 
 	t.Run("error when under base dir but no category match", func(t *testing.T) {

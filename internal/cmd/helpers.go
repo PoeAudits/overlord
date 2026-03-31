@@ -3,15 +3,13 @@ package cmd
 import (
 	"bufio"
 	"fmt"
-	"math"
-	"os"
+"os"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/lifecycle"
-	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/registry"
 	"golang.org/x/term"
 )
@@ -27,38 +25,10 @@ func loadRegistry() (*registry.Registry, error) {
 
 // saveRegistry saves the registry to the default path.
 func saveRegistry(reg *registry.Registry) error {
-	if err := enforceRegistryLockOwnership(); err != nil {
-		return err
-	}
-
 	if err := registry.Save(registry.DefaultRegistryPath, reg); err != nil {
 		return fmt.Errorf("failed to save registry: %w", err)
 	}
 	return nil
-}
-
-func enforceRegistryLockOwnership() error {
-	lock, err := machine.LoadLock(machine.DefaultRegistryLockPath)
-	if err != nil {
-		return fmt.Errorf("failed to load registry lock: %w", err)
-	}
-	if lock == nil {
-		return nil
-	}
-
-	machineConfig, err := machine.Load(machine.DefaultConfigPath)
-	if err != nil {
-		return fmt.Errorf("failed to load machine config for lock check: %w", err)
-	}
-
-	localMachine := machineConfig.Name
-	if lock.Owner == localMachine {
-		return nil
-	}
-
-	return cmdError("registry",
-		fmt.Sprintf("lock is owned by '%s' and this machine is '%s'", lock.Owner, localMachine),
-		fmt.Sprintf("Run on owner machine: overlord sync lock transfer %s. If owner is offline: overlord sync lock claim", localMachine))
 }
 
 // confirmAction allows a quick "y" acknowledgement for reversible operations,
@@ -106,39 +76,11 @@ func expandBaseDir(reg *registry.Registry) (string, error) {
 	return baseDir, nil
 }
 
-func buildThoughtsSettings(reg *registry.Registry, s styles) map[string]string {
-	settings := map[string]string{}
-	if reg == nil {
-		return settings
-	}
-
-	thoughtsDir := reg.Settings.ThoughtsDir
-	if thoughtsDir == "" {
-		return settings
-	}
-
-	expandedThoughtsDir, err := registry.ExpandPath(thoughtsDir)
-	if err != nil {
-		fmt.Printf("%s Failed to expand thoughts directory: %v\n", s.Warn.Render("Warning:"), err)
-		settings["thoughts_dir"] = thoughtsDir
-		return settings
-	}
-
-	settings["thoughts_dir"] = expandedThoughtsDir
-	return settings
-}
-
-func fireProjectEvent(eventType lifecycle.EventType, name, path, thoughtsDir string) error {
-	settings := map[string]string{}
-	if thoughtsDir != "" {
-		settings["thoughts_dir"] = thoughtsDir
-	}
-
+func fireProjectEvent(eventType lifecycle.EventType, name, path string) error {
 	result := lifecycle.DefaultBus.Fire(lifecycle.Event{
 		Type:        eventType,
 		ProjectName: name,
 		ProjectPath: path,
-		Settings:    settings,
 	})
 	if result.Err != nil {
 		return fmt.Errorf("failed to fire %s lifecycle event for project '%s': %w", eventType, name, result.Err)
@@ -283,19 +225,6 @@ func printClearTarget(t clearTarget, nameStyle, pathStyle, dimStyle interface{ R
 		fmt.Printf("    %s\n", projectPath)
 	}
 
-	printedThoughts := false
-	if t.thoughtsExists {
-		fmt.Printf("    %s\n", pathStyle.Render(fileutil.FormatPathWithTilde(t.thoughtsDir)))
-		printedThoughts = true
-	}
-	if t.archiveExists {
-		fmt.Printf("    %s\n", pathStyle.Render(fileutil.FormatPathWithTilde(t.archiveDir)))
-		printedThoughts = true
-	}
-	if !printedThoughts {
-		fmt.Printf("    %s\n", dimStyle.Render("No thoughts directories found"))
-	}
-
 	fmt.Println()
 }
 
@@ -329,13 +258,3 @@ func cmdError(command, problem, suggestion string) error {
 	return fmt.Errorf("[error] %s: %s. %s", command, problem, suggestion)
 }
 
-func formatBytes(value int64) string {
-	if value <= 0 {
-		return "0 B"
-	}
-	units := []string{"B", "KB", "MB", "GB", "TB"}
-	base := float64(value)
-	exp := int(math.Min(float64(len(units)-1), math.Floor(math.Log(base)/math.Log(1024))))
-	formatted := base / math.Pow(1024, float64(exp))
-	return fmt.Sprintf("%.1f %s", formatted, units[exp])
-}

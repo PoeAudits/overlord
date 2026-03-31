@@ -10,8 +10,7 @@ func createTestRegistry() *Registry {
 	return &Registry{
 		Version: 2,
 		Settings: Settings{
-			BaseDir:     "/home/user/projects",
-			ThoughtsDir: "/home/user/thoughts",
+			BaseDir: "/home/user/projects",
 		},
 		Projects: map[string]Project{
 			"overlord": {
@@ -187,8 +186,7 @@ func TestResolve_NilOrEmptyInputs(t *testing.T) {
 			reg: &Registry{
 				Version: 2,
 				Settings: Settings{
-					BaseDir:     "/home/user/projects",
-					ThoughtsDir: "/home/user/thoughts",
+					BaseDir: "/home/user/projects",
 				},
 				Projects: map[string]Project{},
 			},
@@ -199,8 +197,7 @@ func TestResolve_NilOrEmptyInputs(t *testing.T) {
 			reg: &Registry{
 				Version: 2,
 				Settings: Settings{
-					BaseDir:     "/home/user/projects",
-					ThoughtsDir: "/home/user/thoughts",
+					BaseDir: "/home/user/projects",
 				},
 				Projects: nil,
 			},
@@ -223,8 +220,7 @@ func TestResolve_SortedByScore(t *testing.T) {
 	reg := &Registry{
 		Version: 2,
 		Settings: Settings{
-			BaseDir:     "/home/user/projects",
-			ThoughtsDir: "/home/user/thoughts",
+			BaseDir: "/home/user/projects",
 		},
 		Projects: map[string]Project{
 			"test-alpha": {
@@ -351,8 +347,7 @@ func TestResolveOne_AmbiguousMatch(t *testing.T) {
 	reg := &Registry{
 		Version: 2,
 		Settings: Settings{
-			BaseDir:     "/home/user/projects",
-			ThoughtsDir: "/home/user/thoughts",
+			BaseDir: "/home/user/projects",
 		},
 		Projects: map[string]Project{
 			"test-one": {
@@ -397,8 +392,7 @@ func TestResolveOne_AmbiguousMultiMatch(t *testing.T) {
 	reg := &Registry{
 		Version: 2,
 		Settings: Settings{
-			BaseDir:     "/home/user/projects",
-			ThoughtsDir: "/home/user/thoughts",
+			BaseDir: "/home/user/projects",
 		},
 		Projects: map[string]Project{
 			"svc-alpha": {

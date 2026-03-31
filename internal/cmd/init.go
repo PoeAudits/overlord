@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/PoeAudits/overlord/internal/lifecycle"
 	"github.com/PoeAudits/overlord/internal/registry"
 	"github.com/PoeAudits/overlord/internal/templates"
 )
@@ -38,11 +37,6 @@ Writes the following files (skips any that already exist):
   - README.md (project documentation)
   - AGENTS.md (AI agent instructions)
   - opencode.jsonc (editor configuration)
-
-Also ensures thoughts artifacts exist for this project:
-  - ~/thoughts/projects/{name}/{briefs,research,audits,plans,logs,reviews,docs}/
-  - docs/ symlinks to README.md and AGENTS.md (when present)
-  - project-root thoughts symlink
 
 Language is auto-detected from project files if not specified.
 Project name defaults to the directory name.
@@ -180,28 +174,6 @@ func runInitCmd(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  %s %s\n", successStyle.Render("Written"), relPath)
 		written++
 	}
-
-	// Ensure thoughts structure and project-root symlink.
-	reg, err := loadRegistry()
-	if err != nil {
-		return err
-	}
-
-	thoughtsDir, err := registry.ExpandPath(reg.Settings.ThoughtsDir)
-	if err != nil {
-		return fmt.Errorf("failed to expand thoughts directory: %w", err)
-	}
-
-	fmt.Printf("  Creating thoughts structure... ")
-	if err := fireProjectEvent(lifecycle.ProjectInitializing, name, absPath, thoughtsDir); err != nil {
-		return fmt.Errorf("pre-init hook failed: %w", err)
-	}
-	if warning, err := EnsureProjectThoughtsSymlink(thoughtsDir, name, absPath, false); err != nil {
-		return err
-	} else if warning != "" {
-		fmt.Printf("\n  %s %s", warnStyle.Render("Warning:"), warning)
-	}
-	fmt.Println(successStyle.Render("done"))
 
 	fmt.Println()
 	fmt.Printf("%s (%d written, %d skipped)\n",

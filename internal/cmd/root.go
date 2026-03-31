@@ -18,7 +18,7 @@ var rootCmd = &cobra.Command{
 	Long: `Overlord - Project management CLI with tmux workspace integration
 
 Manage development projects with category-based organization, tmux workspaces,
-Syncthing sync, and an AI-first registry.
+and an AI-first registry.
 
 Usage:
   overlord [command] [flags]
@@ -31,7 +31,7 @@ Project Lifecycle:
   open         Open a project workspace in tmux
   info         Show detailed information about a project
   rm           Remove projects from the registry (keeps files)
-  clear        Permanently remove projects, files, and thoughts
+  clear        Permanently remove projects and their files
 
 Organization:
   list         List projects in the registry
@@ -40,17 +40,9 @@ Organization:
   detect       Find projects on disk not in the registry
   init         Initialize a directory with project templates
 
-Sync & Config:
-  sync         Show Syncthing sync status
-  activate     Activate Syncthing sync for a project
-  deactivate   Deactivate Syncthing sync for a project
-  worktree     Manage git worktrees with tmux integration
-  env          Manage project environment files
+Config:
   setup        Set up overlord configuration or bootstrap a project
-  doctor       Verify sync and machine configuration health
-  backup       Create and push one-way registry backup
   config       Open the registry file in your editor
-  thoughts     Manage project thoughts directories
 
 Workflow Examples:
   # Create a new Go service and open it
@@ -64,9 +56,8 @@ Workflow Examples:
   overlord list --recent
   overlord my-a
 
-  # Archive old projects, check sync health
+  # Archive old projects
   overlord archive stale-project
-  overlord doctor
 
 Output Format:
   All commands append a metadata footer to stderr:

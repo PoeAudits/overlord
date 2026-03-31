@@ -44,7 +44,6 @@ The command will:
   - Validate the project path exists
   - Auto-detect language from project files (or use --py/--ts/--go/--sol/--base)
   - Auto-detect category from path (or use --category)
-  - Create thoughts directories with symlinks
   - Register project in registry
 
 Language auto-detection checks for:
@@ -237,7 +236,6 @@ func resolveAddArgs(args []string) (name, projectPath string, err error) {
 type addProjectContext struct {
 	name               string
 	expandedPath       string
-	thoughtsDir        string
 	lang               registry.Language
 	languageAutoDetect bool
 	category           registry.Category
@@ -285,11 +283,6 @@ func buildAddContext(_ *cobra.Command, args []string) (*addProjectContext, error
 
 	if existingName, _, found := reg.FindProjectByPath(expandedPath, baseDir); found {
 		return nil, cmdError("add", fmt.Sprintf("this directory is already registered as project '%s'", existingName), fmt.Sprintf("Use 'overlord info %s' to see details", existingName))
-	}
-
-	thoughtsDir, err := registry.ExpandPath(reg.Settings.ThoughtsDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to expand thoughts directory: %w", err)
 	}
 
 	var (
@@ -340,7 +333,6 @@ func buildAddContext(_ *cobra.Command, args []string) (*addProjectContext, error
 	return &addProjectContext{
 		name:               name,
 		expandedPath:       expandedPath,
-		thoughtsDir:        thoughtsDir,
 		lang:               lang,
 		languageAutoDetect: languageAutoDetect,
 		category:           category,
@@ -384,7 +376,6 @@ func runAddRegister(ctx *addProjectContext, s styles) error {
 		Type:        lifecycle.ProjectCreated,
 		ProjectName: ctx.name,
 		ProjectPath: ctx.expandedPath,
-		Settings:    buildThoughtsSettings(ctx.reg, s),
 	})
 	for _, warning := range postCreateResult.Warnings {
 		fmt.Fprintf(os.Stderr, "warning: %s\n", warning)
@@ -422,16 +413,9 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%s %s\n", labelStyle.Render("Path:"), pathStyle.Render(ctx.expandedPath))
 	fmt.Println()
 
-	fmt.Printf("  Creating thoughts structure...")
-	if err := fireProjectEvent(lifecycle.ProjectCreating, ctx.name, ctx.expandedPath, ctx.thoughtsDir); err != nil {
+	if err := fireProjectEvent(lifecycle.ProjectCreating, ctx.name, ctx.expandedPath); err != nil {
 		return fmt.Errorf("pre-create hook failed: %w", err)
 	}
-	if warning, err := EnsureProjectThoughtsSymlink(ctx.thoughtsDir, ctx.name, ctx.expandedPath, false); err != nil {
-		return err
-	} else if warning != "" {
-		fmt.Printf("\n  %s %s", warnStyle.Render("Warning:"), warning)
-	}
-	fmt.Println(" done")
 
 	if err := runAddRegister(ctx, s); err != nil {
 		return err
@@ -441,7 +425,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%s\n", successStyle.Render("Project added successfully!"))
 	fmt.Println()
 	fmt.Printf("%s %s\n", labelStyle.Render("Project path:"), pathStyle.Render(ctx.expandedPath))
-	fmt.Printf("%s %s\n", labelStyle.Render("Thoughts:"), pathStyle.Render(filepath.Join(ctx.thoughtsDir, "projects", ctx.name)))
 	if len(ctx.aliases) > 0 {
 		fmt.Printf("%s %s\n", labelStyle.Render("Aliases:"), strings.Join(ctx.aliases, ", "))
 	}

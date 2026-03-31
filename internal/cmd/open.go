@@ -567,7 +567,6 @@ func ensureProjectSession(name string, project registry.Project, reg *registry.R
 	if err != nil {
 		return err
 	}
-	settings := reg.Settings
 
 	// Build full project path (handles both relative and absolute paths)
 	projectPath := fileutil.ResolveProjectPath(project.Path, baseDir)
@@ -581,9 +580,7 @@ func ensureProjectSession(name string, project registry.Project, reg *registry.R
 		Type:        lifecycle.ProjectOpening,
 		ProjectName: name,
 		ProjectPath: projectPath,
-		Settings: map[string]string{
-			"thoughts_dir": settings.ThoughtsDir,
-		},
+		Settings:    map[string]string{},
 	})
 	if openResult.Err != nil {
 		return fmt.Errorf("pre-open hook failed: %w", openResult.Err)

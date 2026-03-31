@@ -3,9 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,7 +13,6 @@ import (
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/spf13/cobra"
 
-	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/registry"
 )
 
@@ -27,7 +24,6 @@ type listFlags struct {
 	archived   bool
 	all        bool
 	recent     string
-	synced     bool
 }
 
 var listOpts listFlags
@@ -69,7 +65,6 @@ func init() {
 	listCmd.Flags().BoolVar(&listOpts.all, "all", false, "Include all projects (active and archived)")
 	listCmd.Flags().StringVar(&listOpts.recent, "recent", "", "Show recently opened projects (default: 7d, e.g. 30d, 2w, 24h)")
 	listCmd.Flags().Lookup("recent").NoOptDefVal = "7d"
-	listCmd.Flags().BoolVar(&listOpts.synced, "synced", false, "Show synced projects with disk usage")
 }
 
 // projectOutput represents a project for JSON output
@@ -80,8 +75,6 @@ type projectOutput struct {
 	Lang        string   `json:"lang"`
 	Description string   `json:"description"`
 	Status      string   `json:"status"`
-	SyncStatus  string   `json:"sync_status,omitempty"`
-	DiskUsage   string   `json:"disk_usage,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
 	LastOpened  string   `json:"last_opened,omitempty"`
 }
@@ -120,8 +113,6 @@ func filterProjects(reg *registry.Registry) []projectOutput {
 	var candidates map[string]registry.Project
 
 	switch {
-	case listOpts.synced:
-		candidates = getSyncedProjects(reg)
 	case listOpts.all:
 		candidates = reg.Projects
 	case listOpts.archived:
@@ -200,30 +191,8 @@ func filterProjectsByRecent(candidates map[string]registry.Project, recentStr st
 // filterProjectsToOutput converts filtered project candidates to output format.
 func filterProjectsToOutput(candidates map[string]registry.Project, reg *registry.Registry) []projectOutput {
 	result := make([]projectOutput, 0, len(candidates))
-	baseDir := ""
-	if listOpts.synced {
-		expanded, err := expandBaseDir(reg)
-		if err == nil {
-			baseDir = expanded
-		}
-	}
 	for name, proj := range candidates {
 		status := string(proj.Status.State)
-		syncStatus := string(proj.Sync.Status)
-		diskUsage := ""
-
-		if proj.Status.State == registry.StateActive && proj.Sync.Status == registry.SyncActive {
-			status = "synced"
-		}
-
-		if listOpts.synced && baseDir != "" {
-			usage, err := projectDiskUsage(proj, baseDir)
-			if err == nil {
-				diskUsage = usage
-			} else {
-				diskUsage = "n/a"
-			}
-		}
 
 		result = append(result, projectOutput{
 			Name:        name,
@@ -232,8 +201,6 @@ func filterProjectsToOutput(candidates map[string]registry.Project, reg *registr
 			Lang:        string(proj.Lang),
 			Description: proj.Description,
 			Status:      status,
-			SyncStatus:  syncStatus,
-			DiskUsage:   diskUsage,
 			Tags:        proj.Tags,
 			LastOpened:  proj.LastOpened,
 		})
@@ -268,26 +235,13 @@ func sortProjectOutput(result []projectOutput, recent string) {
 // statusRank returns a sort rank for status (lower = sorted first)
 func statusRank(status string) int {
 	switch status {
-	case "synced":
-		return 0
 	case "active":
-		return 1
+		return 0
 	case "archived":
-		return 2
+		return 1
 	default:
-		return 3
+		return 2
 	}
-}
-
-// getSyncedProjects returns active projects that have sync status 'active'.
-func getSyncedProjects(reg *registry.Registry) map[string]registry.Project {
-	result := make(map[string]registry.Project, len(reg.Projects))
-	for name, project := range reg.Projects {
-		if project.Status.State == registry.StateActive && project.Sync.Status == registry.SyncActive {
-			result[name] = project
-		}
-	}
-	return result
 }
 
 // hasAllTags checks if the project has all required tags
@@ -341,14 +295,10 @@ var languageColors = map[string]lipgloss.Color{
 // outputListTable outputs projects as a formatted table.
 func outputListTable(projects []projectOutput) error {
 	showRecent := listOpts.recent != ""
-	showDisk := listOpts.synced
 
-	rows := outputListTableRows(projects, showRecent, showDisk)
+	rows := outputListTableRows(projects, showRecent)
 
 	lastCol := 4
-	if showDisk {
-		lastCol = 5
-	}
 
 	styles := NewStyles()
 	styleFn := listTableStyleFunc(rows, lastCol, showRecent, styles)
@@ -357,14 +307,14 @@ func outputListTable(projects []projectOutput) error {
 		Border(lipgloss.HiddenBorder()).
 		StyleFunc(styleFn)
 
-	t = t.Headers(listTableHeaders(showRecent, showDisk)...)
+	t = t.Headers(listTableHeaders(showRecent)...)
 	t = t.Rows(rows...)
 	fmt.Println(t)
 	return nil
 }
 
 // outputListTableRows builds the string rows for the list table.
-func outputListTableRows(projects []projectOutput, showRecent, showDisk bool) [][]string {
+func outputListTableRows(projects []projectOutput, showRecent bool) [][]string {
 	rows := make([][]string, 0, len(projects))
 	for _, proj := range projects {
 		desc := truncate(proj.Description, maxDescDisplayLen)
@@ -380,9 +330,6 @@ func outputListTableRows(projects []projectOutput, showRecent, showDisk bool) []
 			row = append(row, relativeTime(proj.LastOpened))
 		} else {
 			row = append(row, proj.Status)
-		}
-		if showDisk {
-			row = append(row, proj.DiskUsage)
 		}
 
 		rows = append(rows, row)
@@ -432,28 +379,19 @@ func listStatusStyle(status string, showRecent bool, styles styles) lipgloss.Sty
 		return styles.TableRecent
 	}
 
-	statusStyles := map[string]lipgloss.Style{
-		"synced": styles.TableStatusSynced,
-		"active": styles.TableStatusActive,
+	if status == "active" {
+		return styles.TableStatusActive
 	}
-
-	if style, ok := statusStyles[status]; ok {
-		return style
-	}
-
 	return styles.TableStatusDefault
 }
 
 // listTableHeaders returns the header strings for the list table.
-func listTableHeaders(showRecent, showDisk bool) []string {
+func listTableHeaders(showRecent bool) []string {
 	headers := []string{"NAME", "CATEGORY", "LANG", "DESCRIPTION"}
 	if showRecent {
 		headers = append(headers, "OPENED")
 	} else {
 		headers = append(headers, "STATUS")
-	}
-	if showDisk {
-		headers = append(headers, "DISK")
 	}
 	return headers
 }
@@ -537,40 +475,3 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
-func projectDiskUsage(project registry.Project, baseDir string) (string, error) {
-	projectPath := fileutil.ResolveProjectPath(project.Path, baseDir)
-	size, err := dirSize(projectPath)
-	if err != nil {
-		return "", err
-	}
-	return formatBytes(size), nil
-}
-
-func dirSize(root string) (int64, error) {
-	var total int64
-	if _, err := os.Stat(root); err != nil {
-		return 0, err
-	}
-
-	walkErr := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.Type()&os.ModeSymlink != 0 {
-			return nil
-		}
-		if d.IsDir() {
-			return nil
-		}
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-		total += info.Size()
-		return nil
-	})
-	if walkErr != nil {
-		return 0, walkErr
-	}
-	return total, nil
-}

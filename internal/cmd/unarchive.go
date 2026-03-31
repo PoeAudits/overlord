@@ -108,12 +108,6 @@ The project will be moved from ~/Overlord/archive/{name}/ to the appropriate
 category directory (e.g., ~/Overlord/projects/web/{name}/), and its registry
 status will be updated to 'active'.
 
-Thoughts directories are restored alongside the project:
-  From: ~/thoughts/archive/{name}/{briefs,research,plans,logs,docs}/
-  To:   ~/thoughts/projects/{name}/{briefs,research,plans,logs,docs}/
-
-Symlinks in docs/ and project-root thoughts symlink are updated.
-
 If --category is not provided, an interactive picker will be shown.
 
 Examples:
@@ -156,15 +150,12 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 	}
 
 	s := NewStyles()
-	settings := buildThoughtsSettings(reg, s)
-	thoughtsRestored := thoughtsArchiveExists(settings, resolvedName)
 
-	if err := firePreUnarchiveEvent(resolvedName, sourcePath, targetPath, settings); err != nil {
+	if err := firePreUnarchiveEvent(resolvedName, sourcePath, targetPath); err != nil {
 		return err
 	}
 
-	thoughtsWarnings, err := performUnarchive(resolvedName, sourcePath, targetPath, settings)
-	if err != nil {
+	if err := performUnarchive(sourcePath, targetPath); err != nil {
 		return err
 	}
 
@@ -172,8 +163,8 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	thoughtsWarnings = append(thoughtsWarnings, firePostUnarchiveEvent(resolvedName, targetPath, settings)...)
-	printUnarchiveSuccess(s, resolvedName, targetCategory, sourcePath, targetPath, reg.Settings.ThoughtsDir, thoughtsRestored, thoughtsWarnings)
+	warnings := firePostUnarchiveEvent(resolvedName, targetPath)
+	printUnarchiveSuccess(s, resolvedName, targetCategory, sourcePath, targetPath, warnings)
 
 	return nil
 }
@@ -238,24 +229,12 @@ func validateUnarchiveTarget(reg *registry.Registry, resolvedName string, target
 	return sourcePath, targetPath, nil
 }
 
-func thoughtsArchiveExists(settings map[string]string, projectName string) bool {
-	thoughtsSetting, ok := settings["thoughts_dir"]
-	if !ok {
-		return false
-	}
-
-	archiveThoughtsBase := filepath.Join(thoughtsSetting, "archive", projectName)
-	_, err := os.Stat(archiveThoughtsBase)
-	return err == nil
-}
-
-func firePreUnarchiveEvent(resolvedName, sourcePath, targetPath string, settings map[string]string) error {
+func firePreUnarchiveEvent(resolvedName, sourcePath, targetPath string) error {
 	preUnarchiveResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
 		Type:        lifecycle.ProjectUnarchiving,
 		ProjectName: resolvedName,
 		ProjectPath: sourcePath,
 		DestPath:    targetPath,
-		Settings:    settings,
 	})
 	if preUnarchiveResult.Err != nil {
 		return fmt.Errorf("pre-unarchive hook failed: %w", preUnarchiveResult.Err)
@@ -264,22 +243,12 @@ func firePreUnarchiveEvent(resolvedName, sourcePath, targetPath string, settings
 	return nil
 }
 
-func performUnarchive(projectName, sourcePath, targetPath string, settings map[string]string) ([]string, error) {
+func performUnarchive(sourcePath, targetPath string) error {
 	if err := fileutil.MoveDirectory(sourcePath, targetPath); err != nil {
-		return nil, fmt.Errorf("failed to move directory: %w", err)
+		return fmt.Errorf("failed to move directory: %w", err)
 	}
 
-	if thoughtsSetting, ok := settings["thoughts_dir"]; ok {
-		warning, err := EnsureProjectThoughtsSymlink(thoughtsSetting, projectName, targetPath, false)
-		if err != nil {
-			return []string{fmt.Sprintf("failed to update project thoughts symlink: %v", err)}, nil
-		}
-		if warning != "" {
-			return []string{warning}, nil
-		}
-	}
-
-	return nil, nil
+	return nil
 }
 
 func updateRegistryForUnarchive(reg *registry.Registry, resolvedName string, project registry.Project, targetCategory registry.Category, s styles) error {
@@ -297,13 +266,12 @@ func updateRegistryForUnarchive(reg *registry.Registry, resolvedName string, pro
 	return nil
 }
 
-func firePostUnarchiveEvent(resolvedName, targetPath string, settings map[string]string) []string {
+func firePostUnarchiveEvent(resolvedName, targetPath string) []string {
 	postUnarchiveResult := lifecycle.DefaultBus.Fire(lifecycle.Event{
 		Type:        lifecycle.ProjectUnarchived,
 		ProjectName: resolvedName,
 		ProjectPath: targetPath,
 		DestPath:    targetPath,
-		Settings:    settings,
 	})
 
 	return postUnarchiveResult.Warnings
@@ -315,9 +283,7 @@ func printUnarchiveSuccess(
 	targetCategory registry.Category,
 	sourcePath string,
 	targetPath string,
-	thoughtsDir string,
-	thoughtsRestored bool,
-	thoughtsWarnings []string,
+	warnings []string,
 ) {
 	labelStyle := s.Label
 	successStyle := s.Success
@@ -329,14 +295,10 @@ func printUnarchiveSuccess(
 		targetCategory)
 	fmt.Printf("  %s %s\n", labelStyle.Render("From:"), pathStyle.Render(fileutil.FormatPathWithTilde(sourcePath)))
 	fmt.Printf("  %s %s\n", labelStyle.Render("To:"), pathStyle.Render(fileutil.FormatPathWithTilde(targetPath)))
-
-	if thoughtsRestored {
-		fmt.Printf("  %s restored from %s/archive/%s/\n", labelStyle.Render("Thoughts:"), thoughtsDir, resolvedName)
-	}
 	fmt.Println()
 
-	if len(thoughtsWarnings) > 0 {
-		for _, warning := range thoughtsWarnings {
+	if len(warnings) > 0 {
+		for _, warning := range warnings {
 			fmt.Printf("%s %s\n", s.StrongWarn.Render("Warning:"), warning)
 		}
 		fmt.Println()

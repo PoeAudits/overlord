@@ -29,10 +29,6 @@ Use --force to also delete project directories from disk (requires confirmation)
 
 Name arguments can be project names or aliases.
 
-Note: Thoughts directories are never deleted and remain at:
-  ~/thoughts/projects/<project>/
-  ~/thoughts/archive/<project>/
-
 Examples:
   overlord rm myproject              # Remove one project from registry
   overlord rm proj1 proj2 proj3      # Remove multiple projects
@@ -55,7 +51,6 @@ func runRm(cmd *cobra.Command, args []string) error {
 
 	// Resolve all projects first before making any changes
 	s := NewStyles()
-	settings := buildThoughtsSettings(reg, s)
 	type resolvedProject struct {
 		name string
 		path string
@@ -123,7 +118,7 @@ func runRm(cmd *cobra.Command, args []string) error {
 			Type:        lifecycle.ProjectRemoving,
 			ProjectName: p.name,
 			ProjectPath: p.path,
-			Settings:    settings,
+			Settings:    nil,
 		})
 		if preRemoveResult.Err != nil {
 			return fmt.Errorf("pre-remove hook failed for '%s': %w", p.name, preRemoveResult.Err)
@@ -142,7 +137,7 @@ func runRm(cmd *cobra.Command, args []string) error {
 			Type:        lifecycle.ProjectRemoved,
 			ProjectName: p.name,
 			ProjectPath: p.path,
-			Settings:    settings,
+			Settings:    nil,
 		})
 		for _, warning := range postRemoveResult.Warnings {
 			fmt.Fprintf(os.Stderr, "warning: %s\n", warning)
@@ -163,16 +158,6 @@ func runRm(cmd *cobra.Command, args []string) error {
 			fmt.Printf("%s '%s'\n", successStyle.Render("Removed from registry"), p.name)
 			fmt.Printf("%s %s\n", labelStyle.Render("Directory:"), pathStyle.Render(p.path))
 		}
-	}
-
-	// Print thoughts note
-	thoughtsDir := reg.Settings.ThoughtsDir
-	if len(resolved) == 1 {
-		fmt.Printf("\n%s Thoughts at %s/{projects,archive}/%s/ remain intact\n",
-			labelStyle.Render("Note:"), thoughtsDir, resolved[0].name)
-	} else {
-		fmt.Printf("\n%s Thoughts directories remain intact at %s/\n",
-			labelStyle.Render("Note:"), thoughtsDir)
 	}
 
 	return nil

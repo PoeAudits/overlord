@@ -38,7 +38,7 @@ var newCmd = &cobra.Command{
 	Use:   "new <name>",
 	Short: "Create a new project with full setup",
 	Long: `Create a new project with directory structure, git initialization,
-templates, thoughts integration, and registry entry.
+templates, and registry entry.
 
 The project will be created at ~/Overlord/{category-path}/{name}/ with:
   - .tmux.local (tmux session configuration)
@@ -46,11 +46,6 @@ The project will be created at ~/Overlord/{category-path}/{name}/ with:
   - README.md (project documentation)
   - AGENTS.md (AI agent instructions)
   - opencode.jsonc (editor configuration)
-
-Thoughts directories will be created at:
-  - ~/thoughts/projects/{name}/{briefs,research,audits,plans,logs,reviews,docs}/
-  - Symlinks to README.md and AGENTS.md placed in docs/ subdirectory
-  - Project root thoughts symlink -> ~/thoughts/projects/{name}
 
 Examples:
   overlord new my-api --category=services --go
@@ -189,7 +184,6 @@ type newProjectContext struct {
 	lang         registry.Language
 	description  string
 	projectPath  string
-	thoughtsDir  string
 	reg          *registry.Registry
 }
 
@@ -217,13 +211,8 @@ func runNew(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Render and write templates + .env.pass
+	// Render and write templates
 	if err := runNewTemplates(ctx, s); err != nil {
-		return err
-	}
-
-	// Create thoughts directories and symlink
-	if err := runNewThoughts(ctx, c, s); err != nil {
 		return err
 	}
 
@@ -239,12 +228,10 @@ func runNew(cmd *cobra.Command, args []string) error {
 	c.success = true
 
 	// Print summary
-	thoughtsProjectBase := filepath.Join(ctx.thoughtsDir, "projects", ctx.name)
 	fmt.Println()
 	fmt.Printf("%s\n", s.Success.Render("Project created successfully!"))
 	fmt.Println()
 	fmt.Printf("%s %s\n", s.Label.Render("Project path:"), s.Path.Render(ctx.projectPath))
-	fmt.Printf("%s %s\n", s.Label.Render("Thoughts:"), s.Path.Render(thoughtsProjectBase))
 	if len(newOpts.aliases) > 0 {
 		fmt.Printf("%s %s\n", s.Label.Render("Aliases:"), strings.Join(newOpts.aliases, ", "))
 	}
@@ -282,11 +269,6 @@ func runNewValidate(name string) (*newProjectContext, error) {
 		return nil, err
 	}
 
-	thoughtsDir, err := registry.ExpandPath(reg.Settings.ThoughtsDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to expand thoughts directory: %w", err)
-	}
-
 	categoryPath := category.Path()
 	projectPath := filepath.Join(baseDir, categoryPath, name)
 
@@ -306,7 +288,6 @@ func runNewValidate(name string) (*newProjectContext, error) {
 		lang:         lang,
 		description:  description,
 		projectPath:  projectPath,
-		thoughtsDir:  thoughtsDir,
 		reg:          reg,
 	}, nil
 }
@@ -324,7 +305,7 @@ func runNewDirectories(projectPath string, c *cleanup) error {
 	return nil
 }
 
-// runNewTemplates renders and writes project templates, then generates .env.pass.
+// runNewTemplates renders and writes project templates.
 func runNewTemplates(ctx *newProjectContext, s styles) error {
 	fmt.Printf("  Writing templates...")
 
@@ -353,39 +334,6 @@ func runNewTemplates(ctx *newProjectContext, s styles) error {
 	}
 	fmt.Println(" done")
 
-	// Generate .env.pass template from pass store (best-effort)
-	fmt.Printf("  Generating .env.pass template...")
-	envCount, envErr := GenerateEnvPassFile(ctx.projectPath)
-	if envErr != nil {
-		fmt.Println()
-		fmt.Printf("  %s %s\n", s.Warn.Render("Warning:"), envErr)
-	} else if envCount == 0 {
-		fmt.Println(" skipped (no pass entries)")
-	} else {
-		fmt.Printf(" done (%d entries)\n", envCount)
-	}
-
-	return nil
-}
-
-// runNewThoughts creates thoughts directories and the project-root thoughts symlink.
-func runNewThoughts(ctx *newProjectContext, c *cleanup, s styles) error {
-	fmt.Printf("  Creating thoughts structure...")
-
-	thoughtsProjectBase := filepath.Join(ctx.thoughtsDir, "projects", ctx.name)
-	c.add(thoughtsProjectBase)
-
-	if err := fireProjectEvent(lifecycle.ProjectCreating, ctx.name, ctx.projectPath, ctx.thoughtsDir); err != nil {
-		return fmt.Errorf("pre-create hook failed: %w", err)
-	}
-
-	if warning, err := EnsureProjectThoughtsSymlink(ctx.thoughtsDir, ctx.name, ctx.projectPath, false); err != nil {
-		return err
-	} else if warning != "" {
-		fmt.Printf("\n  %s %s", s.Warn.Render("Warning:"), warning)
-	}
-
-	fmt.Println(" done")
 	return nil
 }
 
@@ -457,9 +405,7 @@ func runNewRegister(ctx *newProjectContext) error {
 		Type:        lifecycle.ProjectCreated,
 		ProjectName: ctx.name,
 		ProjectPath: ctx.projectPath,
-		Settings: map[string]string{
-			"thoughts_dir": ctx.thoughtsDir,
-		},
+		Settings:    map[string]string{},
 	})
 	for _, warning := range postCreateResult.Warnings {
 		fmt.Fprintf(os.Stderr, "warning: %s\n", warning)
