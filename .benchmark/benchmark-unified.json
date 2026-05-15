@@ -1,0 +1,42 @@
+{
+  "schema_version": "1",
+  "artifact_kind": "benchmark_unified_compact",
+  "vector": {
+    "complexity_avg_ccn": 0.0,
+    "complexity_warning_ratio": 0.0,
+    "complexity_avg_nloc": 0.0,
+    "duplication_percentage": 0.0,
+    "duplication_line_ratio": 0.0
+  },
+  "analyzers": {},
+  "mutation": {
+    "runs": [
+      {
+        "framework": "gremlins",
+        "language": "go",
+        "status": "successful",
+        "mutation_score": null,
+        "killed_count": null,
+        "survived_count": null,
+        "timeout_count": null,
+        "error_count": null,
+        "message": null,
+        "summary": {
+          "artifacts": {
+            "stdout": "/home/thomas/Overlord/core/tools/overlord/.benchmark/gremlins/latest/gremlins-stdout.txt",
+            "stderr": "/home/thomas/Overlord/core/tools/overlord/.benchmark/gremlins/latest/gremlins-stderr.txt",
+            "raw_report": "/home/thomas/Overlord/core/tools/overlord/.benchmark/gremlins/latest/gremlins-report.json",
+            "condensed_report": "/home/thomas/Overlord/core/tools/overlord/.benchmark/gremlins/latest/gremlins-condensed.json"
+          },
+          "return_code": 0,
+          "command": [
+            "sh",
+            "-lc",
+            "mkdir -p /benchmark-scratch && rm -rf /benchmark-scratch/workspace && mkdir -p /benchmark-scratch/workspace && cp -a /workspace/source/. /benchmark-scratch/workspace/ && cd /benchmark-scratch/workspace && export PATH=/go/bin:/usr/local/go/bin:$PATH && /go/bin/gremlins unleash . --output /benchmark-scratch/gremlins-report.json"
+          ],
+          "test_command": "go test ./..."
+        }
+      }
+    ]
+  }
+}

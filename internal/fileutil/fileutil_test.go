@@ -341,6 +341,60 @@ func TestMoveDirectory_CrossDeviceCopyFailure(t *testing.T) {
 	}
 }
 
+func TestAtomicWriteFile(t *testing.T) {
+	t.Run("replaces existing file contents", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "config.yaml")
+		writeFileWithMode(t, path, []byte("old"), 0o644)
+
+		if err := AtomicWriteFile(path, []byte("new"), 0o600); err != nil {
+			t.Fatalf("AtomicWriteFile() returned error: %v", err)
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("failed to read destination file: %v", err)
+		}
+		if string(data) != "new" {
+			t.Fatalf("file contents = %q, want %q", data, "new")
+		}
+		if _, err := os.Stat(path + ".tmp"); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("expected temp file to be absent, stat err = %v", err)
+		}
+	})
+
+	t.Run("removes temp file when rename fails", func(t *testing.T) {
+		origRename := renameFunc
+		renameFunc = func(_, _ string) error {
+			return errors.New("rename failed")
+		}
+		t.Cleanup(func() {
+			renameFunc = origRename
+		})
+
+		path := filepath.Join(t.TempDir(), "config.yaml")
+		writeFileWithMode(t, path, []byte("old"), 0o644)
+
+		err := AtomicWriteFile(path, []byte("new"), 0o600)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "failed to rename temp file") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatalf("failed to read original file: %v", readErr)
+		}
+		if string(data) != "old" {
+			t.Fatalf("original file contents = %q, want %q", data, "old")
+		}
+		if _, statErr := os.Stat(path + ".tmp"); !errors.Is(statErr, os.ErrNotExist) {
+			t.Fatalf("expected temp file cleanup, stat err = %v", statErr)
+		}
+	})
+}
+
 func createProjectDir(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()

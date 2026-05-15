@@ -77,6 +77,44 @@ func (s *Session) Create() error {
 	return nil
 }
 
+// CreateWithCommand starts a detached tmux session with a named initial window running command.
+func (s *Session) CreateWithCommand(windowName, command string) error {
+	exists, err := s.Exists()
+	if err != nil {
+		return err
+	}
+	if exists {
+		return fmt.Errorf("tmux session %q: %w", s.Name, ErrSessionExists)
+	}
+	output, err := s.runner()("tmux", "new-session", "-d", "-s", s.Name, "-n", windowName, "-c", s.Dir, command)
+	if err != nil {
+		if trimmed := strings.TrimSpace(string(output)); trimmed != "" {
+			return errors.New(trimmed)
+		}
+		return err
+	}
+	return nil
+}
+
+// NewWindow adds a new named window running command to an existing session.
+func (s *Session) NewWindow(name, command string) error {
+	exists, err := s.Exists()
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("tmux session %q: %w", s.Name, ErrSessionNotFound)
+	}
+	output, err := s.runner()("tmux", "new-window", "-t", s.Name, "-n", name, "-c", s.Dir, command)
+	if err != nil {
+		if trimmed := strings.TrimSpace(string(output)); trimmed != "" {
+			return errors.New(trimmed)
+		}
+		return err
+	}
+	return nil
+}
+
 // SourceLocal executes the optional .tmux.local script with session context.
 func (s *Session) SourceLocal() error {
 	scriptPath := filepath.Join(s.Dir, ".tmux.local")
@@ -99,6 +137,39 @@ func (s *Session) SourceLocal() error {
 			return fmt.Errorf("failed to source .tmux.local: %s", trimmed)
 		}
 		return fmt.Errorf("failed to source .tmux.local: %w", err)
+	}
+	return nil
+}
+
+// SplitWindow creates a vertical split in the named window, running command in the new pane.
+func (s *Session) SplitWindow(windowName, command string) error {
+	target := s.Name + ":" + windowName
+	args := []string{"split-window", "-v", "-t", target, "-c", s.Dir, command}
+	output, err := s.runner()("tmux", args...)
+	if err != nil {
+		if trimmed := strings.TrimSpace(string(output)); trimmed != "" {
+			return errors.New(trimmed)
+		}
+		return err
+	}
+	return nil
+}
+
+// Kill terminates the tmux session if it exists.
+func (s *Session) Kill() error {
+	exists, err := s.Exists()
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return nil
+	}
+	output, err := s.runner()("tmux", "kill-session", "-t", s.Name)
+	if err != nil {
+		if trimmed := strings.TrimSpace(string(output)); trimmed != "" {
+			return errors.New(trimmed)
+		}
+		return err
 	}
 	return nil
 }

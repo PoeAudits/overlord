@@ -22,6 +22,17 @@ import (
 	"github.com/PoeAudits/overlord/internal/tmux"
 )
 
+var (
+	openLoadRegistry      = loadRegistry
+	openShowPicker        = showPicker
+	openShowPickerResults = showPickerWithResults
+	openEnsureProject     = ensureProjectSession
+	openOpenProject       = openProject
+	openSaveRegistry      = saveRegistry
+	openNow               = time.Now
+	openIsTerminal        = term.IsTerminal
+)
+
 // projectItem represents a project for the picker
 type projectItem struct {
 	name        string
@@ -275,13 +286,13 @@ func init() {
 }
 
 func runOpen(cmd *cobra.Command, args []string) error {
-	reg, err := loadRegistry()
+	reg, err := openLoadRegistry()
 	if err != nil {
 		return err
 	}
 
 	if len(args) == 0 {
-		projectName, project, err := openWithPicker(cmd, reg)
+		projectName, project, err := openShowPicker(reg, "")
 		if err != nil || projectName == "" {
 			return err
 		}
@@ -332,13 +343,13 @@ func openMultipleProjects(cmd *cobra.Command, reg *registry.Registry, queries []
 		recordLastOpened(resolved.name, resolved.project, reg)
 
 		if idx == lastProjectIdx {
-			if err := openProject(resolved.name, resolved.project, reg); err != nil {
+			if err := openOpenProject(resolved.name, resolved.project, reg); err != nil {
 				return err
 			}
 			continue
 		}
 
-		if err := ensureProjectSession(resolved.name, resolved.project, reg); err != nil {
+		if err := openEnsureProject(resolved.name, resolved.project, reg); err != nil {
 			return err
 		}
 	}
@@ -359,31 +370,24 @@ func archivedProjectNames(resolvedProjects []openTarget) []string {
 }
 
 func resolveOpenMatch(cmd *cobra.Command, reg *registry.Registry, query string) (string, registry.Project, error) {
+	return resolveProjectMatch(
+		reg,
+		query,
+		func(query string) error { return openNoMatchError(cmd, query) },
+		openShowPickerResults,
+	)
+}
+
+func resolveProjectMatch(reg *registry.Registry, query string, noMatch func(string) error, ambiguous func([]registry.ResolveResult) (string, registry.Project, error)) (string, registry.Project, error) {
 	results := reg.Resolve(query)
-	if len(results) == 0 {
-		return "", registry.Project{}, openNoMatchError(cmd, query)
+	switch len(results) {
+	case 0:
+		return "", registry.Project{}, noMatch(query)
+	case 1:
+		return results[0].Name, results[0].Project, nil
+	default:
+		return ambiguous(results)
 	}
-
-	if len(results) == 1 {
-		return openSingleMatch(cmd, results[0])
-	}
-
-	return openAmbiguousMatch(cmd, results)
-}
-
-func openWithPicker(cmd *cobra.Command, reg *registry.Registry) (string, registry.Project, error) {
-	_ = cmd
-	return showPicker(reg, "")
-}
-
-func openSingleMatch(cmd *cobra.Command, match registry.ResolveResult) (string, registry.Project, error) {
-	_ = cmd
-	return match.Name, match.Project, nil
-}
-
-func openAmbiguousMatch(cmd *cobra.Command, matches []registry.ResolveResult) (string, registry.Project, error) {
-	_ = cmd
-	return showPickerWithResults(matches)
 }
 
 func openNoMatchError(cmd *cobra.Command, query string) error {
@@ -394,7 +398,6 @@ func openNoMatchError(cmd *cobra.Command, query string) error {
 		"status":   "Use 'overlord list' to see projects or 'overlord info <name>' for details",
 		"show":     "Use 'overlord info <name>' to see project details",
 		"get":      "Use 'overlord info <name>' to see project details",
-		"start":    "Use 'overlord open <name>' to open a project workspace",
 		"run":      "Use 'overlord open <name>' to open a project workspace",
 		"enter":    "Use 'overlord open <name>' to open a project workspace",
 		"ls":       "Use 'overlord list' to see projects",
@@ -418,13 +421,13 @@ func openResolvedProject(projectName string, project registry.Project, reg *regi
 
 	recordLastOpened(projectName, project, reg)
 
-	return openProject(projectName, project, reg)
+	return openOpenProject(projectName, project, reg)
 }
 
 func recordLastOpened(projectName string, project registry.Project, reg *registry.Registry) {
-	project.LastOpened = time.Now().UTC().Format(time.RFC3339)
+	project.LastOpened = openNow().UTC().Format(time.RFC3339)
 	reg.Projects[projectName] = project
-	if err := saveRegistry(reg); err != nil {
+	if err := openSaveRegistry(reg); err != nil {
 		s := NewStyles()
 		fmt.Printf("%s failed to record open time: %v\n", s.Warn.Render("Warning:"), err)
 	}
@@ -432,15 +435,19 @@ func recordLastOpened(projectName string, project registry.Project, reg *registr
 
 // showPicker shows the interactive picker with all active projects
 func showPicker(reg *registry.Registry, initialQuery string) (string, registry.Project, error) {
+	return showPickerForCommand("open", reg, initialQuery)
+}
+
+func showPickerForCommand(command string, reg *registry.Registry, initialQuery string) (string, registry.Project, error) {
 	// Check if we're in a terminal
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		return "", registry.Project{}, cmdError("open", "interactive picker requires a terminal", "Provide a project name: overlord open <name>")
+	if !openIsTerminal(int(os.Stdin.Fd())) {
+		return "", registry.Project{}, cmdError(command, "interactive picker requires a terminal", fmt.Sprintf("Provide a project name: overlord %s <name>", command))
 	}
 
 	// Get active projects
 	activeProjects := reg.ActiveProjects()
 	if len(activeProjects) == 0 {
-		return "", registry.Project{}, cmdError("open", "no active projects found", "Run 'overlord list --all' to see all projects")
+		return "", registry.Project{}, cmdError(command, "no active projects found", "Run 'overlord list --all' to see all projects")
 	}
 
 	// Convert to picker items
@@ -480,14 +487,18 @@ func showPicker(reg *registry.Registry, initialQuery string) (string, registry.P
 
 // showPickerWithResults shows the picker with pre-filtered results
 func showPickerWithResults(results []registry.ResolveResult) (string, registry.Project, error) {
+	return showPickerWithResultsForCommand("open", results)
+}
+
+func showPickerWithResultsForCommand(command string, results []registry.ResolveResult) (string, registry.Project, error) {
 	// Check if we're in a terminal
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
+	if !openIsTerminal(int(os.Stdin.Fd())) {
 		// Not in terminal - show ambiguous error
 		names := make([]string, len(results))
 		for i, result := range results {
 			names[i] = result.Name
 		}
-		return "", registry.Project{}, cmdError("open", fmt.Sprintf("multiple projects match: %s", strings.Join(names, ", ")), "Provide a more specific name")
+		return "", registry.Project{}, cmdError(command, fmt.Sprintf("multiple projects match: %s", strings.Join(names, ", ")), "Provide a more specific name")
 	}
 
 	// Convert to picker items

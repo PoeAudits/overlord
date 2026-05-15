@@ -11,6 +11,11 @@ import (
 
 var version = "0.1.0" // Will be set by build flags later
 
+var (
+	rootRunList = runList
+	rootRunOpen = runOpen
+)
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "overlord [project-name]",
@@ -29,12 +34,14 @@ Project Lifecycle:
   new          Create a new project with full setup
   add          Register an existing project directory
   open         Open a project workspace in tmux
+  path         Print a project path
   info         Show detailed information about a project
   rm           Remove projects from the registry (keeps files)
   clear        Permanently remove projects and their files
 
 Organization:
   list         List projects in the registry
+  backup       Create a backup zip for tagged projects
   archive      Move projects to the archive directory
   unarchive    Restore projects from archive
   detect       Find projects on disk not in the registry
@@ -43,6 +50,7 @@ Organization:
 Config:
   setup        Set up overlord configuration or bootstrap a project
   config       Open the registry file in your editor
+  code         Attach current directory to local OpenCode
 
 Workflow Examples:
   # Create a new Go service and open it
@@ -176,9 +184,9 @@ func unknownFlagSuggestion(errStr, commandName string) string {
 func runRoot(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		// No args - run list command
-		return runList(cmd, args)
+		return rootRunList(cmd, args)
 	}
 
 	// Has args - treat as project name and run open
-	return runOpen(cmd, args)
+	return rootRunOpen(cmd, args)
 }

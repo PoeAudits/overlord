@@ -141,7 +141,7 @@ func AtomicWriteFile(path string, data []byte, perm os.FileMode) error {
 		return fmt.Errorf("failed to write temp file: %w", err)
 	}
 
-	if err := os.Rename(tempPath, path); err != nil {
+	if err := renameFunc(tempPath, path); err != nil {
 		_ = os.Remove(tempPath) // Best-effort cleanup of temp file on failure
 		return fmt.Errorf("failed to rename temp file: %w", err)
 	}

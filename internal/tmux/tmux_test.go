@@ -142,6 +142,181 @@ func TestSessionCreate(t *testing.T) {
 	}
 }
 
+func TestSessionCreateWithCommand(t *testing.T) {
+	tests := []struct {
+		name      string
+		responses []fakeResponse
+		wantErr   error
+		wantCalls []execCall
+	}{
+		{
+			name: "creates session with named window and command",
+			responses: []fakeResponse{
+				{err: &fakeExitError{code: 1, msg: "missing"}},
+				{err: nil},
+			},
+			wantCalls: []execCall{
+				{name: "tmux", args: []string{"has-session", "-t", "proj"}},
+				{name: "tmux", args: []string{"new-session", "-d", "-s", "proj", "-n", "server", "-c", "/tmp", "npm start"}},
+			},
+		},
+		{
+			name: "returns ErrSessionExists when session already exists",
+			responses: []fakeResponse{
+				{err: nil},
+			},
+			wantErr:   tmux.ErrSessionExists,
+			wantCalls: []execCall{{name: "tmux", args: []string{"has-session", "-t", "proj"}}},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &fakeRunner{responses: append([]fakeResponse(nil), tt.responses...)}
+			session := tmux.NewSession("proj", "/tmp", tmux.WithRunner(fake.Run))
+
+			err := session.CreateWithCommand("server", "npm start")
+
+			if tt.wantErr == nil && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.wantErr != nil {
+				if err == nil {
+					t.Fatalf("expected error %v but got nil", tt.wantErr)
+				}
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("expected error %v, got %v", tt.wantErr, err)
+				}
+			}
+
+			if len(fake.calls) != len(tt.wantCalls) {
+				t.Fatalf("expected %d calls, got %d", len(tt.wantCalls), len(fake.calls))
+			}
+			for i, call := range tt.wantCalls {
+				if !call.equal(fake.calls[i]) {
+					t.Fatalf("call %d mismatch: want %#v, got %#v", i, call, fake.calls[i])
+				}
+			}
+		})
+	}
+}
+
+func TestSessionNewWindow(t *testing.T) {
+	tests := []struct {
+		name      string
+		responses []fakeResponse
+		wantErr   error
+		wantCalls []execCall
+	}{
+		{
+			name: "adds new window to existing session",
+			responses: []fakeResponse{
+				{err: nil},
+				{err: nil},
+			},
+			wantCalls: []execCall{
+				{name: "tmux", args: []string{"has-session", "-t", "proj"}},
+				{name: "tmux", args: []string{"new-window", "-t", "proj", "-n", "worker", "-c", "/tmp", "make worker"}},
+			},
+		},
+		{
+			name: "returns ErrSessionNotFound when session does not exist",
+			responses: []fakeResponse{
+				{err: &fakeExitError{code: 1, msg: "missing"}},
+			},
+			wantErr:   tmux.ErrSessionNotFound,
+			wantCalls: []execCall{{name: "tmux", args: []string{"has-session", "-t", "proj"}}},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &fakeRunner{responses: append([]fakeResponse(nil), tt.responses...)}
+			session := tmux.NewSession("proj", "/tmp", tmux.WithRunner(fake.Run))
+
+			err := session.NewWindow("worker", "make worker")
+
+			if tt.wantErr == nil && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.wantErr != nil {
+				if err == nil {
+					t.Fatalf("expected error %v but got nil", tt.wantErr)
+				}
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("expected error %v, got %v", tt.wantErr, err)
+				}
+			}
+
+			if len(fake.calls) != len(tt.wantCalls) {
+				t.Fatalf("expected %d calls, got %d", len(tt.wantCalls), len(fake.calls))
+			}
+			for i, call := range tt.wantCalls {
+				if !call.equal(fake.calls[i]) {
+					t.Fatalf("call %d mismatch: want %#v, got %#v", i, call, fake.calls[i])
+				}
+			}
+		})
+	}
+}
+
+func TestSessionSplitWindow(t *testing.T) {
+	tests := []struct {
+		name      string
+		responses []fakeResponse
+		wantErr   bool
+		wantCalls []execCall
+	}{
+		{
+			name: "splits window vertically with command",
+			responses: []fakeResponse{
+				{err: nil},
+			},
+			wantCalls: []execCall{
+				{name: "tmux", args: []string{"split-window", "-v", "-t", "proj:Ollama", "-c", "/tmp", "ollama run qwen3.5:2b"}},
+			},
+		},
+		{
+			name: "propagates tmux error",
+			responses: []fakeResponse{
+				{err: errors.New("tmux: split failed")},
+			},
+			wantErr: true,
+			wantCalls: []execCall{
+				{name: "tmux", args: []string{"split-window", "-v", "-t", "proj:Ollama", "-c", "/tmp", "ollama run qwen3.5:2b"}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &fakeRunner{responses: append([]fakeResponse(nil), tt.responses...)}
+			session := tmux.NewSession("proj", "/tmp", tmux.WithRunner(fake.Run))
+
+			err := session.SplitWindow("Ollama", "ollama run qwen3.5:2b")
+
+			if tt.wantErr && err == nil {
+				t.Fatal("expected error but got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(fake.calls) != len(tt.wantCalls) {
+				t.Fatalf("expected %d calls, got %d", len(tt.wantCalls), len(fake.calls))
+			}
+			for i, call := range tt.wantCalls {
+				if !call.equal(fake.calls[i]) {
+					t.Fatalf("call %d mismatch: want %#v, got %#v", i, call, fake.calls[i])
+				}
+			}
+		})
+	}
+}
+
 func TestSessionSourceLocal(t *testing.T) {
 	tmp := t.TempDir()
 	session := tmux.NewSession("proj", tmp)
@@ -234,6 +409,77 @@ func TestSessionAttachOrSwitch(t *testing.T) {
 			}
 			if !tt.wantCall.equal(fake.calls[0]) {
 				t.Fatalf("unexpected command: %#v", fake.calls[0])
+			}
+		})
+	}
+}
+
+func TestSessionKill(t *testing.T) {
+	tests := []struct {
+		name      string
+		responses []fakeResponse
+		wantErr   error
+		wantCalls []execCall
+	}{
+		{
+			name: "missing session is already stopped",
+			responses: []fakeResponse{
+				{err: &fakeExitError{code: 1, msg: "missing"}},
+			},
+			wantCalls: []execCall{{name: "tmux", args: []string{"has-session", "-t", "proj"}}},
+		},
+		{
+			name: "kills existing session",
+			responses: []fakeResponse{
+				{err: nil},
+				{err: nil},
+			},
+			wantCalls: []execCall{
+				{name: "tmux", args: []string{"has-session", "-t", "proj"}},
+				{name: "tmux", args: []string{"kill-session", "-t", "proj"}},
+			},
+		},
+		{
+			name: "surfaces tmux output on kill failure",
+			responses: []fakeResponse{
+				{err: nil},
+				{output: []byte("session busy\n"), err: errors.New("exit status 1")},
+			},
+			wantErr: errors.New("session busy"),
+			wantCalls: []execCall{
+				{name: "tmux", args: []string{"has-session", "-t", "proj"}},
+				{name: "tmux", args: []string{"kill-session", "-t", "proj"}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &fakeRunner{responses: append([]fakeResponse(nil), tt.responses...)}
+			session := tmux.NewSession("proj", "/tmp", tmux.WithRunner(fake.Run))
+
+			err := session.Kill()
+
+			if tt.wantErr == nil && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.wantErr != nil {
+				if err == nil {
+					t.Fatalf("expected error %v but got nil", tt.wantErr)
+				}
+				if err.Error() != tt.wantErr.Error() {
+					t.Fatalf("expected error %v, got %v", tt.wantErr, err)
+				}
+			}
+
+			if len(fake.calls) != len(tt.wantCalls) {
+				t.Fatalf("expected %d calls, got %d", len(tt.wantCalls), len(fake.calls))
+			}
+			for i, call := range tt.wantCalls {
+				if !call.equal(fake.calls[i]) {
+					t.Fatalf("call %d mismatch: want %#v, got %#v", i, call, fake.calls[i])
+				}
 			}
 		})
 	}

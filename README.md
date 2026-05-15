@@ -16,6 +16,7 @@ Overlord v2 is a complete rewrite from Bash to Go, providing a modern CLI for ma
 - **Tmux Workspace Integration** - Automatic session creation and management with .tmux.local support
 - **Global Thoughts Directory** - Centralized thoughts directory for cross-project notes
 - **Archive Management** - Archive and restore projects without losing metadata
+- **Source Backups** - Timestamped backup zips for registry projects tagged `backup`
 - **Atomic Operations** - Safe registry updates with automatic backups and validation
 - **Syncthing Sync Management** - Continuous bidirectional sync via Syncthing with per-project activation
 
@@ -25,6 +26,7 @@ Overlord v2 is a complete rewrite from Bash to Go, providing a modern CLI for ma
 # Build and install
 make build
 make install
+overlord setup
 
 # List active projects
 overlord
@@ -37,6 +39,9 @@ overlord myproject
 
 # Create a new project
 overlord new my-web-app --category=web --ts
+
+# Attach the current directory to local OpenCode
+oc
 
 # Show project details
 overlord info my-web-app
@@ -64,7 +69,7 @@ make build
 # Install to ~/.local/bin
 make install
 
-# Run initial setup (creates directories, config, and optionally clones registry)
+# Run initial setup (creates directories, config, and installs the managed oc shim)
 overlord setup
 ```
 
@@ -214,6 +219,54 @@ The `open` command:
 - Sources `.tmux.local` file if present in project directory
 - Switches client if already in tmux, otherwise attaches
 
+#### Attach Current Directory to OpenCode
+
+```bash
+# Preferred stable entrypoint
+oc
+
+# Direct Overlord command
+overlord code
+```
+
+The `oc` shim delegates to `overlord code`, which:
+- Ensures the local OpenCode stack is up
+- Resolves the local OpenCode URL from Overlord config
+- Attaches the current working directory to the local OpenCode server
+- Uses the same OpenCode binary selection as `overlord start`
+
+#### Managed T3 Code Service
+
+Overlord can manage T3 Code as a first-class stack service above OpenCode. OpenCode remains the local agent server for `oc` and `overlord code`; T3 Code is the local/remote control plane exposed through Tailscale Serve.
+
+```yaml
+services:
+  opencode:
+    enabled: true
+    settings:
+      host: 127.0.0.1
+      port: "4096"
+  t3code:
+    enabled: true
+    settings:
+      host: 127.0.0.1
+      port: "3773"
+      workdir: /home/thomas/Overlord/core/tools/code
+      base_dir: ~/.local/share/t3code
+  tailscale:
+    enabled: true
+    settings:
+      target: http://127.0.0.1:3773
+```
+
+Overlord checks for the built server artifact, seeds T3 Code's OpenCode provider setting to `http://127.0.0.1:4096`, then runs the equivalent of:
+
+```bash
+T3CODE_TAILSCALE_SERVE=false node apps/server/dist/bin.mjs serve --host 127.0.0.1 --port 3773 --base-dir ~/.local/share/t3code
+```
+
+Run it from `/home/thomas/Overlord/core/tools/code` after building T3 Code. If `apps/server/dist/bin.mjs` is missing, the T3 Code window prints the required build command (`bun run --cwd apps/web build && bun run --cwd apps/server build`) and exits. Do not enable T3 Code's own Tailscale Serve flag; Overlord owns `tailscale serve --bg` and should proxy the remote root URL to `http://127.0.0.1:3773`, not to OpenCode.
+
 #### Show Project Info
 
 ```bash
@@ -299,6 +352,24 @@ Archived projects:
 - Hidden from default `list` output
 - Cannot be opened until restored
 - Useful for inactive projects you want to track
+
+#### Backup Projects
+
+```bash
+# Create ~/overlord-backup-YYYYMMDD-HHMMSS.zip
+overlord backup
+
+# Preview what would be backed up without writing a zip
+overlord backup --dry-run
+overlord backup --dry-run --files
+
+# Manage the backup set
+overlord backup list
+overlord backup add my-project another-project
+overlord backup rm old-project
+```
+
+The backup set is stored as a `backup` tag on registry projects. For git repositories, the backup includes tracked files plus untracked files that are not ignored by `.gitignore`. Files matching `.env*` are always excluded, along with common top-level generated/dependency directories such as `node_modules`, `.venv`, `lib`, `broadcast`, `cache`, `out`, and `artifacts`.
 
 #### Environment Variables
 

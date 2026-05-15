@@ -20,6 +20,11 @@ type archiveFlags struct {
 
 var archiveOpts archiveFlags
 
+var (
+	archiveLoadRegistry = loadRegistry
+	archiveSaveRegistry = saveRegistry
+)
+
 // archiveCmd represents the archive command
 var archiveCmd = &cobra.Command{
 	Use:   "archive <name> [name...]",
@@ -52,7 +57,7 @@ type resolvedProject struct {
 
 func runArchive(cmd *cobra.Command, args []string) error {
 	// Load registry
-	reg, err := loadRegistry()
+	reg, err := archiveLoadRegistry()
 	if err != nil {
 		return err
 	}
@@ -157,7 +162,7 @@ func runArchive(cmd *cobra.Command, args []string) error {
 	}
 
 	// At least one archive succeeded — persist registry changes
-	if err := saveRegistry(reg); err != nil {
+	if err := archiveSaveRegistry(reg); err != nil {
 		fmt.Printf("%s Registry save failed after %d successful archive(s); filesystem and registry may be out of sync: %v\n",
 			s.StrongWarn.Render("Warning:"), archiveSuccessCount, err)
 		return err

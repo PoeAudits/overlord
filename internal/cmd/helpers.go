@@ -3,7 +3,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
-"os"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -11,6 +11,7 @@ import (
 	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/lifecycle"
 	"github.com/PoeAudits/overlord/internal/registry"
+	"github.com/PoeAudits/overlord/internal/stack"
 	"golang.org/x/term"
 )
 
@@ -29,6 +30,16 @@ func saveRegistry(reg *registry.Registry) error {
 		return fmt.Errorf("failed to save registry: %w", err)
 	}
 	return nil
+}
+
+// loadStackConfig loads the stack config from the default path.
+func loadStackConfig() (*stack.StackConfig, error) {
+	return stack.Load(stack.DefaultConfigPath)
+}
+
+// saveStackConfig saves the stack config to the default path.
+func saveStackConfig(cfg *stack.StackConfig) error {
+	return stack.Save(stack.DefaultConfigPath, cfg)
 }
 
 // confirmAction allows a quick "y" acknowledgement for reversible operations,

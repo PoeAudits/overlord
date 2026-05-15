@@ -3,12 +3,14 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
+	"io"
 	"strings"
 
 	"github.com/PoeAudits/overlord/internal/registry"
 	"github.com/spf13/cobra"
 )
+
+var infoLoadRegistry = loadRegistry
 
 type infoFlags struct {
 	json bool
@@ -40,7 +42,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	name := args[0]
 
 	// Load registry
-	reg, err := loadRegistry()
+	reg, err := infoLoadRegistry()
 	if err != nil {
 		return err
 	}
@@ -55,13 +57,13 @@ func runInfo(cmd *cobra.Command, args []string) error {
 
 	// Output based on format
 	if infoOpts.json {
-		return outputInfoJSON(projectName, project, reg.Settings)
+		return outputInfoJSON(cmd.OutOrStdout(), projectName, project, reg.Settings)
 	}
 
-	return outputInfoHuman(projectName, project, reg.Settings)
+	return outputInfoHuman(cmd.OutOrStdout(), projectName, project, reg.Settings)
 }
 
-func outputInfoHuman(name string, project registry.Project, settings registry.Settings) error {
+func outputInfoHuman(w io.Writer, name string, project registry.Project, settings registry.Settings) error {
 	// Define styles
 	s := NewStyles()
 	labelStyle := s.Label
@@ -91,15 +93,15 @@ func outputInfoHuman(name string, project registry.Project, settings registry.Se
 	}
 
 	// Print formatted output
-	fmt.Printf("%s %s\n", labelStyle.Render("Project:"), valueStyle.Render(name))
-	fmt.Printf("%s %s\n", labelStyle.Render("Path:"), pathStyle.Render(project.Path))
-	fmt.Printf("%s %s\n", labelStyle.Render("Category:"), categoryStyle.Render(string(project.Category)))
-	fmt.Printf("%s %s\n", labelStyle.Render("Language:"), langStyle.Render(string(project.Lang)))
-	fmt.Printf("%s %s\n", labelStyle.Render("Description:"), valueStyle.Render(project.Description))
-	fmt.Printf("%s %s\n", labelStyle.Render("Tags:"), valueStyle.Render(tagsStr))
-	fmt.Printf("%s %s\n", labelStyle.Render("Status:"), statusStyle.Render(string(project.Status.State)))
-	fmt.Printf("%s %s\n", labelStyle.Render("Created:"), valueStyle.Render(project.Created))
-	fmt.Printf("%s %s\n", labelStyle.Render("Aliases:"), valueStyle.Render(aliasesStr))
+	fmt.Fprintf(w, "%s %s\n", labelStyle.Render("Project:"), valueStyle.Render(name))
+	fmt.Fprintf(w, "%s %s\n", labelStyle.Render("Path:"), pathStyle.Render(project.Path))
+	fmt.Fprintf(w, "%s %s\n", labelStyle.Render("Category:"), categoryStyle.Render(string(project.Category)))
+	fmt.Fprintf(w, "%s %s\n", labelStyle.Render("Language:"), langStyle.Render(string(project.Lang)))
+	fmt.Fprintf(w, "%s %s\n", labelStyle.Render("Description:"), valueStyle.Render(project.Description))
+	fmt.Fprintf(w, "%s %s\n", labelStyle.Render("Tags:"), valueStyle.Render(tagsStr))
+	fmt.Fprintf(w, "%s %s\n", labelStyle.Render("Status:"), statusStyle.Render(string(project.Status.State)))
+	fmt.Fprintf(w, "%s %s\n", labelStyle.Render("Created:"), valueStyle.Render(project.Created))
+	fmt.Fprintf(w, "%s %s\n", labelStyle.Render("Aliases:"), valueStyle.Render(aliasesStr))
 	return nil
 }
 
@@ -116,7 +118,7 @@ type infoOutput struct {
 	Created     string            `json:"created"`
 }
 
-func outputInfoJSON(name string, project registry.Project, settings registry.Settings) error {
+func outputInfoJSON(w io.Writer, name string, project registry.Project, settings registry.Settings) error {
 	output := infoOutput{
 		Name:        name,
 		Path:        project.Path,
@@ -129,7 +131,7 @@ func outputInfoJSON(name string, project registry.Project, settings registry.Set
 		Created:     project.Created,
 	}
 
-	encoder := json.NewEncoder(os.Stdout)
+	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(output); err != nil {
 		return fmt.Errorf("failed to encode JSON: %w", err)

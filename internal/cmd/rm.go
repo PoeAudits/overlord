@@ -18,6 +18,13 @@ type rmFlags struct {
 
 var rmOpts rmFlags
 
+var (
+	rmLoadRegistry  = loadRegistry
+	rmSaveRegistry  = saveRegistry
+	rmConfirmDelete = confirmDelete
+	rmRemoveAll     = os.RemoveAll
+)
+
 // rmCmd represents the rm command
 var rmCmd = &cobra.Command{
 	Use:   "rm <name> [name...]",
@@ -44,7 +51,7 @@ func init() {
 
 func runRm(cmd *cobra.Command, args []string) error {
 	// Load registry
-	reg, err := loadRegistry()
+	reg, err := rmLoadRegistry()
 	if err != nil {
 		return err
 	}
@@ -86,11 +93,13 @@ func runRm(cmd *cobra.Command, args []string) error {
 
 	// Handle force mode (delete files)
 	if rmOpts.force {
+		filtered := make([]resolvedProject, 0, len(resolved))
 		for _, p := range resolved {
 			_, err := os.Stat(p.path)
 			if errors.Is(err, fs.ErrNotExist) {
 				fmt.Printf("Warning: Project directory does not exist: %s\n", p.path)
 				fmt.Println("Removing from registry only...")
+				filtered = append(filtered, p)
 				continue
 			}
 
@@ -98,7 +107,7 @@ func runRm(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to check project directory '%s': %w", p.name, err)
 			}
 
-			confirmed, err := confirmDelete(p.name, p.path)
+			confirmed, err := rmConfirmDelete(p.name, p.path)
 			if err != nil {
 				return fmt.Errorf("failed to read confirmation: %w", err)
 			}
@@ -106,9 +115,14 @@ func runRm(cmd *cobra.Command, args []string) error {
 				fmt.Printf("Skipping '%s'\n", p.name)
 				continue
 			}
-			if err := os.RemoveAll(p.path); err != nil {
+			if err := rmRemoveAll(p.path); err != nil {
 				return fmt.Errorf("failed to delete project directory '%s': %w", p.name, err)
 			}
+			filtered = append(filtered, p)
+		}
+		resolved = filtered
+		if len(resolved) == 0 {
+			return nil
 		}
 	}
 
@@ -128,7 +142,7 @@ func runRm(cmd *cobra.Command, args []string) error {
 	}
 
 	// Save registry
-	if err := saveRegistry(reg); err != nil {
+	if err := rmSaveRegistry(reg); err != nil {
 		return err
 	}
 

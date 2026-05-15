@@ -1,0 +1,586 @@
+package cmd
+
+import (
+	"archive/zip"
+	"bytes"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	"github.com/PoeAudits/overlord/internal/fileutil"
+	"github.com/PoeAudits/overlord/internal/registry"
+)
+
+const backupTag = "backup"
+
+var (
+	backupLoadRegistry = loadRegistry
+	backupSaveRegistry = saveRegistry
+	backupNow          = time.Now
+	backupOpts         backupOptions
+)
+
+type backupOptions struct {
+	dryRun    bool
+	listFiles bool
+}
+
+var backupCmd = &cobra.Command{
+	Use:   "backup",
+	Short: "Create a source backup zip for tagged projects",
+	Long: `Create a timestamped backup zip in your home directory for projects tagged
+with "backup" in the overlord registry.
+
+For git repositories, backup includes tracked files plus untracked files that are
+not ignored by .gitignore. Files matching .env* are always excluded.
+
+Examples:
+  overlord backup                  # Create ~/overlord-backup-YYYYMMDD-HHMMSS.zip
+  overlord backup --dry-run        # Show project and file counts without writing
+  overlord backup --dry-run --files # Show every file that would be included
+  overlord backup list             # List projects in the backup set
+  overlord backup add api web-app  # Add projects to the backup set
+  overlord backup rm old-project   # Remove projects from the backup set`,
+	Args: cobra.NoArgs,
+	RunE: runBackup,
+}
+
+var backupAddCmd = &cobra.Command{
+	Use:   "add <project> [project...]",
+	Short: "Add projects to the backup set",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  runBackupAdd,
+}
+
+var backupRmCmd = &cobra.Command{
+	Use:     "rm <project> [project...]",
+	Aliases: []string{"remove"},
+	Short:   "Remove projects from the backup set",
+	Args:    cobra.MinimumNArgs(1),
+	RunE:    runBackupRm,
+}
+
+var backupListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List projects in the backup set",
+	Args:  cobra.NoArgs,
+	RunE:  runBackupList,
+}
+
+func init() {
+	rootCmd.AddCommand(backupCmd)
+	backupCmd.AddCommand(backupAddCmd, backupRmCmd, backupListCmd)
+	backupCmd.Flags().BoolVar(&backupOpts.dryRun, "dry-run", false, "Show what would be backed up without creating a zip")
+	backupCmd.Flags().BoolVar(&backupOpts.listFiles, "files", false, "List files included in the backup output")
+}
+
+type backupProject struct {
+	name string
+	path string
+}
+
+func runBackup(cmd *cobra.Command, args []string) error {
+	reg, err := backupLoadRegistry()
+	if err != nil {
+		return err
+	}
+
+	projects, err := backupProjects(reg)
+	if err != nil {
+		return err
+	}
+	if len(projects) == 0 {
+		return cmdError("backup", "no projects are tagged for backup", "Run 'overlord backup add <project>' first")
+	}
+
+	zipPath, rootName, err := backupOutputPath(backupNow())
+	if err != nil {
+		return err
+	}
+	projectFiles, totalFiles, err := collectBackupFiles(projects)
+	if err != nil {
+		return err
+	}
+
+	if backupOpts.dryRun {
+		printBackupPlan(zipPath, rootName, projects, projectFiles, totalFiles)
+		return nil
+	}
+
+	file, err := os.Create(zipPath)
+	if err != nil {
+		return fmt.Errorf("failed to create backup zip: %w", err)
+	}
+
+	zipWriter := zip.NewWriter(file)
+
+	for _, project := range projects {
+		for _, relPath := range projectFiles[project.name] {
+			sourcePath := filepath.Join(project.path, relPath)
+			zipName := filepath.ToSlash(filepath.Join(rootName, safeZipSegment(project.name), relPath))
+			_, err := addPathToZip(zipWriter, sourcePath, zipName)
+			if err != nil {
+				zipWriter.Close()
+				file.Close()
+				_ = os.Remove(zipPath)
+				return fmt.Errorf("failed to add %s: %w", sourcePath, err)
+			}
+		}
+	}
+
+	if err := zipWriter.Close(); err != nil {
+		file.Close()
+		_ = os.Remove(zipPath)
+		return fmt.Errorf("failed to finalize backup zip: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		_ = os.Remove(zipPath)
+		return fmt.Errorf("failed to close backup zip: %w", err)
+	}
+
+	fmt.Printf("Created backup: %s\n", fileutil.FormatPathWithTilde(zipPath))
+	fmt.Printf("Projects: %d\n", len(projects))
+	fmt.Printf("Files: %d\n", totalFiles)
+
+	return nil
+}
+
+func collectBackupFiles(projects []backupProject) (map[string][]string, int, error) {
+	projectFiles := make(map[string][]string, len(projects))
+	totalFiles := 0
+	for _, project := range projects {
+		files, err := backupProjectFiles(project.path)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to collect files for '%s': %w", project.name, err)
+		}
+		projectFiles[project.name] = files
+		totalFiles += len(files)
+	}
+	return projectFiles, totalFiles, nil
+}
+
+func printBackupPlan(zipPath, rootName string, projects []backupProject, projectFiles map[string][]string, totalFiles int) {
+	fmt.Printf("Would create backup: %s\n", fileutil.FormatPathWithTilde(zipPath))
+	fmt.Printf("Projects: %d\n", len(projects))
+	fmt.Printf("Files: %d\n", totalFiles)
+	for _, project := range projects {
+		fmt.Printf("%s\t%d files\n", project.name, len(projectFiles[project.name]))
+	}
+	if !backupOpts.listFiles {
+		return
+	}
+	for _, project := range projects {
+		for _, relPath := range projectFiles[project.name] {
+			fmt.Println(filepath.ToSlash(filepath.Join(rootName, safeZipSegment(project.name), relPath)))
+		}
+	}
+}
+
+func runBackupAdd(cmd *cobra.Command, args []string) error {
+	return updateBackupTags(args, true)
+}
+
+func runBackupRm(cmd *cobra.Command, args []string) error {
+	return updateBackupTags(args, false)
+}
+
+func runBackupList(cmd *cobra.Command, args []string) error {
+	reg, err := backupLoadRegistry()
+	if err != nil {
+		return err
+	}
+
+	projects, err := backupProjects(reg)
+	if err != nil {
+		return err
+	}
+	for _, project := range projects {
+		fmt.Printf("%s\t%s\n", project.name, fileutil.FormatPathWithTilde(project.path))
+	}
+
+	return nil
+}
+
+func updateBackupTags(args []string, add bool) error {
+	reg, err := backupLoadRegistry()
+	if err != nil {
+		return err
+	}
+
+	changed := false
+	seen := make(map[string]struct{}, len(args))
+	for _, arg := range args {
+		result, err := reg.ResolveOne(arg)
+		if err != nil {
+			return err
+		}
+		if _, ok := seen[result.Name]; ok {
+			continue
+		}
+		seen[result.Name] = struct{}{}
+
+		project := result.Project
+		if add {
+			if addBackupTag(&project) {
+				changed = true
+				fmt.Printf("Added to backup: %s\n", result.Name)
+			} else {
+				fmt.Printf("Already in backup: %s\n", result.Name)
+			}
+		} else {
+			if removeBackupTag(&project) {
+				changed = true
+				fmt.Printf("Removed from backup: %s\n", result.Name)
+			} else {
+				fmt.Printf("Not in backup: %s\n", result.Name)
+			}
+		}
+		reg.Projects[result.Name] = project
+	}
+
+	if changed {
+		return backupSaveRegistry(reg)
+	}
+	return nil
+}
+
+func backupProjects(reg *registry.Registry) ([]backupProject, error) {
+	names := make([]string, 0, len(reg.Projects))
+	for name, project := range reg.Projects {
+		if hasBackupTag(project) {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+
+	projects := make([]backupProject, 0, len(names))
+	for _, name := range names {
+		project := reg.Projects[name]
+		projectPath, err := fileutil.ExpandProjectPath(project.Path, reg.Settings.BaseDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to expand path for '%s': %w", name, err)
+		}
+		info, err := os.Stat(projectPath)
+		if err != nil {
+			return nil, fmt.Errorf("project '%s' path is unavailable: %w", name, err)
+		}
+		if !info.IsDir() {
+			return nil, fmt.Errorf("project '%s' path is not a directory: %s", name, projectPath)
+		}
+		projects = append(projects, backupProject{name: name, path: projectPath})
+	}
+
+	return projects, nil
+}
+
+func backupOutputPath(now time.Time) (string, string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to resolve home directory: %w", err)
+	}
+
+	rootName := "overlord-backup-" + now.Format("20060102-150405")
+	return filepath.Join(homeDir, rootName+".zip"), rootName, nil
+}
+
+func backupProjectFiles(projectPath string) ([]string, error) {
+	files, usedGit, err := gitBackupFiles(projectPath)
+	if usedGit || err != nil {
+		return files, err
+	}
+	return fallbackBackupFiles(projectPath)
+}
+
+func gitBackupFiles(projectPath string) ([]string, bool, error) {
+	if err := exec.Command("git", "-C", projectPath, "rev-parse", "--is-inside-work-tree").Run(); err != nil {
+		return nil, false, nil
+	}
+
+	cmd := exec.Command("git", "-C", projectPath, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ".")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, true, fmt.Errorf("git ls-files failed: %w", err)
+	}
+
+	files := cleanBackupFileList(bytes.Split(output, []byte{0}))
+	files, err = filterExistingBackupFiles(projectPath, files)
+	return files, true, err
+}
+
+func fallbackBackupFiles(projectPath string) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(projectPath, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		relPath, err := filepath.Rel(projectPath, path)
+		if err != nil {
+			return err
+		}
+		if relPath == "." {
+			return nil
+		}
+
+		if entry.IsDir() {
+			if shouldExcludeBackupPath(relPath) || shouldSkipFallbackDir(entry.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if shouldExcludeBackupPath(relPath) || shouldSkipFallbackFile(entry.Name()) {
+			return nil
+		}
+		files = append(files, relPath)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Strings(files)
+	return files, nil
+}
+
+func filterExistingBackupFiles(projectPath string, files []string) ([]string, error) {
+	filtered := files[:0]
+	for _, relPath := range files {
+		info, err := os.Lstat(filepath.Join(projectPath, relPath))
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, err
+		}
+		if info.IsDir() || (info.Mode()&os.ModeSymlink == 0 && !info.Mode().IsRegular()) {
+			continue
+		}
+		filtered = append(filtered, relPath)
+	}
+	return filtered, nil
+}
+
+func cleanBackupFileList(entries [][]byte) []string {
+	seen := make(map[string]struct{}, len(entries))
+	files := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if len(entry) == 0 {
+			continue
+		}
+		relPath := filepath.Clean(string(entry))
+		if relPath == "." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) || filepath.IsAbs(relPath) {
+			continue
+		}
+		if shouldExcludeBackupPath(relPath) {
+			continue
+		}
+		if _, ok := seen[relPath]; ok {
+			continue
+		}
+		seen[relPath] = struct{}{}
+		files = append(files, relPath)
+	}
+	sort.Strings(files)
+	return files
+}
+
+func addPathToZip(zipWriter *zip.Writer, sourcePath, zipName string) (bool, error) {
+	info, err := os.Lstat(sourcePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	if info.IsDir() {
+		return false, nil
+	}
+	if info.Mode()&os.ModeSymlink == 0 && !info.Mode().IsRegular() {
+		return false, nil
+	}
+
+	header, err := zip.FileInfoHeader(info)
+	if err != nil {
+		return false, err
+	}
+	header.Name = zipName
+	header.Method = zip.Deflate
+	header.SetMode(info.Mode())
+
+	writer, err := zipWriter.CreateHeader(header)
+	if err != nil {
+		return false, err
+	}
+
+	if info.Mode()&os.ModeSymlink != 0 {
+		target, err := os.Readlink(sourcePath)
+		if err != nil {
+			return false, err
+		}
+		_, err = writer.Write([]byte(target))
+		return err == nil, err
+	}
+
+	file, err := os.Open(sourcePath)
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+
+	_, err = io.Copy(writer, file)
+	return err == nil, err
+}
+
+func hasBackupTag(project registry.Project) bool {
+	for _, tag := range project.Tags {
+		if tag == backupTag {
+			return true
+		}
+	}
+	return false
+}
+
+func addBackupTag(project *registry.Project) bool {
+	if hasBackupTag(*project) {
+		return false
+	}
+	project.Tags = append(project.Tags, backupTag)
+	sort.Strings(project.Tags)
+	return true
+}
+
+func removeBackupTag(project *registry.Project) bool {
+	removed := false
+	tags := project.Tags[:0]
+	for _, tag := range project.Tags {
+		if tag == backupTag {
+			removed = true
+			continue
+		}
+		tags = append(tags, tag)
+	}
+	project.Tags = tags
+	return removed
+}
+
+func shouldExcludeBackupPath(relPath string) bool {
+	parts := strings.Split(filepath.ToSlash(relPath), "/")
+	if len(parts) > 0 && shouldSkipBackupTopLevelDir(parts[0]) {
+		return true
+	}
+	for _, part := range parts {
+		if shouldSkipBackupAnyDir(part) {
+			return true
+		}
+		if matched, _ := filepath.Match(".env*", part); matched {
+			return true
+		}
+	}
+	if shouldExcludeBackupFile(filepath.Base(relPath)) {
+		return true
+	}
+	return false
+}
+
+func shouldSkipBackupAnyDir(name string) bool {
+	skipped := map[string]struct{}{
+		".venv":        {},
+		"__pycache__":  {},
+		"env":          {},
+		"node_modules": {},
+		"target":       {},
+		"venv":         {},
+	}
+	_, ok := skipped[strings.ToLower(name)]
+	return ok
+}
+
+func shouldExcludeBackupFile(name string) bool {
+	patterns := []string{
+		"*.log",
+		"*.pyc",
+		"*.pyo",
+		"*.session",
+		"*.session-journal",
+		"*.tmp",
+		"*.tsbuildinfo",
+	}
+	for _, pattern := range patterns {
+		if matched, _ := filepath.Match(pattern, name); matched {
+			return true
+		}
+	}
+	return name == ".DS_Store"
+}
+
+func shouldSkipBackupTopLevelDir(name string) bool {
+	skipped := map[string]struct{}{
+		".cache":        {},
+		".git":          {},
+		".mypy_cache":   {},
+		".next":         {},
+		".pytest_cache": {},
+		".ruff_cache":   {},
+		".turbo":        {},
+		".venv":         {},
+		".worktrees":    {},
+		"artifacts":     {},
+		"bin":           {},
+		"broadcast":     {},
+		"build":         {},
+		"cache":         {},
+		"coverage":      {},
+		"dist":          {},
+		"env":           {},
+		"lib":           {},
+		"logs":          {},
+		"myenv":         {},
+		"node_modules":  {},
+		"out":           {},
+		"target":        {},
+		"tmp":           {},
+		"venv":          {},
+		"worktrees":     {},
+	}
+	_, ok := skipped[strings.ToLower(name)]
+	return ok
+}
+
+func shouldSkipFallbackDir(name string) bool {
+	skipped := map[string]struct{}{
+		".cache":        {},
+		".mypy_cache":   {},
+		".next":         {},
+		".pytest_cache": {},
+		".ruff_cache":   {},
+		".turbo":        {},
+		".venv":         {},
+		"__pycache__":   {},
+		"node_modules":  {},
+		"target":        {},
+	}
+	_, ok := skipped[name]
+	return ok
+}
+
+func shouldSkipFallbackFile(name string) bool {
+	return shouldExcludeBackupFile(name)
+}
+
+func safeZipSegment(name string) string {
+	name = strings.ReplaceAll(name, "/", "_")
+	name = strings.ReplaceAll(name, "\\", "_")
+	name = strings.TrimSpace(name)
+	if name == "" || name == "." || name == ".." {
+		return "project"
+	}
+	return name
+}

@@ -1,0 +1,767 @@
+Starting...
+Gathering coverage... done in 2.449896371s
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:257:36
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:371:39
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:390:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:416:89
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:420:40
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/add.go:428:22
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:428:22
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:253:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:322:17
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:307:22
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:271:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:328:73
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:309:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:366:22
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:262:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:280:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/archive.go:129:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:314:13
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/add.go:296:14
+      KILLED CONDITIONALS_NEGATION at internal/cmd/add.go:220:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/archive.go:99:17
+      KILLED CONDITIONALS_NEGATION at internal/cmd/archive.go:61:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/archive.go:84:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/archive.go:71:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/archive.go:78:27
+      KILLED CONDITIONALS_NEGATION at internal/cmd/add.go:162:64
+      KILLED CONDITIONALS_NEGATION at internal/cmd/add.go:228:18
+      KILLED CONDITIONALS_NEGATION at internal/cmd/archive.go:91:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/archive.go:122:19
+      KILLED CONDITIONALS_NEGATION at internal/cmd/add.go:111:98
+      KILLED CONDITIONALS_NEGATION at internal/cmd/add.go:176:9
+      KILLED CONDITIONALS_BOUNDARY at internal/cmd/add.go:111:98
+      KILLED CONDITIONALS_NEGATION at internal/cmd/archive.go:144:10
+       LIVED CONDITIONALS_NEGATION at internal/cmd/add.go:116:37
+       LIVED CONDITIONALS_BOUNDARY at internal/cmd/archive.go:152:24
+       LIVED CONDITIONALS_NEGATION at internal/cmd/archive.go:115:24
+       LIVED INCREMENT_DECREMENT at internal/cmd/archive.go:147:23
+       LIVED CONDITIONALS_NEGATION at internal/cmd/add.go:116:18
+       LIVED CONDITIONALS_BOUNDARY at internal/cmd/archive.go:115:24
+      KILLED CONDITIONALS_NEGATION at internal/cmd/archive.go:160:25
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/backup.go:196:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/backup.go:201:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/backup.go:213:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/backup.go:221:10
+       LIVED CONDITIONALS_NEGATION at internal/cmd/archive.go:165:42
+       LIVED CONDITIONALS_NEGATION at internal/cmd/archive.go:152:24
+       LIVED CONDITIONALS_BOUNDARY at internal/cmd/archive.go:171:24
+      KILLED ARITHMETIC_BASE at internal/cmd/backup.go:289:33
+      KILLED CONDITIONALS_NEGATION at internal/cmd/archive.go:193:86
+      KILLED CONDITIONALS_NEGATION at internal/cmd/archive.go:189:51
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:91:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/archive.go:198:68
+       LIVED CONDITIONALS_NEGATION at internal/cmd/archive.go:171:24
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:96:9
+      KILLED ARITHMETIC_BASE at internal/cmd/backup.go:290:40
+       LIVED CONDITIONALS_NEGATION at internal/cmd/archive.go:224:37
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:99:19
+       LIVED CONDITIONALS_BOUNDARY at internal/cmd/archive.go:224:37
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:143:30
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:108:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:118:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:160:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:129:11
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:104:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:138:35
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:267:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/backup.go:425:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/backup.go:429:14
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:271:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:285:9
+      KILLED ARITHMETIC_BASE at internal/cmd/backup.go:379:55
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:295:20
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:308:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:320:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:302:100
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:325:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:345:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:328:14
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/clear.go:53:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/clear.go:64:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/clear.go:70:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/clear.go:81:42
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/clear.go:89:24
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/clear.go:89:24
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/clear.go:96:18
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/clear.go:102:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/clear.go:114:42
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/clear.go:120:35
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/clear.go:125:22
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/clear.go:125:22
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/clear.go:133:22
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/clear.go:150:46
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/config.go:35:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/config.go:53:33
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/config.go:62:43
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/config.go:68:43
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/detect.go:53:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/detect.go:58:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/detect.go:74:14
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/detect.go:82:23
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/detect.go:85:18
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/detect.go:89:20
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/detect.go:101:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/detect.go:140:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/detect.go:150:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/detect.go:155:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/detect.go:163:19
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/detect.go:181:39
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/detect.go:181:28
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/detect.go:192:42
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/helpers.go:21:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/helpers.go:29:66
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/helpers.go:50:12
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/helpers.go:50:24
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/helpers.go:59:12
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/helpers.go:73:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:357:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:375:17
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:379:14
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/helpers.go:127:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:397:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/helpers.go:192:19
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/helpers.go:245:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/helpers.go:245:9
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/helpers.go:247:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/helpers.go:247:9
+       LIVED CONDITIONALS_NEGATION at internal/cmd/backup.go:363:50
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:411:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:423:32
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/info.go:79:26
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/info.go:79:26
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/info.go:85:23
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/info.go:85:23
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/info.go:91:26
+       LIVED CONDITIONALS_NEGATION at internal/cmd/backup.go:419:9
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/init.go:73:15
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/init.go:73:15
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/init.go:79:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/init.go:88:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/init.go:97:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/init.go:107:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/init.go:117:17
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/init.go:145:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/init.go:158:41
+ NOT COVERED INCREMENT_DECREMENT at internal/cmd/init.go:160:11
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/init.go:165:63
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/init.go:170:67
+ NOT COVERED INCREMENT_DECREMENT at internal/cmd/init.go:175:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:84:21
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:85:51
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:92:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:100:19
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:137:14
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:143:20
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:153:15
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:168:15
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:172:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:177:22
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:181:15
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:214:12
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/list.go:216:32
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:216:32
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:222:9
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/list.go:223:14
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:223:14
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:225:25
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/list.go:226:30
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:226:30
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:228:21
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/list.go:229:26
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:229:26
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/list.go:231:25
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:231:25
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:297:32
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:343:10
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/list.go:346:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:346:10
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/list.go:346:21
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:346:21
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:350:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:353:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:356:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:359:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:362:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:382:12
+       LIVED CONDITIONALS_NEGATION at internal/cmd/backup.go:406:32
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:444:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:464:10
+       LIVED CONDITIONALS_NEGATION at internal/cmd/backup.go:439:13
+       LIVED CONDITIONALS_NEGATION at internal/cmd/backup.go:433:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:521:14
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:476:16
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:582:39
+       LIVED CONDITIONALS_BOUNDARY at internal/cmd/backup.go:476:16
+      KILLED CONDITIONALS_NEGATION at internal/cmd/helpers.go:96:16
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:582:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/helpers.go:266:16
+      KILLED CONDITIONALS_NEGATION at internal/cmd/backup.go:582:24
+      KILLED INCREMENT_DECREMENT at internal/cmd/helpers.go:146:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/helpers.go:84:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/helpers.go:104:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/info.go:46:9
+      KILLED INVERT_NEGATIVES at internal/cmd/list.go:408:18
+      KILLED CONDITIONALS_NEGATION at internal/cmd/list.go:403:7
+      KILLED CONDITIONALS_NEGATION at internal/cmd/info.go:52:9
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/list.go:447:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:447:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/info.go:136:40
+      KILLED ARITHMETIC_BASE at internal/cmd/list.go:408:18
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/list.go:453:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:453:9
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/list.go:453:13
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/list.go:455:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:455:9
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/list.go:455:15
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/list.go:455:12
+      KILLED ARITHMETIC_BASE at internal/cmd/list.go:414:19
+      KILLED ARITHMETIC_BASE at internal/cmd/list.go:415:21
+      KILLED INVERT_NEGATIVES at internal/cmd/list.go:415:21
+      KILLED ARITHMETIC_BASE at internal/cmd/list.go:417:23
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/list.go:468:12
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:468:12
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/list.go:472:12
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/list.go:472:12
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/list.go:475:22
+ NOT COVERED INVERT_NEGATIVES at internal/cmd/list.go:475:18
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/list.go:475:18
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/new.go:127:22
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/new.go:132:55
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/new.go:137:80
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/new.go:137:80
+      KILLED ARITHMETIC_BASE at internal/cmd/list.go:417:18
+      KILLED INVERT_NEGATIVES at internal/cmd/list.go:421:21
+      KILLED ARITHMETIC_BASE at internal/cmd/list.go:418:21
+      KILLED INVERT_NEGATIVES at internal/cmd/list.go:418:21
+      KILLED ARITHMETIC_BASE at internal/cmd/list.go:421:21
+      KILLED CONDITIONALS_BOUNDARY at internal/cmd/list.go:431:7
+      KILLED ARITHMETIC_BASE at internal/cmd/list.go:424:19
+      KILLED CONDITIONALS_NEGATION at internal/cmd/list.go:428:9
+      KILLED INVERT_NEGATIVES at internal/cmd/list.go:435:30
+      KILLED ARITHMETIC_BASE at internal/cmd/list.go:435:48
+      KILLED CONDITIONALS_NEGATION at internal/cmd/list.go:431:7
+       LIVED CONDITIONALS_BOUNDARY at internal/cmd/list.go:449:8
+      KILLED CONDITIONALS_NEGATION at internal/cmd/list.go:441:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/list.go:449:8
+      KILLED ARITHMETIC_BASE at internal/cmd/list.go:458:27
+      KILLED ARITHMETIC_BASE at internal/cmd/list.go:456:46
+      KILLED ARITHMETIC_BASE at internal/cmd/list.go:435:30
+      KILLED ARITHMETIC_BASE at internal/cmd/list.go:458:22
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:146:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:150:15
+      KILLED CONDITIONALS_BOUNDARY at internal/cmd/new.go:150:15
+      KILLED CONDITIONALS_BOUNDARY at internal/cmd/new.go:177:31
+      KILLED CONDITIONALS_NEGATION at internal/cmd/list.go:459:8
+      KILLED INVERT_NEGATIVES at internal/cmd/new.go:177:24
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/new.go:355:41
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/new.go:373:47
+      KILLED ARITHMETIC_BASE at internal/cmd/new.go:177:24
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:177:31
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/new.go:433:42
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/new.go:442:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/new.go:448:35
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/new.go:453:40
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/new.go:458:42
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:215:55
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:220:41
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:200:9
+      KILLED INCREMENT_DECREMENT at internal/cmd/new.go:177:38
+       LIVED CONDITIONALS_NEGATION at internal/cmd/new.go:178:43
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:228:37
+       LIVED CONDITIONALS_NEGATION at internal/cmd/new.go:240:26
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:273:9
+       LIVED CONDITIONALS_BOUNDARY at internal/cmd/new.go:240:26
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:264:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:253:36
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/oc_shim.go:98:42
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:304:49
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:325:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:280:41
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:336:67
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:285:17
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:332:63
+       LIVED CONDITIONALS_NEGATION at internal/cmd/new.go:400:22
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/open.go:103:23
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:103:23
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/open.go:103:39
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:103:39
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/open.go:109:16
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:109:16
+ NOT COVERED INCREMENT_DECREMENT at internal/cmd/open.go:110:13
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/open.go:115:16
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:115:16
+ NOT COVERED INVERT_NEGATIVES at internal/cmd/open.go:115:33
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/open.go:115:33
+ NOT COVERED INCREMENT_DECREMENT at internal/cmd/open.go:116:13
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:132:25
+      KILLED ARITHMETIC_BASE at internal/cmd/oc_shim.go:112:38
+      KILLED CONDITIONALS_NEGATION at internal/cmd/new.go:405:42
+      KILLED CONDITIONALS_NEGATION at internal/cmd/oc.go:34:9
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/open.go:153:30
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/open.go:153:24
+      KILLED ARITHMETIC_BASE at internal/cmd/oc_shim.go:112:23
+      KILLED CONDITIONALS_NEGATION at internal/cmd/oc.go:54:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:192:21
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/open.go:199:23
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:199:23
+ NOT COVERED INCREMENT_DECREMENT at internal/cmd/open.go:199:34
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/open.go:206:14
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:206:14
+ NOT COVERED INVERT_NEGATIVES at internal/cmd/open.go:207:25
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/open.go:207:25
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/open.go:208:17
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:208:17
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/open.go:214:14
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:214:14
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/open.go:215:36
+ NOT COVERED INVERT_NEGATIVES at internal/cmd/open.go:215:23
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/open.go:215:23
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/open.go:218:21
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/open.go:219:12
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:219:12
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:229:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:234:9
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/open.go:239:20
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:239:20
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/open.go:240:51
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/open.go:240:19
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/open.go:245:15
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:245:15
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/open.go:246:37
+ NOT COVERED INVERT_NEGATIVES at internal/cmd/open.go:246:33
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/open.go:246:33
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/open.go:259:12
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:259:12
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/open.go:262:11
+ NOT COVERED INVERT_NEGATIVES at internal/cmd/open.go:262:38
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/open.go:262:38
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:290:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:294:15
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:296:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:296:32
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/open.go:302:15
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:302:15
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:307:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:307:31
+      KILLED CONDITIONALS_NEGATION at internal/cmd/oc.go:43:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/oc_shim.go:50:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/oc.go:38:38
+      KILLED CONDITIONALS_NEGATION at internal/cmd/oc_shim.go:58:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/oc_shim.go:66:9
+       LIVED CONDITIONALS_NEGATION at internal/cmd/oc_shim.go:74:60
+      KILLED CONDITIONALS_NEGATION at internal/cmd/oc_shim.go:74:13
+      KILLED CONDITIONALS_NEGATION at internal/cmd/oc_shim.go:83:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/oc_shim.go:93:42
+       LIVED CONDITIONALS_BOUNDARY at internal/cmd/open.go:72:18
+       LIVED CONDITIONALS_BOUNDARY at internal/cmd/open.go:75:22
+       LIVED CONDITIONALS_NEGATION at internal/cmd/open.go:72:18
+       LIVED CONDITIONALS_NEGATION at internal/cmd/open.go:75:22
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/open.go:468:24
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:468:24
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:473:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:476:14
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:519:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:522:14
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:528:18
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:539:18
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:546:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:560:58
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:566:42
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:578:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:596:20
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:608:42
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:617:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:627:35
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/open.go:632:40
+       LIVED CONDITIONALS_NEGATION at internal/cmd/open.go:152:21
+      KILLED CONDITIONALS_NEGATION at internal/cmd/oc_shim.go:116:56
+       LIVED CONDITIONALS_BOUNDARY at internal/cmd/open.go:152:21
+      KILLED CONDITIONALS_NEGATION at internal/cmd/open.go:143:11
+       LIVED CONDITIONALS_BOUNDARY at internal/cmd/open.go:169:14
+       LIVED CONDITIONALS_NEGATION at internal/cmd/open.go:169:14
+      KILLED INVERT_NEGATIVES at internal/cmd/open.go:341:42
+      KILLED CONDITIONALS_BOUNDARY at internal/cmd/open.go:337:31
+      KILLED CONDITIONALS_NEGATION at internal/cmd/open.go:323:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/open.go:337:31
+      KILLED CONDITIONALS_NEGATION at internal/cmd/open.go:326:18
+      KILLED ARITHMETIC_BASE at internal/cmd/open.go:341:42
+      KILLED CONDITIONALS_NEGATION at internal/cmd/open.go:352:74
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/rm.go:118:39
+      KILLED CONDITIONALS_NEGATION at internal/cmd/open.go:363:36
+      KILLED CONDITIONALS_NEGATION at internal/cmd/open.go:418:26
+       LIVED CONDITIONALS_NEGATION at internal/cmd/open.go:346:73
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/root.go:98:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/open.go:345:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/path.go:51:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/path.go:40:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/open.go:449:25
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:53:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:58:41
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:63:48
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:68:43
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:74:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:80:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:85:44
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:92:60
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:98:35
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:104:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:129:36
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:142:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:151:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:164:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:169:14
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:169:33
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:176:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:181:15
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:183:39
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:193:42
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:196:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:197:28
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:201:15
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:207:28
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:215:48
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:222:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:230:15
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:236:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:245:32
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/setup.go:252:80
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:253:67
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:282:50
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:294:18
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:300:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:306:21
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:307:41
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:312:77
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/setup.go:316:36
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:316:49
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:328:43
+      KILLED CONDITIONALS_NEGATION at internal/cmd/path.go:54:18
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/setup.go:332:16
+       LIVED CONDITIONALS_NEGATION at internal/cmd/open.go:430:39
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start.go:86:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start.go:94:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start.go:99:31
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/start.go:109:19
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start.go:109:19
+ NOT COVERED INVERT_NEGATIVES at internal/cmd/start.go:110:45
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/start.go:110:45
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start.go:112:64
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start.go:130:19
+ NOT COVERED INVERT_NEGATIVES at internal/cmd/start.go:136:34
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/start.go:136:34
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/start.go:143:67
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start.go:153:16
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/start.go:154:39
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/start.go:154:20
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/start.go:156:43
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start_manage.go:51:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start_manage.go:60:23
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/start_manage.go:64:65
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start_manage.go:72:19
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/start_manage.go:78:28
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start_manage.go:78:28
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/start_manage.go:85:53
+      KILLED CONDITIONALS_NEGATION at internal/cmd/path.go:46:15
+      KILLED CONDITIONALS_NEGATION at internal/cmd/path.go:59:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/rm.go:55:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/rm.go:90:19
+      KILLED CONDITIONALS_NEGATION at internal/cmd/rm.go:75:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/rm.go:70:10
+       LIVED CONDITIONALS_NEGATION at internal/cmd/rm.go:83:24
+      KILLED CONDITIONALS_NEGATION at internal/cmd/rm.go:106:11
+       LIVED CONDITIONALS_BOUNDARY at internal/cmd/rm.go:83:24
+      KILLED CONDITIONALS_NEGATION at internal/cmd/rm.go:111:11
+      KILLED CONDITIONALS_NEGATION at internal/cmd/root.go:121:47
+      KILLED CONDITIONALS_NEGATION at internal/cmd/root.go:135:16
+       LIVED CONDITIONALS_NEGATION at internal/cmd/rm.go:145:37
+      KILLED CONDITIONALS_NEGATION at internal/cmd/rm.go:137:26
+      KILLED CONDITIONALS_NEGATION at internal/cmd/rm.go:124:20
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_manage.go:102:9
+       LIVED CONDITIONALS_NEGATION at internal/cmd/root.go:170:17
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start.go:68:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_manage.go:97:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/root.go:185:15
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_manage.go:118:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start_status.go:77:12
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start.go:77:9
+      KILLED ARITHMETIC_BASE at internal/cmd/start_status.go:51:59
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_manage.go:124:31
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/start_status.go:119:14
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start_stop.go:27:9
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/start_stop.go:28:90
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start_stop.go:33:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start_stop.go:51:19
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/start_stop.go:55:26
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/start_stop.go:55:26
+      KILLED INVERT_NEGATIVES at internal/cmd/start_manage.go:167:10
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_manage.go:149:49
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/unarchive.go:48:25
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:48:25
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/unarchive.go:48:41
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:48:41
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/unarchive.go:54:16
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:54:16
+ NOT COVERED INCREMENT_DECREMENT at internal/cmd/unarchive.go:55:13
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/unarchive.go:60:16
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:60:16
+ NOT COVERED INVERT_NEGATIVES at internal/cmd/unarchive.go:60:35
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/unarchive.go:60:35
+ NOT COVERED INCREMENT_DECREMENT at internal/cmd/unarchive.go:61:13
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:86:8
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/unarchive.go:87:44
+ NOT COVERED ARITHMETIC_BASE at internal/cmd/unarchive.go:89:42
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:130:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:135:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:140:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:148:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:154:77
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:158:58
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:162:91
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:174:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:178:33
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:186:27
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:188:10
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:195:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:198:14
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:207:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:212:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:220:40
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:225:50
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:239:28
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:247:64
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:260:35
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/cmd/unarchive.go:300:19
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:300:19
+ NOT COVERED CONDITIONALS_NEGATION at internal/cmd/unarchive.go:320:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_manage.go:158:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_manage.go:145:11
+      KILLED ARITHMETIC_BASE at internal/cmd/start_manage.go:167:10
+       LIVED INCREMENT_DECREMENT at internal/cmd/start_manage.go:142:8
+      KILLED ARITHMETIC_BASE at internal/cmd/start_manage.go:175:13
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_manage.go:169:12
+      KILLED ARITHMETIC_BASE at internal/fileutil/fileutil.go:32:14
+      KILLED ARITHMETIC_BASE at internal/cmd/start_manage.go:181:61
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_manage.go:175:10
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:27:27
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:22:10
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:27:9
+       LIVED INCREMENT_DECREMENT at internal/cmd/start_manage.go:184:10
+      KILLED INVERT_NEGATIVES at internal/cmd/start_manage.go:175:13
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:40:33
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:48:38
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:44:55
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:50:43
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:53:38
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:67:9
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:79:9
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:74:50
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_status.go:46:9
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:88:51
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_manage.go:187:13
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:105:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:186:9
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_status.go:41:9
+       LIVED CONDITIONALS_NEGATION at internal/cmd/start_status.go:94:15
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_manage.go:191:49
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:111:9
+      KILLED ARITHMETIC_BASE at internal/fileutil/fileutil.go:139:19
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_status.go:103:9
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:94:53
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:124:47
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:115:55
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:120:9
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:130:33
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:140:52
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:144:44
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:172:15
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_url.go:32:9
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:177:9
+      KILLED CONDITIONALS_NEGATION at internal/lifecycle/bus.go:47:10
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:155:9
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:202:9
+      KILLED CONDITIONALS_NEGATION at internal/lifecycle/bus.go:38:19
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:197:13
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:206:15
+       LIVED CONDITIONALS_BOUNDARY at internal/lifecycle/bus.go:53:22
+       LIVED CONDITIONALS_NEGATION at internal/cmd/start_status.go:109:22
+ NOT COVERED CONDITIONALS_NEGATION at internal/registry/resolve.go:136:20
+      KILLED CONDITIONALS_NEGATION at internal/lifecycle/bus.go:53:22
+      KILLED CONDITIONALS_NEGATION at internal/cmd/start_url.go:42:9
+       LIVED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:210:13
+       LIVED ARITHMETIC_BASE at internal/lifecycle/bus.go:61:71
+      KILLED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:218:9
+      KILLED CONDITIONALS_NEGATION at internal/lifecycle/bus.go:72:40
+       LIVED CONDITIONALS_NEGATION at internal/fileutil/fileutil.go:210:31
+      KILLED CONDITIONALS_NEGATION at internal/registry/resolve.go:36:36
+      KILLED CONDITIONALS_NEGATION at internal/registry/resolve.go:36:11
+      KILLED CONDITIONALS_NEGATION at internal/registry/resolve.go:64:27
+       LIVED CONDITIONALS_BOUNDARY at internal/registry/resolve.go:64:27
+      KILLED CONDITIONALS_NEGATION at internal/registry/resolve.go:51:13
+       LIVED CONDITIONALS_BOUNDARY at internal/registry/resolve.go:96:18
+      KILLED CONDITIONALS_NEGATION at internal/registry/resolve.go:96:18
+      KILLED CONDITIONALS_NEGATION at internal/registry/resolve.go:120:11
+      KILLED CONDITIONALS_BOUNDARY at internal/registry/resolve.go:131:18
+      KILLED CONDITIONALS_NEGATION at internal/registry/resolve.go:131:18
+      KILLED ARITHMETIC_BASE at internal/registry/store.go:88:29
+      KILLED CONDITIONALS_NEGATION at internal/registry/resolve.go:126:18
+       LIVED CONDITIONALS_NEGATION at internal/registry/resolve.go:131:42
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:26:9
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:71:9
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:38:9
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:49:37
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:77:41
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:44:49
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:66:37
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:61:14
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:83:9
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:105:15
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:90:60
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:89:53
+       LIVED CONDITIONALS_NEGATION at internal/registry/store.go:95:69
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:115:16
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:117:39
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:117:21
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:109:13
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:111:10
+      KILLED CONDITIONALS_NEGATION at internal/registry/store.go:128:10
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:60:8
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:176:37
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:98:8
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:150:12
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:116:31
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:166:57
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:162:15
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:171:19
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:181:18
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:116:11
+      KILLED ARITHMETIC_BASE at internal/registry/types.go:303:70
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:182:60
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:187:15
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:230:37
+      KILLED CONDITIONALS_BOUNDARY at internal/registry/types.go:187:15
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:201:15
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:219:15
+      KILLED CONDITIONALS_BOUNDARY at internal/registry/types.go:235:15
+ NOT COVERED ARITHMETIC_BASE at internal/stack/service.go:14:30
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:224:39
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:235:15
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:252:9
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:264:27
+      KILLED ARITHMETIC_BASE at internal/stack/endpoints.go:40:21
+      KILLED CONDITIONALS_BOUNDARY at internal/registry/types.go:304:24
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:303:14
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:275:27
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:304:24
+      KILLED CONDITIONALS_BOUNDARY at internal/registry/types.go:312:40
+      KILLED CONDITIONALS_NEGATION at internal/registry/types.go:312:40
+      KILLED CONDITIONALS_NEGATION at internal/stack/endpoints.go:36:34
+      KILLED CONDITIONALS_NEGATION at internal/stack/endpoints.go:27:46
+      KILLED ARITHMETIC_BASE at internal/stack/service.go:158:82
+      KILLED ARITHMETIC_BASE at internal/stack/service.go:139:23
+      KILLED CONDITIONALS_NEGATION at internal/stack/opencode_binary.go:66:9
+      KILLED CONDITIONALS_NEGATION at internal/stack/endpoints.go:22:9
+      KILLED CONDITIONALS_NEGATION at internal/stack/opencode_binary.go:47:35
+      KILLED CONDITIONALS_NEGATION at internal/stack/opencode_binary.go:43:11
+      KILLED CONDITIONALS_NEGATION at internal/stack/service.go:75:9
+       LIVED CONDITIONALS_NEGATION at internal/stack/endpoints.go:64:17
+ NOT COVERED CONDITIONALS_NEGATION at internal/stack/session.go:117:66
+       LIVED CONDITIONALS_NEGATION at internal/stack/service.go:61:15
+      KILLED CONDITIONALS_BOUNDARY at internal/stack/service.go:79:21
+       LIVED CONDITIONALS_NEGATION at internal/stack/endpoints.go:60:9
+      KILLED CONDITIONALS_NEGATION at internal/stack/service.go:79:21
+      KILLED CONDITIONALS_NEGATION at internal/stack/service.go:165:9
+      KILLED CONDITIONALS_NEGATION at internal/stack/service.go:120:9
+      KILLED CONDITIONALS_NEGATION at internal/stack/service.go:79:46
+      KILLED CONDITIONALS_NEGATION at internal/stack/service.go:203:11
+       LIVED CONDITIONALS_BOUNDARY at internal/stack/service.go:79:46
+      KILLED CONDITIONALS_NEGATION at internal/stack/session.go:68:20
+       LIVED CONDITIONALS_NEGATION at internal/stack/service.go:176:9
+      KILLED ARITHMETIC_BASE at internal/stack/session.go:158:51
+      KILLED ARITHMETIC_BASE at internal/stack/session.go:158:45
+      KILLED ARITHMETIC_BASE at internal/stack/session.go:158:16
+      KILLED CONDITIONALS_NEGATION at internal/stack/session.go:99:68
+      KILLED CONDITIONALS_NEGATION at internal/stack/session.go:107:60
+      KILLED CONDITIONALS_NEGATION at internal/stack/session.go:72:19
+      KILLED CONDITIONALS_NEGATION at internal/stack/session.go:96:8
+      KILLED CONDITIONALS_NEGATION at internal/stack/session.go:46:9
+       LIVED CONDITIONALS_NEGATION at internal/stack/session.go:82:41
+      KILLED CONDITIONALS_NEGATION at internal/stack/session.go:142:20
+       LIVED CONDITIONALS_NEGATION at internal/stack/session.go:90:10
+      KILLED CONDITIONALS_NEGATION at internal/stack/session.go:155:18
+       LIVED CONDITIONALS_NEGATION at internal/stack/session.go:114:44
+      KILLED CONDITIONALS_NEGATION at internal/stack/settings.go:57:32
+      KILLED CONDITIONALS_NEGATION at internal/stack/settings.go:24:10
+       LIVED CONDITIONALS_NEGATION at internal/stack/settings.go:50:52
+       LIVED CONDITIONALS_NEGATION at internal/stack/settings.go:42:54
+      KILLED CONDITIONALS_NEGATION at internal/stack/settings.go:57:9
+      KILLED CONDITIONALS_NEGATION at internal/stack/settings.go:61:28
+      KILLED CONDITIONALS_NEGATION at internal/stack/settings.go:73:26
+      KILLED CONDITIONALS_NEGATION at internal/stack/settings.go:73:9
+      KILLED CONDITIONALS_NEGATION at internal/stack/settings.go:69:11
+      KILLED ARITHMETIC_BASE at internal/templates/templates.go:76:27
+       LIVED CONDITIONALS_BOUNDARY at internal/stack/settings.go:73:26
+      KILLED ARITHMETIC_BASE at internal/templates/templates.go:79:26
+      KILLED CONDITIONALS_NEGATION at internal/stack/stop.go:23:9
+      KILLED CONDITIONALS_NEGATION at internal/stack/stop.go:33:49
+      KILLED ARITHMETIC_BASE at internal/stack/store.go:65:29
+      KILLED CONDITIONALS_NEGATION at internal/stack/stop.go:27:33
+      KILLED CONDITIONALS_NEGATION at internal/stack/stop.go:39:43
+      KILLED CONDITIONALS_NEGATION at internal/stack/store.go:20:9
+      KILLED CONDITIONALS_NEGATION at internal/stack/store.go:46:12
+      KILLED CONDITIONALS_NEGATION at internal/templates/templates.go:70:18
+      KILLED CONDITIONALS_NEGATION at internal/stack/store.go:56:41
+      KILLED CONDITIONALS_NEGATION at internal/stack/store.go:34:47
+      KILLED CONDITIONALS_NEGATION at internal/stack/store.go:51:9
+      KILLED CONDITIONALS_NEGATION at internal/stack/store.go:29:9
+      KILLED CONDITIONALS_NEGATION at internal/stack/store.go:61:9
+      KILLED CONDITIONALS_NEGATION at internal/templates/templates.go:94:40
+      KILLED CONDITIONALS_NEGATION at internal/templates/templates.go:151:42
+ NOT COVERED CONDITIONALS_NEGATION at internal/tmux/tmux.go:91:60
+      KILLED CONDITIONALS_NEGATION at internal/templates/templates.go:146:9
+      KILLED CONDITIONALS_NEGATION at internal/stack/store.go:67:54
+ NOT COVERED CONDITIONALS_NEGATION at internal/tmux/tmux.go:110:60
+      KILLED CONDITIONALS_NEGATION at internal/stack/store.go:66:42
+      KILLED CONDITIONALS_NEGATION at internal/templates/templates.go:115:9
+ NOT COVERED CONDITIONALS_NEGATION at internal/tmux/tmux.go:136:14
+      KILLED CONDITIONALS_NEGATION at internal/templates/templates.go:165:10
+      KILLED CONDITIONALS_NEGATION at internal/templates/templates.go:110:9
+      KILLED CONDITIONALS_NEGATION at internal/templates/templates.go:131:9
+      KILLED CONDITIONALS_NEGATION at internal/templates/templates.go:136:9
+      KILLED CONDITIONALS_NEGATION at internal/templates/templates.go:179:10
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:35:10
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:64:9
+      KILLED CONDITIONALS_NEGATION at internal/templates/templates.go:188:9
+       LIVED CONDITIONALS_NEGATION at internal/stack/store.go:72:69
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:52:9
+      KILLED ARITHMETIC_BASE at internal/tmux/tmux.go:146:25
+ NOT COVERED CONDITIONALS_NEGATION at internal/tmux/tmux.go:203:10
+ NOT COVERED CONDITIONALS_BOUNDARY at internal/tmux/tmux.go:203:33
+ NOT COVERED CONDITIONALS_NEGATION at internal/tmux/tmux.go:203:33
+      KILLED ARITHMETIC_BASE at internal/tmux/tmux.go:146:19
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:71:9
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:55:43
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:83:9
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:72:60
+       LIVED CONDITIONALS_NEGATION at internal/tmux/tmux.go:90:9
+       LIVED CONDITIONALS_NEGATION at internal/tmux/tmux.go:109:9
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:134:9
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:121:40
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:102:9
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:149:9
+       LIVED CONDITIONALS_NEGATION at internal/tmux/tmux.go:150:60
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:161:9
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:168:9
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:169:60
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:186:44
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:180:34
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:217:9
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:185:9
+      KILLED CONDITIONALS_NEGATION at internal/tmux/tmux.go:195:14
+
+Mutation testing completed in 50 seconds 81 milliseconds
+Killed: 346, Lived: 65, Not covered: 348
+Timed out: 0, Not viable: 0, Skipped: 0
+Test efficacy: 84.18%
+Mutator coverage: 54.15%

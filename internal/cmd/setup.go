@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/registry"
 )
 
@@ -28,6 +29,7 @@ var setupCmd = &cobra.Command{
 
 Creates:
   - Config directory (~/.config/overlord/)
+  - Managed oc shim (~/.local/bin/oc)
   - Git repository for registry sync (optional)
   - Registry file (~/.config/overlord/registry.yaml)
   - Base directory (~/Overlord by default)
@@ -97,6 +99,21 @@ func runSetup(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	fmt.Printf("  Registry: %s\n", registry.DefaultRegistryPath)
+
+	shimResult, err := ensureOCShimInstalled()
+	if err != nil {
+		return err
+	}
+	switch shimResult.Action {
+	case ocShimInstalled:
+		fmt.Printf("  oc shim:  installed at %s\n", fileutil.FormatPathWithTilde(shimResult.Path))
+	case ocShimUpdated:
+		fmt.Printf("  oc shim:  updated at %s\n", fileutil.FormatPathWithTilde(shimResult.Path))
+	case ocShimSkipped:
+		fmt.Printf("  oc shim:  skipped (%s is not Overlord-managed)\n", fileutil.FormatPathWithTilde(shimResult.Path))
+	default:
+		fmt.Printf("  oc shim:  already current at %s\n", fileutil.FormatPathWithTilde(shimResult.Path))
+	}
 
 	fmt.Println("\nSetup complete!")
 	return nil

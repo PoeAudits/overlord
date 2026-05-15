@@ -33,6 +33,11 @@ type newFlags struct {
 
 var newOpts newFlags
 
+var (
+	newLoadRegistry = loadRegistry
+	newSaveRegistry = saveRegistry
+)
+
 // newCmd represents the new command
 var newCmd = &cobra.Command{
 	Use:   "new <name>",
@@ -255,7 +260,7 @@ func runNewValidate(name string) (*newProjectContext, error) {
 		lang = registry.LanguageBase
 	}
 
-	reg, err := loadRegistry()
+	reg, err := newLoadRegistry()
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +402,7 @@ func runNewRegister(ctx *newProjectContext) error {
 	}
 	ctx.reg.Projects[ctx.name] = project
 
-	if err := saveRegistry(ctx.reg); err != nil {
+	if err := newSaveRegistry(ctx.reg); err != nil {
 		return err
 	}
 

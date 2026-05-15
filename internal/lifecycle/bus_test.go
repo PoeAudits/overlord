@@ -72,6 +72,30 @@ func TestFirePreEventErrorsAreFatal(t *testing.T) {
 	}
 }
 
+func TestFireJoinsMultiplePreEventErrors(t *testing.T) {
+	bus := NewBus()
+	first := errors.New("first failure")
+	second := errors.New("second failure")
+
+	bus.Subscribe(ProjectCreating, func(Event) error { return first })
+	bus.Subscribe(ProjectCreating, func(Event) error { return second })
+
+	res := bus.Fire(Event{Type: ProjectCreating})
+
+	if res.Err == nil {
+		t.Fatal("expected joined fatal error, got nil")
+	}
+	if !errors.Is(res.Err, first) {
+		t.Fatalf("expected joined error to contain first failure: %v", res.Err)
+	}
+	if !errors.Is(res.Err, second) {
+		t.Fatalf("expected joined error to contain second failure: %v", res.Err)
+	}
+	if len(res.Warnings) != 0 {
+		t.Fatalf("pre-event warnings should be empty: %+v", res.Warnings)
+	}
+}
+
 func TestFirePostEventErrorsBecomeWarnings(t *testing.T) {
 	bus := NewBus()
 	bus.Subscribe(ProjectArchived, func(Event) error {
@@ -88,6 +112,27 @@ func TestFirePostEventErrorsBecomeWarnings(t *testing.T) {
 	}
 	if !strings.Contains(res.Warnings[0], "cleanup failed") {
 		t.Fatalf("warning should include handler error message: %s", res.Warnings[0])
+	}
+}
+
+func TestFireCollectsAllPostEventWarnings(t *testing.T) {
+	bus := NewBus()
+	bus.Subscribe(ProjectArchived, func(Event) error { return errors.New("cleanup failed") })
+	bus.Subscribe(ProjectArchived, func(Event) error { return errors.New("metrics failed") })
+
+	res := bus.Fire(Event{Type: ProjectArchived})
+
+	if res.Err != nil {
+		t.Fatalf("post-event errors should not be fatal: %v", res.Err)
+	}
+	if len(res.Warnings) != 2 {
+		t.Fatalf("expected 2 warnings, got %d", len(res.Warnings))
+	}
+	if !strings.Contains(res.Warnings[0], "cleanup failed") {
+		t.Fatalf("first warning missing handler error: %s", res.Warnings[0])
+	}
+	if !strings.Contains(res.Warnings[1], "metrics failed") {
+		t.Fatalf("second warning missing handler error: %s", res.Warnings[1])
 	}
 }
 

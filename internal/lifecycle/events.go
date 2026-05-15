@@ -16,6 +16,9 @@ const (
 	ProjectRemoving     EventType = "project.removing"
 	ProjectRemoved      EventType = "project.removed"
 	ProjectInitializing EventType = "project.initializing"
+
+	StackStarting EventType = "stack.starting"
+	StackStarted  EventType = "stack.started"
 )
 
 // Event carries context for a lifecycle hook.
@@ -25,6 +28,7 @@ type Event struct {
 	ProjectPath string
 	DestPath    string
 	Settings    map[string]string
+	StackName   string
 }
 
 // Handler defines the callback signature for lifecycle hooks.
