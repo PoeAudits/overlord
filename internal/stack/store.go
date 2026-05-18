@@ -91,15 +91,6 @@ func DefaultConfig() *StackConfig {
 					openCodePortKey: strconv.Itoa(defaultOpenCodePort),
 				},
 			},
-			t3CodeServiceName: {
-				Enabled: true,
-				Settings: map[string]string{
-					t3CodeHostKey:    defaultT3CodeHost,
-					t3CodePortKey:    strconv.Itoa(defaultT3CodePort),
-					t3CodeWorkDirKey: defaultT3CodeDir,
-					t3CodeBaseDirKey: defaultT3CodeBaseDir,
-				},
-			},
 			"frontend": {
 				Enabled: true,
 				Settings: map[string]string{
@@ -110,7 +101,7 @@ func DefaultConfig() *StackConfig {
 			"tailscale": {
 				Enabled: true,
 				Settings: map[string]string{
-					tailscaleTargetKey: T3CodeURL(nil),
+					tailscaleTargetKey: OpenCodeURL(nil),
 				},
 			},
 			"ollama": {

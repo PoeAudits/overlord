@@ -22,11 +22,11 @@ func TestLoad_DefaultConfigWhenFileNotExist(t *testing.T) {
 	if len(config.Projects) != 0 {
 		t.Errorf("expected empty Projects, got %v", config.Projects)
 	}
-	if len(config.Services) != 5 {
-		t.Errorf("expected 5 default services, got %d", len(config.Services))
+	if len(config.Services) != 4 {
+		t.Errorf("expected 4 default services, got %d", len(config.Services))
 	}
 
-	expectedServices := []string{"opencode", "t3code", "frontend", "tailscale", "ollama"}
+	expectedServices := []string{"opencode", "frontend", "tailscale", "ollama"}
 	for _, name := range expectedServices {
 		svc, ok := config.Services[name]
 		if !ok {

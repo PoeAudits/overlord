@@ -13,9 +13,6 @@ import (
 const (
 	// healthCheckTimeout is the HTTP timeout for service health checks.
 	healthCheckTimeout = 2 * time.Second
-
-	t3CodeTailscaleServeEnv = "T3CODE_TAILSCALE_SERVE=false"
-	t3CodeHealthPath        = "/.well-known/t3/environment"
 )
 
 // Service defines the interface for a managed stack service.
@@ -41,9 +38,9 @@ type Service interface {
 }
 
 // DefaultServices returns the daily-driver services in startup order
-// (OpenCode, T3 Code, FrontEnd, Tailscale, Ollama), filtered to only those
-// enabled in the provided config. Ollama uses a vertical split pane:
-// "ollama serve" in the top pane and the configured model in the bottom pane.
+// (OpenCode, FrontEnd, Tailscale, Ollama), filtered to only those enabled in
+// the provided config. Ollama uses a vertical split pane: "ollama serve" in
+// the top pane and the configured model in the bottom pane.
 func DefaultServices(cfg *StackConfig) []Service {
 	// Define services in startup order.
 	builders := []struct {
@@ -51,7 +48,6 @@ func DefaultServices(cfg *StackConfig) []Service {
 		make func(cfg *StackConfig) Service
 	}{
 		{"opencode", func(cfg *StackConfig) Service { return newOpenCodeService(cfg) }},
-		{t3CodeServiceName, func(cfg *StackConfig) Service { return newT3CodeService(cfg) }},
 		{"frontend", func(cfg *StackConfig) Service { return newFrontEndService(cfg) }},
 		{"tailscale", func(cfg *StackConfig) Service { return newTailscaleService(cfg) }},
 		{"ollama", func(cfg *StackConfig) Service { return newOllamaService(serviceSettings(cfg, "ollama")) }},
@@ -84,22 +80,6 @@ func httpHealthCheck(url string) error {
 	return nil
 }
 
-func httpHealthCheckOKOrRedirect(url string) error {
-	client := *healthClient
-	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
-	resp, err := client.Get(url)
-	if err != nil {
-		return fmt.Errorf("health check request failed: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return fmt.Errorf("health check returned status %d", resp.StatusCode)
-	}
-	return nil
-}
-
 // --- OpenCode service ---
 
 type openCodeService struct {
@@ -122,59 +102,6 @@ func (s *openCodeService) Env() []string       { return nil }
 func (s *openCodeService) PaneCommand() string { return "" }
 func (s *openCodeService) HealthCheck() error {
 	return httpHealthCheck(fmt.Sprintf("http://%s:%d/global/health", s.host, s.port))
-}
-
-// --- T3 Code service ---
-
-type t3CodeService struct {
-	host        string
-	port        int
-	workDir     string
-	baseDir     string
-	openCodeURL string
-	command     string
-}
-
-func newT3CodeService(cfg *StackConfig) *t3CodeService {
-	return &t3CodeService{
-		host:        t3CodeHost(cfg),
-		port:        t3CodePort(cfg),
-		workDir:     expandPathOrOriginal(t3CodeWorkDir(cfg)),
-		baseDir:     t3CodeBaseDir(cfg),
-		openCodeURL: OpenCodeURL(cfg),
-		command:     t3CodeCommand(cfg),
-	}
-}
-
-func (s *t3CodeService) Name() string       { return t3CodeServiceName }
-func (s *t3CodeService) WindowName() string { return "T3Code" }
-func (s *t3CodeService) Command() string {
-	if s.command != "" {
-		return s.command
-	}
-	bin := "apps/server/dist/bin.mjs"
-	return fmt.Sprintf(
-		"test -f %s || { printf '%%s\\n' %s >&2; exit 1; }; %s && node %s serve --host %s --port %d --base-dir %s",
-		shellQuote(bin),
-		shellQuote("T3 Code server is not built. Run: bun run --cwd apps/web build && bun run --cwd apps/server build"),
-		s.seedOpenCodeProviderCommand(),
-		shellQuote(bin),
-		shellQuote(s.host),
-		s.port,
-		shellQuote(s.baseDir),
-	)
-}
-
-func (s *t3CodeService) seedOpenCodeProviderCommand() string {
-	script := `const fs=require("fs"),path=require("path");const base=process.argv[1],url=process.argv[2];const file=path.join(base,"userdata","settings.json");fs.mkdirSync(path.dirname(file),{recursive:true});let settings={};try{settings=JSON.parse(fs.readFileSync(file,"utf8"))}catch(e){if(e.code!=="ENOENT")throw e}settings.providers={...settings.providers,opencode:{...settings.providers?.opencode,serverUrl:url}};fs.writeFileSync(file,JSON.stringify(settings,null,2)+"\n")`
-	return fmt.Sprintf("node -e %s -- %s %s", shellQuote(script), shellQuote(expandPathOrOriginal(s.baseDir)), shellQuote(s.openCodeURL))
-}
-
-func (s *t3CodeService) WorkDir() string     { return s.workDir }
-func (s *t3CodeService) Env() []string       { return []string{t3CodeTailscaleServeEnv} }
-func (s *t3CodeService) PaneCommand() string { return "" }
-func (s *t3CodeService) HealthCheck() error {
-	return httpHealthCheckOKOrRedirect(fmt.Sprintf("http://%s:%d%s", s.host, s.port, t3CodeHealthPath))
 }
 
 // --- FrontEnd service ---
@@ -202,10 +129,6 @@ func expandPathOrOriginal(path string) string {
 	return expanded
 }
 
-func shellQuote(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
-}
-
 func (s *frontEndService) Name() string        { return "frontend" }
 func (s *frontEndService) WindowName() string  { return "FrontEnd" }
 func (s *frontEndService) Command() string     { return "bun serve.ts" }
@@ -231,14 +154,9 @@ func newTailscaleService(cfg *StackConfig) *tailscaleService {
 	return &tailscaleService{target: tailscaleTarget(cfg)}
 }
 
-func (s *tailscaleService) Name() string       { return "tailscale" }
-func (s *tailscaleService) WindowName() string { return "Tailscale" }
-func (s *tailscaleService) Command() string {
-	return fmt.Sprintf(
-		"tailscale serve --bg %s; status=$?; if [ $status -eq 0 ]; then for i in 1 2 3 4 5 6 7 8 9 10; do overlord start url --remote >/dev/null 2>&1 && break; sleep 1; done; printf '\\nT3 phone pairing:\\n'; overlord start pair || printf 'Run `overlord start pair` after Tailscale Serve is ready.\\n' >&2; else exit $status; fi; exec ${SHELL:-sh}",
-		shellQuote(s.target),
-	)
-}
+func (s *tailscaleService) Name() string        { return "tailscale" }
+func (s *tailscaleService) WindowName() string  { return "Tailscale" }
+func (s *tailscaleService) Command() string     { return "tailscale serve --bg " + s.target }
 func (s *tailscaleService) WorkDir() string     { return "" }
 func (s *tailscaleService) Env() []string       { return nil }
 func (s *tailscaleService) PaneCommand() string { return "" }

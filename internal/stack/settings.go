@@ -3,27 +3,16 @@ package stack
 import "strconv"
 
 const (
-	t3CodeServiceName = "t3code"
-
-	openCodeHostKey  = "host"
-	openCodePortKey  = "port"
-	t3CodeHostKey    = "host"
-	t3CodePortKey    = "port"
-	t3CodeWorkDirKey = "workdir"
-	t3CodeBaseDirKey = "base_dir"
-	t3CodeCommandKey = "command"
+	openCodeHostKey = "host"
+	openCodePortKey = "port"
 
 	frontEndPortKey    = "port"
 	frontEndWorkDirKey = "workdir"
 
 	tailscaleTargetKey = "target"
 
-	defaultOpenCodeHost  = "127.0.0.1"
-	defaultOpenCodePort  = 4096
-	defaultT3CodeHost    = "127.0.0.1"
-	defaultT3CodePort    = 3773
-	defaultT3CodeDir     = "/home/thomas/Overlord/core/tools/code"
-	defaultT3CodeBaseDir = "~/.local/share/t3code"
+	defaultOpenCodeHost = "127.0.0.1"
+	defaultOpenCodePort = 4096
 
 	defaultFrontEndPort = 3001
 	defaultFrontEndDir  = "~/Overlord/sandbox/phone-code/web"
@@ -39,41 +28,6 @@ func openCodePort(cfg *StackConfig) int {
 	return intSetting(settings, openCodePortKey, defaultOpenCodePort)
 }
 
-func t3CodeHost(cfg *StackConfig) string {
-	settings := serviceSettings(cfg, t3CodeServiceName)
-	return stringSetting(settings, t3CodeHostKey, defaultT3CodeHost)
-}
-
-func t3CodePort(cfg *StackConfig) int {
-	settings := serviceSettings(cfg, t3CodeServiceName)
-	return intSetting(settings, t3CodePortKey, defaultT3CodePort)
-}
-
-func t3CodeWorkDir(cfg *StackConfig) string {
-	settings := serviceSettings(cfg, t3CodeServiceName)
-	return stringSetting(settings, t3CodeWorkDirKey, defaultT3CodeDir)
-}
-
-// T3CodeWorkDir returns the configured T3 Code repository directory.
-func T3CodeWorkDir(cfg *StackConfig) string {
-	return expandPathOrOriginal(t3CodeWorkDir(cfg))
-}
-
-func t3CodeBaseDir(cfg *StackConfig) string {
-	settings := serviceSettings(cfg, t3CodeServiceName)
-	return stringSetting(settings, t3CodeBaseDirKey, defaultT3CodeBaseDir)
-}
-
-// T3CodeBaseDir returns the configured T3 Code state directory.
-func T3CodeBaseDir(cfg *StackConfig) string {
-	return expandPathOrOriginal(t3CodeBaseDir(cfg))
-}
-
-func t3CodeCommand(cfg *StackConfig) string {
-	settings := serviceSettings(cfg, t3CodeServiceName)
-	return settings[t3CodeCommandKey]
-}
-
 func frontEndPort(cfg *StackConfig) int {
 	settings := serviceSettings(cfg, "frontend")
 	return intSetting(settings, frontEndPortKey, defaultFrontEndPort)
@@ -86,7 +40,7 @@ func frontEndWorkDir(cfg *StackConfig) string {
 
 func tailscaleTarget(cfg *StackConfig) string {
 	settings := serviceSettings(cfg, "tailscale")
-	return stringSetting(settings, tailscaleTargetKey, T3CodeURL(cfg))
+	return stringSetting(settings, tailscaleTargetKey, OpenCodeURL(cfg))
 }
 
 func serviceSettings(cfg *StackConfig, name string) map[string]string {

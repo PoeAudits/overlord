@@ -15,14 +15,14 @@ func TestRunStartStatus_PrintsOpenCodeDriftWhenStackStopped(t *testing.T) {
 	origLoadStackConfig := startStatusLoadStackConfig
 	origSessionExists := startStatusSessionExists
 	origDefaultServices := startStatusDefaultServices
-	origRemoteT3CodeURL := startStatusRemoteT3CodeURL
+	origRemoteOpenCodeURL := startStatusRemoteOpenCodeURL
 	origResolveOpenCodeBinary := startStatusResolveOpenCodeBinary
 	origInspectOCShim := startStatusInspectOCShim
 	t.Cleanup(func() {
 		startStatusLoadStackConfig = origLoadStackConfig
 		startStatusSessionExists = origSessionExists
 		startStatusDefaultServices = origDefaultServices
-		startStatusRemoteT3CodeURL = origRemoteT3CodeURL
+		startStatusRemoteOpenCodeURL = origRemoteOpenCodeURL
 		startStatusResolveOpenCodeBinary = origResolveOpenCodeBinary
 		startStatusInspectOCShim = origInspectOCShim
 	})
@@ -36,7 +36,7 @@ func TestRunStartStatus_PrintsOpenCodeDriftWhenStackStopped(t *testing.T) {
 	startStatusDefaultServices = func(*stack.StackConfig) []stack.Service {
 		return nil
 	}
-	startStatusRemoteT3CodeURL = func(*stack.StackConfig) (string, error) {
+	startStatusRemoteOpenCodeURL = func(*stack.StackConfig) (string, error) {
 		return "", errors.New("missing")
 	}
 	startStatusResolveOpenCodeBinary = func() string {
@@ -55,7 +55,7 @@ func TestRunStartStatus_PrintsOpenCodeDriftWhenStackStopped(t *testing.T) {
 	}
 
 	out := stderr.String()
-	for _, want := range []string{"StartServer is not running", "T3 Code URL", "OpenCode URL", "/usr/bin/opencode", "/tmp/oc", "stale"} {
+	for _, want := range []string{"StartServer is not running", "OpenCode URL", "/usr/bin/opencode", "/tmp/oc", "stale"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("output missing %q:\n%s", want, out)
 		}

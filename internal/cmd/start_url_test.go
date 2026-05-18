@@ -22,8 +22,8 @@ func TestRunStartURL_PrintsLocalURL(t *testing.T) {
 	startURLRemote = false
 	startURLLoadStackConfig = func() (*stack.StackConfig, error) {
 		cfg := stack.DefaultConfig()
-		cfg.Services["t3code"].Settings["host"] = "0.0.0.0"
-		cfg.Services["t3code"].Settings["port"] = "7777"
+		cfg.Services["opencode"].Settings["host"] = "0.0.0.0"
+		cfg.Services["opencode"].Settings["port"] = "7777"
 		return cfg, nil
 	}
 
@@ -42,11 +42,11 @@ func TestRunStartURL_PrintsLocalURL(t *testing.T) {
 
 func TestRunStartURL_PrintsRemoteURL(t *testing.T) {
 	origLoadStackConfig := startURLLoadStackConfig
-	origRemoteT3CodeURL := startURLRemoteT3CodeURL
+	origRemoteOpenCodeURL := startURLRemoteOpenCodeURL
 	origRemote := startURLRemote
 	t.Cleanup(func() {
 		startURLLoadStackConfig = origLoadStackConfig
-		startURLRemoteT3CodeURL = origRemoteT3CodeURL
+		startURLRemoteOpenCodeURL = origRemoteOpenCodeURL
 		startURLRemote = origRemote
 	})
 
@@ -54,8 +54,8 @@ func TestRunStartURL_PrintsRemoteURL(t *testing.T) {
 	startURLLoadStackConfig = func() (*stack.StackConfig, error) {
 		return stack.DefaultConfig(), nil
 	}
-	startURLRemoteT3CodeURL = func(*stack.StackConfig) (string, error) {
-		return "https://t3code.tailnet.ts.net", nil
+	startURLRemoteOpenCodeURL = func(*stack.StackConfig) (string, error) {
+		return "https://opencode.tailnet.ts.net", nil
 	}
 
 	var stdout bytes.Buffer
@@ -66,18 +66,18 @@ func TestRunStartURL_PrintsRemoteURL(t *testing.T) {
 		t.Fatalf("runStartURL() returned error: %v", err)
 	}
 
-	if got := stdout.String(); got != "https://t3code.tailnet.ts.net\n" {
-		t.Fatalf("stdout = %q, want %q", got, "https://t3code.tailnet.ts.net\n")
+	if got := stdout.String(); got != "https://opencode.tailnet.ts.net\n" {
+		t.Fatalf("stdout = %q, want %q", got, "https://opencode.tailnet.ts.net\n")
 	}
 }
 
 func TestRunStartURL_ReturnsCommandErrorWhenRemoteLookupFails(t *testing.T) {
 	origLoadStackConfig := startURLLoadStackConfig
-	origRemoteT3CodeURL := startURLRemoteT3CodeURL
+	origRemoteOpenCodeURL := startURLRemoteOpenCodeURL
 	origRemote := startURLRemote
 	t.Cleanup(func() {
 		startURLLoadStackConfig = origLoadStackConfig
-		startURLRemoteT3CodeURL = origRemoteT3CodeURL
+		startURLRemoteOpenCodeURL = origRemoteOpenCodeURL
 		startURLRemote = origRemote
 	})
 
@@ -85,7 +85,7 @@ func TestRunStartURL_ReturnsCommandErrorWhenRemoteLookupFails(t *testing.T) {
 	startURLLoadStackConfig = func() (*stack.StackConfig, error) {
 		return stack.DefaultConfig(), nil
 	}
-	startURLRemoteT3CodeURL = func(*stack.StackConfig) (string, error) {
+	startURLRemoteOpenCodeURL = func(*stack.StackConfig) (string, error) {
 		return "", errors.New("tailscale unavailable")
 	}
 

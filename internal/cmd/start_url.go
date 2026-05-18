@@ -11,13 +11,13 @@ import (
 var startURLRemote bool
 
 var (
-	startURLLoadStackConfig = loadStackConfig
-	startURLRemoteT3CodeURL = stack.RemoteT3CodeURL
+	startURLLoadStackConfig   = loadStackConfig
+	startURLRemoteOpenCodeURL = stack.RemoteOpenCodeURL
 )
 
 var startURLCmd = &cobra.Command{
 	Use:   "url",
-	Short: "Print T3 Code service URL",
+	Short: "Print OpenCode service URL",
 	Args:  cobra.NoArgs,
 	RunE:  runStartURL,
 }
@@ -34,11 +34,11 @@ func runStartURL(cmd *cobra.Command, args []string) error {
 	}
 
 	if !startURLRemote {
-		fmt.Fprintln(cmd.OutOrStdout(), stack.T3CodeURL(cfg))
+		fmt.Fprintln(cmd.OutOrStdout(), stack.OpenCodeURL(cfg))
 		return nil
 	}
 
-	remote, err := startURLRemoteT3CodeURL(cfg)
+	remote, err := startURLRemoteOpenCodeURL(cfg)
 	if err != nil {
 		return cmdError("start url", "failed to resolve remote URL", err.Error())
 	}

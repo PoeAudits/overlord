@@ -17,7 +17,7 @@ var (
 	startStatusLoadStackConfig       = loadStackConfig
 	startStatusSessionExists         = func() (bool, error) { return tmux.NewSession(stack.SessionName, "").Exists() }
 	startStatusDefaultServices       = stack.DefaultServices
-	startStatusRemoteT3CodeURL       = stack.RemoteT3CodeURL
+	startStatusRemoteOpenCodeURL     = stack.RemoteOpenCodeURL
 	startStatusResolveOpenCodeBinary = stack.ResolveOpenCodeBinary
 	startStatusInspectOCShim         = inspectOCShim
 )
@@ -88,10 +88,9 @@ func runStartStatus(cmd *cobra.Command, args []string) error {
 }
 
 func printStartStatusEndpointDetails(w io.Writer, cfg *stack.StackConfig, s styles) {
-	fmt.Fprintf(w, "  %-14s %s\n", s.Label.Render("T3 Code URL"), s.Value.Render(stack.T3CodeURL(cfg)))
 	fmt.Fprintf(w, "  %-14s %s\n", s.Label.Render("OpenCode URL"), s.Value.Render(stack.OpenCodeURL(cfg)))
 
-	remoteURL, remoteErr := startStatusRemoteT3CodeURL(cfg)
+	remoteURL, remoteErr := startStatusRemoteOpenCodeURL(cfg)
 	if remoteErr != nil {
 		fmt.Fprintf(w, "  %-14s %s\n", s.Label.Render("Remote URL"), s.Dim.Render("unavailable"))
 	} else {

@@ -12,17 +12,6 @@ func OpenCodeURL(cfg *StackConfig) string {
 	return fmt.Sprintf("http://%s:%d", openCodeHost(cfg), openCodePort(cfg))
 }
 
-// T3CodeURL returns the canonical local URL for the t3code service.
-func T3CodeURL(cfg *StackConfig) string {
-	return fmt.Sprintf("http://%s:%d", t3CodeHost(cfg), t3CodePort(cfg))
-}
-
-// RemoteT3CodeURL resolves the current Tailscale HTTPS URL that proxies to
-// the local t3code endpoint.
-func RemoteT3CodeURL(cfg *StackConfig) (string, error) {
-	return remoteURLForTarget(T3CodeURL(cfg))
-}
-
 // RemoteOpenCodeURL resolves the current Tailscale HTTPS URL that proxies to
 // the local opencode endpoint.
 func RemoteOpenCodeURL(cfg *StackConfig) (string, error) {
