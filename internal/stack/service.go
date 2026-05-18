@@ -38,9 +38,9 @@ type Service interface {
 }
 
 // DefaultServices returns the daily-driver services in startup order
-// (OpenCode, FrontEnd, Tailscale, Ollama), filtered to only those enabled in
-// the provided config. Ollama uses a vertical split pane: "ollama serve" in
-// the top pane and the configured model in the bottom pane.
+// (OpenCode, OpenCode Desktop, FrontEnd, Tailscale, Ollama), filtered to only
+// those enabled in the provided config. Ollama uses a vertical split pane:
+// "ollama serve" in the top pane and the configured model in the bottom pane.
 func DefaultServices(cfg *StackConfig) []Service {
 	// Define services in startup order.
 	builders := []struct {
@@ -48,6 +48,7 @@ func DefaultServices(cfg *StackConfig) []Service {
 		make func(cfg *StackConfig) Service
 	}{
 		{"opencode", func(cfg *StackConfig) Service { return newOpenCodeService(cfg) }},
+		{"opencode-desktop", func(cfg *StackConfig) Service { return newOpenCodeDesktopService(cfg) }},
 		{"frontend", func(cfg *StackConfig) Service { return newFrontEndService(cfg) }},
 		{"tailscale", func(cfg *StackConfig) Service { return newTailscaleService(cfg) }},
 		{"ollama", func(cfg *StackConfig) Service { return newOllamaService(serviceSettings(cfg, "ollama")) }},
@@ -102,6 +103,30 @@ func (s *openCodeService) Env() []string       { return nil }
 func (s *openCodeService) PaneCommand() string { return "" }
 func (s *openCodeService) HealthCheck() error {
 	return httpHealthCheck(fmt.Sprintf("http://%s:%d/global/health", s.host, s.port))
+}
+
+// --- OpenCode Desktop service ---
+
+type openCodeDesktopService struct {
+	binary string
+}
+
+func newOpenCodeDesktopService(cfg *StackConfig) *openCodeDesktopService {
+	return &openCodeDesktopService{binary: openCodeDesktopBinary(cfg)}
+}
+
+func (s *openCodeDesktopService) Name() string        { return "opencode-desktop" }
+func (s *openCodeDesktopService) WindowName() string  { return "OpenCodeDesktop" }
+func (s *openCodeDesktopService) Command() string     { return s.binary }
+func (s *openCodeDesktopService) WorkDir() string     { return "" }
+func (s *openCodeDesktopService) Env() []string       { return nil }
+func (s *openCodeDesktopService) PaneCommand() string { return "" }
+func (s *openCodeDesktopService) HealthCheck() error {
+	cmd := commandExec("pgrep", "-f", "opencode-desktop|/usr/lib/opencode-desktop")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("opencode desktop process not found: %w", err)
+	}
+	return nil
 }
 
 // --- FrontEnd service ---

@@ -3,16 +3,18 @@ package stack
 import "strconv"
 
 const (
-	openCodeHostKey = "host"
-	openCodePortKey = "port"
+	openCodeHostKey          = "host"
+	openCodePortKey          = "port"
+	openCodeDesktopBinaryKey = "binary"
 
 	frontEndPortKey    = "port"
 	frontEndWorkDirKey = "workdir"
 
 	tailscaleTargetKey = "target"
 
-	defaultOpenCodeHost = "127.0.0.1"
-	defaultOpenCodePort = 4096
+	defaultOpenCodeHost          = "127.0.0.1"
+	defaultOpenCodePort          = 4096
+	defaultOpenCodeDesktopBinary = "opencode-desktop"
 
 	defaultFrontEndPort = 3001
 	defaultFrontEndDir  = "~/Overlord/sandbox/phone-code/web"
@@ -26,6 +28,11 @@ func openCodeHost(cfg *StackConfig) string {
 func openCodePort(cfg *StackConfig) int {
 	settings := serviceSettings(cfg, "opencode")
 	return intSetting(settings, openCodePortKey, defaultOpenCodePort)
+}
+
+func openCodeDesktopBinary(cfg *StackConfig) string {
+	settings := serviceSettings(cfg, "opencode-desktop")
+	return stringSetting(settings, openCodeDesktopBinaryKey, defaultOpenCodeDesktopBinary)
 }
 
 func frontEndPort(cfg *StackConfig) int {

@@ -21,8 +21,8 @@ func TestIntegration_DefaultServicesOnFreshConfig(t *testing.T) {
 	}
 
 	services := DefaultServices(cfg)
-	if len(services) != 4 {
-		t.Fatalf("expected 4 default services, got %d", len(services))
+	if len(services) != 5 {
+		t.Fatalf("expected 5 default services, got %d", len(services))
 	}
 
 	expectedOrder := []struct {
@@ -30,6 +30,7 @@ func TestIntegration_DefaultServicesOnFreshConfig(t *testing.T) {
 		windowName string
 	}{
 		{"opencode", "OpenCode"},
+		{"opencode-desktop", "OpenCodeDesktop"},
 		{"frontend", "FrontEnd"},
 		{"tailscale", "Tailscale"},
 		{"ollama", "Ollama"},

@@ -91,6 +91,12 @@ func DefaultConfig() *StackConfig {
 					openCodePortKey: strconv.Itoa(defaultOpenCodePort),
 				},
 			},
+			"opencode-desktop": {
+				Enabled: true,
+				Settings: map[string]string{
+					openCodeDesktopBinaryKey: defaultOpenCodeDesktopBinary,
+				},
+			},
 			"frontend": {
 				Enabled: true,
 				Settings: map[string]string{

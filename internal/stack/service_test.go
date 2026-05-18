@@ -10,6 +10,7 @@ import (
 // Compile-time interface compliance checks.
 var (
 	_ Service = (*openCodeService)(nil)
+	_ Service = (*openCodeDesktopService)(nil)
 	_ Service = (*frontEndService)(nil)
 	_ Service = (*tailscaleService)(nil)
 	_ Service = (*ollamaService)(nil)
@@ -19,26 +20,27 @@ func TestDefaultServices_AllEnabled(t *testing.T) {
 	cfg := &StackConfig{
 		Version: 1,
 		Services: map[string]ServiceConfig{
-			"opencode":  {Enabled: true, Settings: map[string]string{}},
-			"frontend":  {Enabled: true, Settings: map[string]string{}},
-			"tailscale": {Enabled: true, Settings: map[string]string{}},
-			"ollama":    {Enabled: true, Settings: map[string]string{"model": "llama3"}},
+			"opencode":         {Enabled: true, Settings: map[string]string{}},
+			"opencode-desktop": {Enabled: true, Settings: map[string]string{}},
+			"frontend":         {Enabled: true, Settings: map[string]string{}},
+			"tailscale":        {Enabled: true, Settings: map[string]string{}},
+			"ollama":           {Enabled: true, Settings: map[string]string{"model": "llama3"}},
 		},
 	}
 
 	services := DefaultServices(cfg)
-	if len(services) != 4 {
-		t.Fatalf("expected 4 services, got %d", len(services))
+	if len(services) != 5 {
+		t.Fatalf("expected 5 services, got %d", len(services))
 	}
 
-	expectedOrder := []string{"opencode", "frontend", "tailscale", "ollama"}
+	expectedOrder := []string{"opencode", "opencode-desktop", "frontend", "tailscale", "ollama"}
 	for i, name := range expectedOrder {
 		if services[i].Name() != name {
 			t.Errorf("service[%d]: expected %q, got %q", i, name, services[i].Name())
 		}
 	}
 	// Verify ollama has a pane command for the model runner.
-	if services[3].PaneCommand() == "" {
+	if services[4].PaneCommand() == "" {
 		t.Error("ollama service should have a non-empty PaneCommand")
 	}
 }
@@ -47,10 +49,11 @@ func TestDefaultServices_FilterDisabled(t *testing.T) {
 	cfg := &StackConfig{
 		Version: 1,
 		Services: map[string]ServiceConfig{
-			"opencode":  {Enabled: true, Settings: map[string]string{}},
-			"frontend":  {Enabled: false, Settings: map[string]string{}},
-			"tailscale": {Enabled: true, Settings: map[string]string{}},
-			"ollama":    {Enabled: false, Settings: map[string]string{}},
+			"opencode":         {Enabled: true, Settings: map[string]string{}},
+			"opencode-desktop": {Enabled: false, Settings: map[string]string{}},
+			"frontend":         {Enabled: false, Settings: map[string]string{}},
+			"tailscale":        {Enabled: true, Settings: map[string]string{}},
+			"ollama":           {Enabled: false, Settings: map[string]string{}},
 		},
 	}
 
@@ -89,17 +92,18 @@ func TestDefaultServices_NilSettings(t *testing.T) {
 	cfg := &StackConfig{
 		Version: 1,
 		Services: map[string]ServiceConfig{
-			"opencode":  {Enabled: true},
-			"frontend":  {Enabled: true},
-			"tailscale": {Enabled: true},
-			"ollama":    {Enabled: true},
+			"opencode":         {Enabled: true},
+			"opencode-desktop": {Enabled: true},
+			"frontend":         {Enabled: true},
+			"tailscale":        {Enabled: true},
+			"ollama":           {Enabled: true},
 		},
 	}
 
 	// Should not panic with nil settings.
 	services := DefaultServices(cfg)
-	if len(services) != 4 {
-		t.Fatalf("expected 4 services, got %d", len(services))
+	if len(services) != 5 {
+		t.Fatalf("expected 5 services, got %d", len(services))
 	}
 }
 
@@ -118,6 +122,14 @@ func TestServiceProperties(t *testing.T) {
 			wantName:   "opencode",
 			wantWindow: "OpenCode",
 			wantCmd:    "serve --hostname 127.0.0.1 --port 4096",
+			wantEnvLen: 0,
+		},
+		{
+			name:       "opencode-desktop",
+			svc:        newOpenCodeDesktopService(DefaultConfig()),
+			wantName:   "opencode-desktop",
+			wantWindow: "OpenCodeDesktop",
+			wantCmd:    "opencode-desktop",
 			wantEnvLen: 0,
 		},
 		{
@@ -212,6 +224,18 @@ func TestFrontEndService_WorkDir(t *testing.T) {
 	}
 }
 
+func TestOpenCodeDesktopService_Settings(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Services["opencode-desktop"] = ServiceConfig{Enabled: true, Settings: map[string]string{
+		openCodeDesktopBinaryKey: "/usr/bin/opencode-desktop",
+	}}
+
+	svc := newOpenCodeDesktopService(cfg)
+	if svc.Command() != "/usr/bin/opencode-desktop" {
+		t.Fatalf("Command() = %q", svc.Command())
+	}
+}
+
 func TestFrontEndService_Env(t *testing.T) {
 	svc := newFrontEndService(DefaultConfig())
 	env := svc.Env()
@@ -256,6 +280,42 @@ func TestOpenCodeService_HealthCheck(t *testing.T) {
 			t.Fatal("expected error, got nil")
 		}
 		if !strings.Contains(err.Error(), "status 503") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+}
+
+func TestOpenCodeDesktopService_HealthCheck(t *testing.T) {
+	prevExec := commandExec
+	t.Cleanup(func() {
+		commandExec = prevExec
+	})
+
+	t.Run("process found", func(t *testing.T) {
+		commandExec = func(name string, args ...string) *exec.Cmd {
+			if name != "pgrep" {
+				t.Fatalf("command = %q, want pgrep", name)
+			}
+			return commandWithOutput("123 /usr/lib/opencode-desktop")
+		}
+
+		svc := newOpenCodeDesktopService(DefaultConfig())
+		if err := svc.HealthCheck(); err != nil {
+			t.Fatalf("HealthCheck() returned error: %v", err)
+		}
+	})
+
+	t.Run("process missing", func(t *testing.T) {
+		commandExec = func(name string, args ...string) *exec.Cmd {
+			return commandWithOutputAndExit("", 1)
+		}
+
+		svc := newOpenCodeDesktopService(DefaultConfig())
+		err := svc.HealthCheck()
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "opencode desktop process not found") {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
