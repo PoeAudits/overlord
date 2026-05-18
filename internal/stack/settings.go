@@ -54,9 +54,19 @@ func t3CodeWorkDir(cfg *StackConfig) string {
 	return stringSetting(settings, t3CodeWorkDirKey, defaultT3CodeDir)
 }
 
+// T3CodeWorkDir returns the configured T3 Code repository directory.
+func T3CodeWorkDir(cfg *StackConfig) string {
+	return expandPathOrOriginal(t3CodeWorkDir(cfg))
+}
+
 func t3CodeBaseDir(cfg *StackConfig) string {
 	settings := serviceSettings(cfg, t3CodeServiceName)
 	return stringSetting(settings, t3CodeBaseDirKey, defaultT3CodeBaseDir)
+}
+
+// T3CodeBaseDir returns the configured T3 Code state directory.
+func T3CodeBaseDir(cfg *StackConfig) string {
+	return expandPathOrOriginal(t3CodeBaseDir(cfg))
 }
 
 func t3CodeCommand(cfg *StackConfig) string {

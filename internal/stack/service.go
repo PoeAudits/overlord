@@ -231,9 +231,14 @@ func newTailscaleService(cfg *StackConfig) *tailscaleService {
 	return &tailscaleService{target: tailscaleTarget(cfg)}
 }
 
-func (s *tailscaleService) Name() string        { return "tailscale" }
-func (s *tailscaleService) WindowName() string  { return "Tailscale" }
-func (s *tailscaleService) Command() string     { return "tailscale serve --bg " + s.target }
+func (s *tailscaleService) Name() string       { return "tailscale" }
+func (s *tailscaleService) WindowName() string { return "Tailscale" }
+func (s *tailscaleService) Command() string {
+	return fmt.Sprintf(
+		"tailscale serve --bg %s; status=$?; if [ $status -eq 0 ]; then for i in 1 2 3 4 5 6 7 8 9 10; do overlord start url --remote >/dev/null 2>&1 && break; sleep 1; done; printf '\\nT3 phone pairing:\\n'; overlord start pair || printf 'Run `overlord start pair` after Tailscale Serve is ready.\\n' >&2; else exit $status; fi; exec ${SHELL:-sh}",
+		shellQuote(s.target),
+	)
+}
 func (s *tailscaleService) WorkDir() string     { return "" }
 func (s *tailscaleService) Env() []string       { return nil }
 func (s *tailscaleService) PaneCommand() string { return "" }

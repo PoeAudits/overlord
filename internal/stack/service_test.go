@@ -149,7 +149,7 @@ func TestServiceProperties(t *testing.T) {
 			svc:        newTailscaleService(DefaultConfig()),
 			wantName:   "tailscale",
 			wantWindow: "Tailscale",
-			wantCmd:    "tailscale serve --bg http://127.0.0.1:3773",
+			wantCmd:    "tailscale serve --bg 'http://127.0.0.1:3773'",
 			wantEnvLen: 0,
 		},
 		{
@@ -177,6 +177,13 @@ func TestServiceProperties(t *testing.T) {
 			} else if tt.name == "t3code" {
 				if !strings.Contains(tt.svc.Command(), tt.wantCmd) {
 					t.Errorf("Command() = %q, want substring %q", tt.svc.Command(), tt.wantCmd)
+				}
+			} else if tt.name == "tailscale" {
+				cmd := tt.svc.Command()
+				for _, want := range []string{tt.wantCmd, "T3 phone pairing", "overlord start pair", "exec ${SHELL:-sh}"} {
+					if !strings.Contains(cmd, want) {
+						t.Errorf("Command() = %q, want substring %q", cmd, want)
+					}
 				}
 			} else if tt.svc.Command() != tt.wantCmd {
 				t.Errorf("Command() = %q, want %q", tt.svc.Command(), tt.wantCmd)
