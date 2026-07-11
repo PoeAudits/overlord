@@ -234,7 +234,7 @@ process, not an ownership transfer of Alice state.
 [README](README.md) is the primary user-facing command guide and
 [AGENTS.md](AGENTS.md) is the repository execution boundary. Source and tests
 are authoritative for current behavior; this model is optional-load orientation
-and subordinate to them. The [readiness record](/home/thomas/Overlord/config/wayfinder/efforts/production-readiness/issues/assets/013-ready-overlord/readiness-record.md)
+and subordinate to them. The [readiness record](../../../config/wayfinder/efforts/production-readiness/issues/assets/013-ready-overlord/readiness-record.md)
 is historical validation evidence, not mutable runtime state.
 
 ### Future direction (not current behavior)
