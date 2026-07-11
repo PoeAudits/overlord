@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/spf13/cobra"
 
 	"github.com/PoeAudits/overlord/internal/fileutil"
@@ -69,7 +71,7 @@ var backupRmCmd = &cobra.Command{
 
 var backupListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List projects in the backup set",
+	Short: "Compare all projects against the backup set",
 	Args:  cobra.NoArgs,
 	RunE:  runBackupList,
 }
@@ -84,6 +86,16 @@ func init() {
 type backupProject struct {
 	name string
 	path string
+}
+
+type backupListProject struct {
+	name       string
+	path       string
+	category   string
+	lang       string
+	status     string
+	lastOpened string
+	backedUp   bool
 }
 
 func runBackup(cmd *cobra.Command, args []string) error {
@@ -197,15 +209,133 @@ func runBackupList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	projects, err := backupProjects(reg)
-	if err != nil {
-		return err
-	}
-	for _, project := range projects {
-		fmt.Printf("%s\t%s\n", project.name, fileutil.FormatPathWithTilde(project.path))
-	}
+	projects := backupListProjects(reg)
+	backedUp, notBackedUp := splitBackupListProjects(projects)
+
+	styles := NewStyles()
+	printBackupListSection("IN BACKUP", backedUp, styles.Success, styles)
+	printBackupListSection("NOT BACKED UP", notBackedUp, styles.StrongWarn, styles)
 
 	return nil
+}
+
+func backupListProjects(reg *registry.Registry) []backupListProject {
+	projects := make([]backupListProject, 0, len(reg.Projects))
+	for name, project := range reg.Projects {
+		projectPath, err := fileutil.ExpandProjectPath(project.Path, reg.Settings.BaseDir)
+		if err != nil {
+			projectPath = project.Path
+		}
+		projects = append(projects, backupListProject{
+			name:       name,
+			path:       projectPath,
+			category:   string(project.Category),
+			lang:       string(project.Lang),
+			status:     string(project.Status.State),
+			lastOpened: project.LastOpened,
+			backedUp:   hasBackupTag(project),
+		})
+	}
+	sortBackupListProjects(projects)
+	return projects
+}
+
+func splitBackupListProjects(projects []backupListProject) ([]backupListProject, []backupListProject) {
+	backedUp := make([]backupListProject, 0, len(projects))
+	notBackedUp := make([]backupListProject, 0, len(projects))
+	for _, project := range projects {
+		if project.backedUp {
+			backedUp = append(backedUp, project)
+		} else {
+			notBackedUp = append(notBackedUp, project)
+		}
+	}
+	return backedUp, notBackedUp
+}
+
+func sortBackupListProjects(projects []backupListProject) {
+	sort.Slice(projects, func(i, j int) bool {
+		if projects[i].status != projects[j].status {
+			return statusRank(projects[i].status) < statusRank(projects[j].status)
+		}
+		if projects[i].lastOpened != projects[j].lastOpened {
+			if projects[i].lastOpened == "" {
+				return false
+			}
+			if projects[j].lastOpened == "" {
+				return true
+			}
+			return projects[i].lastOpened > projects[j].lastOpened
+		}
+		if projects[i].category != projects[j].category {
+			return projects[i].category < projects[j].category
+		}
+		if projects[i].lang != projects[j].lang {
+			return projects[i].lang < projects[j].lang
+		}
+		return projects[i].name < projects[j].name
+	})
+}
+
+func printBackupListSection(title string, projects []backupListProject, titleStyle lipgloss.Style, styles styles) {
+	fmt.Println(titleStyle.Render(fmt.Sprintf("%s (%d)", title, len(projects))))
+	if len(projects) == 0 {
+		fmt.Println(styles.TableMuted.Render("  none"))
+		fmt.Println()
+		return
+	}
+
+	rows := backupListTableRows(projects)
+	t := table.New().
+		Border(lipgloss.HiddenBorder()).
+		StyleFunc(backupListTableStyleFunc(rows, styles)).
+		Headers("NAME", "CATEGORY", "LANG", "OPENED", "STATUS", "PATH").
+		Rows(rows...)
+	fmt.Println(t)
+	fmt.Println()
+}
+
+func backupListTableRows(projects []backupListProject) [][]string {
+	rows := make([][]string, 0, len(projects))
+	for _, project := range projects {
+		rows = append(rows, []string{
+			project.name,
+			project.category,
+			project.lang,
+			relativeTime(project.lastOpened),
+			project.status,
+			fileutil.FormatPathWithTilde(project.path),
+		})
+	}
+	return rows
+}
+
+func backupListTableStyleFunc(rows [][]string, styles styles) func(row, col int) lipgloss.Style {
+	return func(row, col int) lipgloss.Style {
+		if row == table.HeaderRow {
+			return styles.TableHeader
+		}
+		if row < 0 || row >= len(rows) {
+			return styles.TableCell
+		}
+
+		switch col {
+		case 0:
+			return styles.TableName
+		case 1:
+			return listColorStyle(styles.TableCell, rows[row][1], categoryColors, styles.TableMuted)
+		case 2:
+			return listColorStyle(styles.TableCell, rows[row][2], languageColors, styles.TableMuted)
+		case 3:
+			return styles.TableRecent
+		case 4:
+			return listStatusStyle(rows[row][4], false, styles)
+		case 5:
+			return styles.TableMuted
+		default:
+			return styles.TableCell
+		}
+	}
 }
 
 func updateBackupTags(args []string, add bool) error {

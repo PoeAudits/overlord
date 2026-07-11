@@ -149,6 +149,46 @@ func TestRunBackupCreatesTimestampedZip(t *testing.T) {
 	}
 }
 
+func TestBackupListProjectsSplitsBackupMembership(t *testing.T) {
+	reg := testRegistry(map[string]registry.Project{
+		"alpha": testProject("projects/alpha", registry.CategoryCLI, registry.LanguageGo, registry.StateActive),
+		"beta":  testProject("projects/beta", registry.CategoryWeb, registry.LanguageTypeScript, registry.StateActive),
+	})
+	alpha := reg.Projects["alpha"]
+	alpha.Tags = []string{"backup"}
+	reg.Projects["alpha"] = alpha
+
+	backedUp, notBackedUp := splitBackupListProjects(backupListProjects(reg))
+
+	if len(backedUp) != 1 || backedUp[0].name != "alpha" {
+		t.Fatalf("backedUp = %+v, want alpha", backedUp)
+	}
+	if len(notBackedUp) != 1 || notBackedUp[0].name != "beta" {
+		t.Fatalf("notBackedUp = %+v, want beta", notBackedUp)
+	}
+}
+
+func TestSortBackupListProjectsActiveRecentCategoryThenArchived(t *testing.T) {
+	projects := []backupListProject{
+		{name: "archived-recent", status: "archived", lastOpened: "2026-01-10T00:00:00Z", category: "cli", lang: "go"},
+		{name: "active-old", status: "active", lastOpened: "2026-01-01T00:00:00Z", category: "web", lang: "typescript"},
+		{name: "active-new", status: "active", lastOpened: "2026-01-09T00:00:00Z", category: "contracts", lang: "solidity"},
+		{name: "active-no-recent-a", status: "active", category: "cli", lang: "go"},
+		{name: "active-no-recent-b", status: "active", category: "web", lang: "typescript"},
+	}
+
+	sortBackupListProjects(projects)
+
+	got := make([]string, 0, len(projects))
+	for _, project := range projects {
+		got = append(got, project.name)
+	}
+	want := []string{"active-new", "active-old", "active-no-recent-a", "active-no-recent-b", "archived-recent"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("sorted projects = %v, want %v", got, want)
+	}
+}
+
 func requireGit(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
