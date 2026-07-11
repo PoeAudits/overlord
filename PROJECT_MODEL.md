@@ -50,6 +50,12 @@ The registry and tmux command runner are existing seams: registry mutation must
 flow through load/save, and external processes should stay behind the injected
 executor/adapter seams so fixture tests do not touch real state.
 
+Other active entrypoints include `init`, which initializes a Project in the
+current directory; `detect`, which reports detected Project metadata; and
+`code`, which ensures the configured stack and attaches the current directory
+to OpenCode. These are operational commands rather than coordination APIs, and
+their exact flags and side effects remain defined by CLI help and source.
+
 ## Registry contract and persistence
 
 The runtime registry source of truth is `~/.config/overlord/registry.yaml`.
