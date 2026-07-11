@@ -271,6 +271,7 @@ var categoryColors = map[string]lipgloss.Color{
 	// Core group - blue shades
 	"core-agents": colorBlue,
 	"core-tools":  colorLightBlue,
+	"core-evals":  colorPurple,
 	// Blockchain - pink/magenta
 	"contracts": colorMagenta,
 	// Web/Services group - green shades

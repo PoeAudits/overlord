@@ -19,6 +19,7 @@ func TestCategoryPath(t *testing.T) {
 		{CategoryCLI, "projects/cli/"},
 		{CategoryCoreAgents, "core/agents/"},
 		{CategoryCoreTools, "core/tools/"},
+		{CategoryCoreEvals, "core/evals/"},
 		{CategorySandbox, "sandbox/"},
 		{CategoryConfig, "config/"},
 	}
@@ -40,6 +41,7 @@ func TestCategoryIsValid(t *testing.T) {
 		{CategoryContracts, true},
 		{CategoryWeb, true},
 		{CategoryConfig, true},
+		{CategoryCoreEvals, true},
 		{Category("invalid"), false},
 		{Category(""), false},
 	}

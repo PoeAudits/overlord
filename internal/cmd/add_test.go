@@ -203,6 +203,7 @@ func TestDetectCategory(t *testing.T) {
 			{"cli", "projects/cli/my-tool", registry.CategoryCLI},
 			{"core-agents", "core/agents/my-agent", registry.CategoryCoreAgents},
 			{"core-tools", "core/tools/my-tool", registry.CategoryCoreTools},
+			{"core-evals", "core/evals/my-eval", registry.CategoryCoreEvals},
 			{"sandbox", "sandbox/experiment", registry.CategorySandbox},
 		}
 

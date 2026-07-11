@@ -20,6 +20,7 @@ const (
 	CategoryCLI        Category = "cli"
 	CategoryCoreAgents Category = "core-agents"
 	CategoryCoreTools  Category = "core-tools"
+	CategoryCoreEvals  Category = "core-evals"
 	CategorySandbox    Category = "sandbox"
 	CategoryConfig     Category = "config"
 )
@@ -34,6 +35,7 @@ var categoryPaths = map[Category]string{
 	CategoryCLI:        "projects/cli/",
 	CategoryCoreAgents: "core/agents/",
 	CategoryCoreTools:  "core/tools/",
+	CategoryCoreEvals:  "core/evals/",
 	CategorySandbox:    "sandbox/",
 	CategoryConfig:     "config/",
 }
@@ -49,6 +51,7 @@ func ValidCategories() []Category {
 		CategoryCLI,
 		CategoryCoreAgents,
 		CategoryCoreTools,
+		CategoryCoreEvals,
 		CategorySandbox,
 		CategoryConfig,
 	}

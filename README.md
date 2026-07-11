@@ -141,6 +141,7 @@ projects:
 - `cli` - Command-line tools
 - `core-agents` - Core AI agents
 - `core-tools` - Core development tools
+- `core-evals` - Core evaluation infrastructure
 - `sandbox` - Experimental projects
 
 ### Languages
