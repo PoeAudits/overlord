@@ -47,10 +47,10 @@ func StartStack(cfg *StackConfig, opts ...tmux.Option) (*StartResult, error) {
 		return nil, fmt.Errorf("checking session existence: %w", err)
 	}
 
-	services := DefaultServices(cfg)
+	services, preflightWarnings := preflightServices(cfg, DefaultServices(cfg))
 
 	if exists {
-		result := &StartResult{}
+		result := &StartResult{Warnings: preflightWarnings}
 		for _, svc := range services {
 			result.ServiceResults = append(result.ServiceResults, ServiceResult{
 				Name:        svc.Name(),
@@ -73,7 +73,7 @@ func StartStack(cfg *StackConfig, opts ...tmux.Option) (*StartResult, error) {
 		return &StartResult{}, nil
 	}
 
-	var warnings []string
+	warnings := append([]string{}, preflightWarnings...)
 	sessionCreated := false
 	cleanupOnError := func(cause error) error {
 		if !sessionCreated {
