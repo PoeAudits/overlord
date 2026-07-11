@@ -91,6 +91,10 @@ func DefaultConfig() *StackConfig {
 					openCodePortKey: strconv.Itoa(defaultOpenCodePort),
 				},
 			},
+			"speech-outbox": {
+				Enabled:  true,
+				Settings: map[string]string{},
+			},
 			"opencode-desktop": {
 				Enabled: true,
 				Settings: map[string]string{
@@ -108,6 +112,17 @@ func DefaultConfig() *StackConfig {
 				Enabled: true,
 				Settings: map[string]string{
 					tailscaleTargetKey: OpenCodeURL(nil),
+				},
+			},
+			"phoenix": {
+				Enabled: true,
+				Settings: map[string]string{
+					phoenixHostKey:      defaultPhoenixHost,
+					phoenixPortKey:      strconv.Itoa(defaultPhoenixPort),
+					phoenixCommandKey:   defaultPhoenixCommand,
+					phoenixWorkDirKey:   "",
+					phoenixDataDirKey:   defaultPhoenixDataDir,
+					phoenixHealthURLKey: fmt.Sprintf("http://%s:%d/", defaultPhoenixHost, defaultPhoenixPort),
 				},
 			},
 			"ollama": {

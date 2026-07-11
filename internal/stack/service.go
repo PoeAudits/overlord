@@ -48,9 +48,11 @@ func DefaultServices(cfg *StackConfig) []Service {
 		make func(cfg *StackConfig) Service
 	}{
 		{"opencode", func(cfg *StackConfig) Service { return newOpenCodeService(cfg) }},
+		{"speech-outbox", func(cfg *StackConfig) Service { return &speechOutboxService{} }},
 		{"opencode-desktop", func(cfg *StackConfig) Service { return newOpenCodeDesktopService(cfg) }},
 		{"frontend", func(cfg *StackConfig) Service { return newFrontEndService(cfg) }},
 		{"tailscale", func(cfg *StackConfig) Service { return newTailscaleService(cfg) }},
+		{"phoenix", func(cfg *StackConfig) Service { return newPhoenixService(cfg) }},
 		{"ollama", func(cfg *StackConfig) Service { return newOllamaService(serviceSettings(cfg, "ollama")) }},
 	}
 
@@ -122,7 +124,11 @@ func (s *openCodeDesktopService) WorkDir() string     { return "" }
 func (s *openCodeDesktopService) Env() []string       { return nil }
 func (s *openCodeDesktopService) PaneCommand() string { return "" }
 func (s *openCodeDesktopService) HealthCheck() error {
-	cmd := commandExec("pgrep", "-f", "opencode-desktop|/usr/lib/opencode-desktop")
+	pattern := "opencode-desktop|opencode-desktop-app|/usr/lib/opencode-desktop|/opt/opencode-desktop|ai.opencode.desktop"
+	if strings.Contains(s.binary, "opencode-desktop") {
+		pattern = pattern + "|" + s.binary
+	}
+	cmd := commandExec("pgrep", "-f", pattern)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("opencode desktop process not found: %w", err)
 	}
@@ -181,7 +187,12 @@ func newTailscaleService(cfg *StackConfig) *tailscaleService {
 
 func (s *tailscaleService) Name() string        { return "tailscale" }
 func (s *tailscaleService) WindowName() string  { return "Tailscale" }
-func (s *tailscaleService) Command() string     { return "tailscale serve --bg " + s.target }
+func (s *tailscaleService) Command() string {
+	return fmt.Sprintf(
+		"tailscale serve --bg %s && tailscale serve --bg --set-path=/speech-outbox http://127.0.0.1:%d",
+		s.target, speechOutboxPort,
+	)
+}
 func (s *tailscaleService) WorkDir() string     { return "" }
 func (s *tailscaleService) Env() []string       { return nil }
 func (s *tailscaleService) PaneCommand() string { return "" }
@@ -203,6 +214,63 @@ func (s *tailscaleService) serveDisplayTarget() string {
 		return s.target
 	}
 	return parsed.String()
+}
+
+// --- Phoenix service ---
+
+type phoenixService struct {
+	host      string
+	port      int
+	command   string
+	workDir   string
+	dataDir   string
+	healthURL string
+}
+
+func newPhoenixService(cfg *StackConfig) *phoenixService {
+	return &phoenixService{
+		host:      phoenixHost(cfg),
+		port:      phoenixPort(cfg),
+		command:   phoenixCommand(cfg),
+		workDir:   phoenixWorkDir(cfg),
+		dataDir:   phoenixDataDir(cfg),
+		healthURL: phoenixHealthURL(cfg),
+	}
+}
+
+func (s *phoenixService) Name() string        { return "phoenix" }
+func (s *phoenixService) WindowName() string  { return "Phoenix" }
+func (s *phoenixService) Command() string     { return s.command }
+func (s *phoenixService) WorkDir() string     { return s.workDir }
+func (s *phoenixService) PaneCommand() string { return "" }
+func (s *phoenixService) Env() []string {
+	return []string{
+		fmt.Sprintf("PHOENIX_HOST=%s", s.host),
+		fmt.Sprintf("PHOENIX_PORT=%d", s.port),
+		fmt.Sprintf("PHOENIX_WORKING_DIR=%s", s.dataDir),
+	}
+}
+func (s *phoenixService) HealthCheck() error { return httpHealthCheck(s.healthURL) }
+
+// --- Speech Outbox service ---
+
+const speechOutboxHost = "127.0.0.1"
+const speechOutboxPort = 8090
+
+type speechOutboxService struct{}
+
+func (s *speechOutboxService) Name() string       { return "speech-outbox" }
+func (s *speechOutboxService) WindowName() string { return "AliceSpeech" }
+func (s *speechOutboxService) Command() string {
+	return fmt.Sprintf("alice speech-outbox serve --host %s --port %d", speechOutboxHost, speechOutboxPort)
+}
+func (s *speechOutboxService) WorkDir() string     { return "" }
+func (s *speechOutboxService) Env() []string {
+	return []string{"PHONE_SESSION_DIRECTORY=/home/thomas/.config/alice"}
+}
+func (s *speechOutboxService) PaneCommand() string { return "" }
+func (s *speechOutboxService) HealthCheck() error {
+	return httpHealthCheck(fmt.Sprintf("http://127.0.0.1:%d/speech-outbox", speechOutboxPort))
 }
 
 // --- Ollama service ---

@@ -13,34 +13,38 @@ var (
 	_ Service = (*openCodeDesktopService)(nil)
 	_ Service = (*frontEndService)(nil)
 	_ Service = (*tailscaleService)(nil)
+	_ Service = (*speechOutboxService)(nil)
 	_ Service = (*ollamaService)(nil)
+	_ Service = (*phoenixService)(nil)
 )
 
 func TestDefaultServices_AllEnabled(t *testing.T) {
 	cfg := &StackConfig{
 		Version: 1,
 		Services: map[string]ServiceConfig{
-			"opencode":         {Enabled: true, Settings: map[string]string{}},
-			"opencode-desktop": {Enabled: true, Settings: map[string]string{}},
-			"frontend":         {Enabled: true, Settings: map[string]string{}},
-			"tailscale":        {Enabled: true, Settings: map[string]string{}},
-			"ollama":           {Enabled: true, Settings: map[string]string{"model": "llama3"}},
+			"opencode":              {Enabled: true, Settings: map[string]string{}},
+			"speech-outbox":         {Enabled: true, Settings: map[string]string{}},
+			"opencode-desktop":      {Enabled: true, Settings: map[string]string{}},
+			"frontend":              {Enabled: true, Settings: map[string]string{}},
+			"tailscale":             {Enabled: true, Settings: map[string]string{}},
+			"phoenix":               {Enabled: true, Settings: map[string]string{}},
+			"ollama":                {Enabled: true, Settings: map[string]string{"model": "llama3"}},
 		},
 	}
 
 	services := DefaultServices(cfg)
-	if len(services) != 5 {
-		t.Fatalf("expected 5 services, got %d", len(services))
+	if len(services) != 7 {
+		t.Fatalf("expected 7 services, got %d", len(services))
 	}
 
-	expectedOrder := []string{"opencode", "opencode-desktop", "frontend", "tailscale", "ollama"}
+	expectedOrder := []string{"opencode", "speech-outbox", "opencode-desktop", "frontend", "tailscale", "phoenix", "ollama"}
 	for i, name := range expectedOrder {
 		if services[i].Name() != name {
 			t.Errorf("service[%d]: expected %q, got %q", i, name, services[i].Name())
 		}
 	}
 	// Verify ollama has a pane command for the model runner.
-	if services[4].PaneCommand() == "" {
+	if services[6].PaneCommand() == "" {
 		t.Error("ollama service should have a non-empty PaneCommand")
 	}
 }
@@ -92,18 +96,20 @@ func TestDefaultServices_NilSettings(t *testing.T) {
 	cfg := &StackConfig{
 		Version: 1,
 		Services: map[string]ServiceConfig{
-			"opencode":         {Enabled: true},
-			"opencode-desktop": {Enabled: true},
-			"frontend":         {Enabled: true},
-			"tailscale":        {Enabled: true},
-			"ollama":           {Enabled: true},
+			"opencode":              {Enabled: true},
+			"speech-outbox":         {Enabled: true},
+			"opencode-desktop":      {Enabled: true},
+			"frontend":              {Enabled: true},
+			"tailscale":             {Enabled: true},
+			"phoenix":               {Enabled: true},
+			"ollama":                {Enabled: true},
 		},
 	}
 
 	// Should not panic with nil settings.
 	services := DefaultServices(cfg)
-	if len(services) != 5 {
-		t.Fatalf("expected 5 services, got %d", len(services))
+	if len(services) != 7 {
+		t.Fatalf("expected 7 services, got %d", len(services))
 	}
 }
 
@@ -123,6 +129,14 @@ func TestServiceProperties(t *testing.T) {
 			wantWindow: "OpenCode",
 			wantCmd:    "serve --hostname 127.0.0.1 --port 4096",
 			wantEnvLen: 0,
+		},
+		{
+			name:       "speech-outbox",
+			svc:        &speechOutboxService{},
+			wantName:   "speech-outbox",
+			wantWindow: "AliceSpeech",
+			wantCmd:    "alice speech-outbox serve --host 127.0.0.1 --port 8090",
+			wantEnvLen: 1,
 		},
 		{
 			name:       "opencode-desktop",
@@ -145,7 +159,7 @@ func TestServiceProperties(t *testing.T) {
 			svc:        newTailscaleService(DefaultConfig()),
 			wantName:   "tailscale",
 			wantWindow: "Tailscale",
-			wantCmd:    "tailscale serve --bg http://127.0.0.1:4096",
+			wantCmd:    "tailscale serve --bg http://127.0.0.1:4096 && tailscale serve --bg --set-path=/speech-outbox http://127.0.0.1:8090",
 			wantEnvLen: 0,
 		},
 		{
@@ -156,6 +170,15 @@ func TestServiceProperties(t *testing.T) {
 			wantCmd:    "ollama serve",
 			wantEnvLen: 0,
 		},
+		{
+			name:       "phoenix",
+			svc:        newPhoenixService(DefaultConfig()),
+			wantName:   "phoenix",
+			wantWindow: "Phoenix",
+			wantCmd:    "uv tool run --from arize-phoenix phoenix serve",
+			wantEnvLen: 3,
+		},
+
 	}
 
 	for _, tt := range tests {
@@ -182,6 +205,82 @@ func TestServiceProperties(t *testing.T) {
 				t.Errorf("Env() length = %d, want %d", len(env), tt.wantEnvLen)
 			}
 		})
+	}
+}
+
+func TestPhoenixService_DefaultSettings(t *testing.T) {
+	svc := newPhoenixService(DefaultConfig())
+
+	if svc.Name() != "phoenix" {
+		t.Fatalf("Name() = %q, want phoenix", svc.Name())
+	}
+	if svc.WindowName() != "Phoenix" {
+		t.Fatalf("WindowName() = %q, want Phoenix", svc.WindowName())
+	}
+	if svc.Command() != "uv tool run --from arize-phoenix phoenix serve" {
+		t.Fatalf("Command() = %q", svc.Command())
+	}
+	if svc.WorkDir() != "" {
+		t.Fatalf("WorkDir() = %q, want empty", svc.WorkDir())
+	}
+
+	wantEnv := []string{
+		"PHOENIX_HOST=127.0.0.1",
+		"PHOENIX_PORT=6006",
+		"PHOENIX_WORKING_DIR=/tmp/phoenix-overlord",
+	}
+	gotEnv := svc.Env()
+	if strings.Join(gotEnv, "\n") != strings.Join(wantEnv, "\n") {
+		t.Fatalf("Env() = %#v, want %#v", gotEnv, wantEnv)
+	}
+}
+
+func TestPhoenixService_OverriddenSettings(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Services["phoenix"] = ServiceConfig{Enabled: true, Settings: map[string]string{
+		"host":       "0.0.0.0",
+		"port":       "7007",
+		"command":    "phoenix serve --dev",
+		"workdir":    "/srv/phoenix",
+		"data_dir":   "/var/lib/phoenix",
+		"health_url": "http://127.0.0.1:7007/healthz",
+	}}
+
+	svc := newPhoenixService(cfg)
+	if svc.Command() != "phoenix serve --dev" {
+		t.Fatalf("Command() = %q", svc.Command())
+	}
+	if svc.WorkDir() != "/srv/phoenix" {
+		t.Fatalf("WorkDir() = %q", svc.WorkDir())
+	}
+
+	wantEnv := []string{
+		"PHOENIX_HOST=0.0.0.0",
+		"PHOENIX_PORT=7007",
+		"PHOENIX_WORKING_DIR=/var/lib/phoenix",
+	}
+	gotEnv := svc.Env()
+	if strings.Join(gotEnv, "\n") != strings.Join(wantEnv, "\n") {
+		t.Fatalf("Env() = %#v, want %#v", gotEnv, wantEnv)
+	}
+}
+
+func TestPhoenixService_HealthCheckUsesConfiguredURL(t *testing.T) {
+	server := newIPv4Server(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/phoenix-health" {
+			t.Fatalf("request path = %q, want /phoenix-health", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	cfg := DefaultConfig()
+	cfg.Services["phoenix"] = ServiceConfig{Enabled: true, Settings: map[string]string{
+		"health_url": server.URL + "/phoenix-health",
+	}}
+	svc := newPhoenixService(cfg)
+
+	if err := svc.HealthCheck(); err != nil {
+		t.Fatalf("HealthCheck() returned error: %v", err)
 	}
 }
 
@@ -291,17 +390,17 @@ func TestOpenCodeDesktopService_HealthCheck(t *testing.T) {
 		commandExec = prevExec
 	})
 
-	t.Run("process found", func(t *testing.T) {
-		commandExec = func(name string, args ...string) *exec.Cmd {
-			if name != "pgrep" {
-				t.Fatalf("command = %q, want pgrep", name)
+		t.Run("process found", func(t *testing.T) {
+			commandExec = func(name string, args ...string) *exec.Cmd {
+				if name != "pgrep" {
+					t.Fatalf("command = %q, want pgrep", name)
+				}
+				return commandWithOutput("123 /usr/lib/opencode-desktop-app")
 			}
-			return commandWithOutput("123 /usr/lib/opencode-desktop")
-		}
 
-		svc := newOpenCodeDesktopService(DefaultConfig())
-		if err := svc.HealthCheck(); err != nil {
-			t.Fatalf("HealthCheck() returned error: %v", err)
+			svc := newOpenCodeDesktopService(DefaultConfig())
+			if err := svc.HealthCheck(); err != nil {
+				t.Fatalf("HealthCheck() returned error: %v", err)
 		}
 	})
 

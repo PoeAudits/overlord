@@ -1,6 +1,9 @@
 package stack
 
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+)
 
 const (
 	openCodeHostKey          = "host"
@@ -12,12 +15,24 @@ const (
 
 	tailscaleTargetKey = "target"
 
+	phoenixHostKey      = "host"
+	phoenixPortKey      = "port"
+	phoenixCommandKey   = "command"
+	phoenixWorkDirKey   = "workdir"
+	phoenixDataDirKey   = "data_dir"
+	phoenixHealthURLKey = "health_url"
+
 	defaultOpenCodeHost          = "127.0.0.1"
 	defaultOpenCodePort          = 4096
 	defaultOpenCodeDesktopBinary = "opencode-desktop"
 
 	defaultFrontEndPort = 3001
 	defaultFrontEndDir  = "~/Overlord/sandbox/phone-code/web"
+
+	defaultPhoenixHost    = "127.0.0.1"
+	defaultPhoenixPort    = 6006
+	defaultPhoenixCommand = "uv tool run --from arize-phoenix phoenix serve"
+	defaultPhoenixDataDir = "/tmp/phoenix-overlord"
 )
 
 func openCodeHost(cfg *StackConfig) string {
@@ -48,6 +63,39 @@ func frontEndWorkDir(cfg *StackConfig) string {
 func tailscaleTarget(cfg *StackConfig) string {
 	settings := serviceSettings(cfg, "tailscale")
 	return stringSetting(settings, tailscaleTargetKey, OpenCodeURL(cfg))
+}
+
+func phoenixHost(cfg *StackConfig) string {
+	settings := serviceSettings(cfg, "phoenix")
+	return stringSetting(settings, phoenixHostKey, defaultPhoenixHost)
+}
+
+func phoenixPort(cfg *StackConfig) int {
+	settings := serviceSettings(cfg, "phoenix")
+	return intSetting(settings, phoenixPortKey, defaultPhoenixPort)
+}
+
+func phoenixCommand(cfg *StackConfig) string {
+	settings := serviceSettings(cfg, "phoenix")
+	return stringSetting(settings, phoenixCommandKey, defaultPhoenixCommand)
+}
+
+func phoenixWorkDir(cfg *StackConfig) string {
+	settings := serviceSettings(cfg, "phoenix")
+	return stringSetting(settings, phoenixWorkDirKey, "")
+}
+
+func phoenixDataDir(cfg *StackConfig) string {
+	settings := serviceSettings(cfg, "phoenix")
+	return stringSetting(settings, phoenixDataDirKey, defaultPhoenixDataDir)
+}
+
+func phoenixHealthURL(cfg *StackConfig) string {
+	settings := serviceSettings(cfg, "phoenix")
+	if url := settings[phoenixHealthURLKey]; url != "" {
+		return url
+	}
+	return fmt.Sprintf("http://%s:%d/", phoenixHost(cfg), phoenixPort(cfg))
 }
 
 func serviceSettings(cfg *StackConfig, name string) map[string]string {

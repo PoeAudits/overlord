@@ -22,11 +22,11 @@ func TestLoad_DefaultConfigWhenFileNotExist(t *testing.T) {
 	if len(config.Projects) != 0 {
 		t.Errorf("expected empty Projects, got %v", config.Projects)
 	}
-	if len(config.Services) != 5 {
-		t.Errorf("expected 5 default services, got %d", len(config.Services))
+	if len(config.Services) != 7 {
+		t.Errorf("expected 7 default services, got %d", len(config.Services))
 	}
 
-	expectedServices := []string{"opencode", "opencode-desktop", "frontend", "tailscale", "ollama"}
+	expectedServices := []string{"opencode", "speech-outbox", "opencode-desktop", "frontend", "tailscale", "phoenix", "ollama"}
 	for _, name := range expectedServices {
 		svc, ok := config.Services[name]
 		if !ok {
@@ -36,6 +36,26 @@ func TestLoad_DefaultConfigWhenFileNotExist(t *testing.T) {
 		if !svc.Enabled {
 			t.Errorf("expected service %q to be enabled", name)
 		}
+	}
+
+	phoenix := config.Services["phoenix"]
+	if phoenix.Settings["host"] != "127.0.0.1" {
+		t.Errorf("phoenix host = %q", phoenix.Settings["host"])
+	}
+	if phoenix.Settings["port"] != "6006" {
+		t.Errorf("phoenix port = %q", phoenix.Settings["port"])
+	}
+	if phoenix.Settings["command"] != "uv tool run --from arize-phoenix phoenix serve" {
+		t.Errorf("phoenix command = %q", phoenix.Settings["command"])
+	}
+	if phoenix.Settings["workdir"] != "" {
+		t.Errorf("phoenix workdir = %q", phoenix.Settings["workdir"])
+	}
+	if phoenix.Settings["data_dir"] != "/tmp/phoenix-overlord" {
+		t.Errorf("phoenix data_dir = %q", phoenix.Settings["data_dir"])
+	}
+	if phoenix.Settings["health_url"] != "http://127.0.0.1:6006/" {
+		t.Errorf("phoenix health_url = %q", phoenix.Settings["health_url"])
 	}
 }
 
