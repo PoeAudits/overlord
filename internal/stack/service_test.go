@@ -22,13 +22,13 @@ func TestDefaultServices_AllEnabled(t *testing.T) {
 	cfg := &StackConfig{
 		Version: 1,
 		Services: map[string]ServiceConfig{
-			"opencode":              {Enabled: true, Settings: map[string]string{}},
-			"speech-outbox":         {Enabled: true, Settings: map[string]string{}},
-			"opencode-desktop":      {Enabled: true, Settings: map[string]string{}},
-			"frontend":              {Enabled: true, Settings: map[string]string{}},
-			"tailscale":             {Enabled: true, Settings: map[string]string{}},
-			"phoenix":               {Enabled: true, Settings: map[string]string{}},
-			"ollama":                {Enabled: true, Settings: map[string]string{"model": "llama3"}},
+			"opencode":         {Enabled: true, Settings: map[string]string{}},
+			"speech-outbox":    {Enabled: true, Settings: map[string]string{}},
+			"opencode-desktop": {Enabled: true, Settings: map[string]string{}},
+			"frontend":         {Enabled: true, Settings: map[string]string{}},
+			"tailscale":        {Enabled: true, Settings: map[string]string{}},
+			"phoenix":          {Enabled: true, Settings: map[string]string{}},
+			"ollama":           {Enabled: true, Settings: map[string]string{"model": "llama3"}},
 		},
 	}
 
@@ -96,13 +96,13 @@ func TestDefaultServices_NilSettings(t *testing.T) {
 	cfg := &StackConfig{
 		Version: 1,
 		Services: map[string]ServiceConfig{
-			"opencode":              {Enabled: true},
-			"speech-outbox":         {Enabled: true},
-			"opencode-desktop":      {Enabled: true},
-			"frontend":              {Enabled: true},
-			"tailscale":             {Enabled: true},
-			"phoenix":               {Enabled: true},
-			"ollama":                {Enabled: true},
+			"opencode":         {Enabled: true},
+			"speech-outbox":    {Enabled: true},
+			"opencode-desktop": {Enabled: true},
+			"frontend":         {Enabled: true},
+			"tailscale":        {Enabled: true},
+			"phoenix":          {Enabled: true},
+			"ollama":           {Enabled: true},
 		},
 	}
 
@@ -132,7 +132,7 @@ func TestServiceProperties(t *testing.T) {
 		},
 		{
 			name:       "speech-outbox",
-			svc:        &speechOutboxService{},
+			svc:        newSpeechOutboxService(DefaultConfig()),
 			wantName:   "speech-outbox",
 			wantWindow: "AliceSpeech",
 			wantCmd:    "alice speech-outbox serve --host 127.0.0.1 --port 8090",
@@ -178,7 +178,6 @@ func TestServiceProperties(t *testing.T) {
 			wantCmd:    "uv tool run --from arize-phoenix phoenix serve",
 			wantEnvLen: 3,
 		},
-
 	}
 
 	for _, tt := range tests {
@@ -205,6 +204,19 @@ func TestServiceProperties(t *testing.T) {
 				t.Errorf("Env() length = %d, want %d", len(env), tt.wantEnvLen)
 			}
 		})
+	}
+}
+
+func TestSpeechOutboxService_DirectorySetting(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Services["speech-outbox"] = ServiceConfig{
+		Enabled:  true,
+		Settings: map[string]string{"directory": "/tmp/alice-test"},
+	}
+
+	svc := newSpeechOutboxService(cfg)
+	if got := svc.Env(); len(got) != 1 || got[0] != "PHONE_SESSION_DIRECTORY=/tmp/alice-test" {
+		t.Fatalf("Env() = %v, want configured speech outbox directory", got)
 	}
 }
 
@@ -390,17 +402,17 @@ func TestOpenCodeDesktopService_HealthCheck(t *testing.T) {
 		commandExec = prevExec
 	})
 
-		t.Run("process found", func(t *testing.T) {
-			commandExec = func(name string, args ...string) *exec.Cmd {
-				if name != "pgrep" {
-					t.Fatalf("command = %q, want pgrep", name)
-				}
-				return commandWithOutput("123 /usr/lib/opencode-desktop-app")
+	t.Run("process found", func(t *testing.T) {
+		commandExec = func(name string, args ...string) *exec.Cmd {
+			if name != "pgrep" {
+				t.Fatalf("command = %q, want pgrep", name)
 			}
+			return commandWithOutput("123 /usr/lib/opencode-desktop-app")
+		}
 
-			svc := newOpenCodeDesktopService(DefaultConfig())
-			if err := svc.HealthCheck(); err != nil {
-				t.Fatalf("HealthCheck() returned error: %v", err)
+		svc := newOpenCodeDesktopService(DefaultConfig())
+		if err := svc.HealthCheck(); err != nil {
+			t.Fatalf("HealthCheck() returned error: %v", err)
 		}
 	})
 

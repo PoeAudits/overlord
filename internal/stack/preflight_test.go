@@ -46,7 +46,7 @@ func TestPreflightServices_AllowsDesktopWhenUpstreamVersionsMatch(t *testing.T) 
 
 func TestPreflightServices_AllowsDesktopAppPackageName(t *testing.T) {
 	withPackageVersions(t, map[string]string{
-		"opencode-bin":        "opencode-bin 1.17.3-1",
+		"opencode-bin":         "opencode-bin 1.17.3-1",
 		"opencode-desktop-app": "opencode-desktop-app 1.17.3-4",
 	})
 

@@ -284,7 +284,7 @@ func TestRegistryValidate(t *testing.T) {
 		{
 			name: "missing base_dir",
 			registry: Registry{
-				Version: 2,
+				Version:  2,
 				Settings: Settings{},
 				Projects: map[string]Project{},
 			},
@@ -751,4 +751,3 @@ func TestRegistry_ArchivedProjects(t *testing.T) {
 		})
 	}
 }
-

@@ -134,15 +134,15 @@ func (s *Status) Validate() error {
 
 // Project represents a project entry in the registry
 type Project struct {
-	Path        string      `yaml:"path"`
-	Category    Category    `yaml:"category"`
-	Lang        Language    `yaml:"lang"`
-	Created     string      `yaml:"created"`
-	Description string      `yaml:"description"`
-	Aliases     []string    `yaml:"aliases,omitempty"`
-	Tags        []string    `yaml:"tags,omitempty"`
-	Status      Status      `yaml:"status"`
-	LastOpened  string      `yaml:"last_opened,omitempty"`
+	Path        string   `yaml:"path"`
+	Category    Category `yaml:"category"`
+	Lang        Language `yaml:"lang"`
+	Created     string   `yaml:"created"`
+	Description string   `yaml:"description"`
+	Aliases     []string `yaml:"aliases,omitempty"`
+	Tags        []string `yaml:"tags,omitempty"`
+	Status      Status   `yaml:"status"`
+	LastOpened  string   `yaml:"last_opened,omitempty"`
 }
 
 // Validate validates the project fields

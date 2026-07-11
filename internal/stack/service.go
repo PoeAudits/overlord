@@ -48,7 +48,7 @@ func DefaultServices(cfg *StackConfig) []Service {
 		make func(cfg *StackConfig) Service
 	}{
 		{"opencode", func(cfg *StackConfig) Service { return newOpenCodeService(cfg) }},
-		{"speech-outbox", func(cfg *StackConfig) Service { return &speechOutboxService{} }},
+		{"speech-outbox", func(cfg *StackConfig) Service { return newSpeechOutboxService(cfg) }},
 		{"opencode-desktop", func(cfg *StackConfig) Service { return newOpenCodeDesktopService(cfg) }},
 		{"frontend", func(cfg *StackConfig) Service { return newFrontEndService(cfg) }},
 		{"tailscale", func(cfg *StackConfig) Service { return newTailscaleService(cfg) }},
@@ -185,8 +185,8 @@ func newTailscaleService(cfg *StackConfig) *tailscaleService {
 	return &tailscaleService{target: tailscaleTarget(cfg)}
 }
 
-func (s *tailscaleService) Name() string        { return "tailscale" }
-func (s *tailscaleService) WindowName() string  { return "Tailscale" }
+func (s *tailscaleService) Name() string       { return "tailscale" }
+func (s *tailscaleService) WindowName() string { return "Tailscale" }
 func (s *tailscaleService) Command() string {
 	return fmt.Sprintf(
 		"tailscale serve --bg %s && tailscale serve --bg --set-path=/speech-outbox http://127.0.0.1:%d",
@@ -257,16 +257,22 @@ func (s *phoenixService) HealthCheck() error { return httpHealthCheck(s.healthUR
 const speechOutboxHost = "127.0.0.1"
 const speechOutboxPort = 8090
 
-type speechOutboxService struct{}
+type speechOutboxService struct {
+	directory string
+}
+
+func newSpeechOutboxService(cfg *StackConfig) *speechOutboxService {
+	return &speechOutboxService{directory: expandPathOrOriginal(speechOutboxDirectory(cfg))}
+}
 
 func (s *speechOutboxService) Name() string       { return "speech-outbox" }
 func (s *speechOutboxService) WindowName() string { return "AliceSpeech" }
 func (s *speechOutboxService) Command() string {
 	return fmt.Sprintf("alice speech-outbox serve --host %s --port %d", speechOutboxHost, speechOutboxPort)
 }
-func (s *speechOutboxService) WorkDir() string     { return "" }
+func (s *speechOutboxService) WorkDir() string { return "" }
 func (s *speechOutboxService) Env() []string {
-	return []string{"PHONE_SESSION_DIRECTORY=/home/thomas/.config/alice"}
+	return []string{"PHONE_SESSION_DIRECTORY=" + s.directory}
 }
 func (s *speechOutboxService) PaneCommand() string { return "" }
 func (s *speechOutboxService) HealthCheck() error {

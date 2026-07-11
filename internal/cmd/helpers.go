@@ -268,4 +268,3 @@ func cmdError(command, problem, suggestion string) error {
 	}
 	return fmt.Errorf("[error] %s: %s. %s", command, problem, suggestion)
 }
-

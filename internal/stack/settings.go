@@ -15,12 +15,13 @@ const (
 
 	tailscaleTargetKey = "target"
 
-	phoenixHostKey      = "host"
-	phoenixPortKey      = "port"
-	phoenixCommandKey   = "command"
-	phoenixWorkDirKey   = "workdir"
-	phoenixDataDirKey   = "data_dir"
-	phoenixHealthURLKey = "health_url"
+	phoenixHostKey           = "host"
+	phoenixPortKey           = "port"
+	phoenixCommandKey        = "command"
+	phoenixWorkDirKey        = "workdir"
+	phoenixDataDirKey        = "data_dir"
+	phoenixHealthURLKey      = "health_url"
+	speechOutboxDirectoryKey = "directory"
 
 	defaultOpenCodeHost          = "127.0.0.1"
 	defaultOpenCodePort          = 4096
@@ -29,15 +30,21 @@ const (
 	defaultFrontEndPort = 3001
 	defaultFrontEndDir  = "~/Overlord/sandbox/phone-code/web"
 
-	defaultPhoenixHost    = "127.0.0.1"
-	defaultPhoenixPort    = 6006
-	defaultPhoenixCommand = "uv tool run --from arize-phoenix phoenix serve"
-	defaultPhoenixDataDir = "/tmp/phoenix-overlord"
+	defaultPhoenixHost           = "127.0.0.1"
+	defaultPhoenixPort           = 6006
+	defaultPhoenixCommand        = "uv tool run --from arize-phoenix phoenix serve"
+	defaultPhoenixDataDir        = "/tmp/phoenix-overlord"
+	defaultSpeechOutboxDirectory = "~/.config/alice"
 )
 
 func openCodeHost(cfg *StackConfig) string {
 	settings := serviceSettings(cfg, "opencode")
 	return stringSetting(settings, openCodeHostKey, defaultOpenCodeHost)
+}
+
+func speechOutboxDirectory(cfg *StackConfig) string {
+	settings := serviceSettings(cfg, "speech-outbox")
+	return stringSetting(settings, speechOutboxDirectoryKey, defaultSpeechOutboxDirectory)
 }
 
 func openCodePort(cfg *StackConfig) int {
