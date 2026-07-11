@@ -155,6 +155,32 @@ func (s *Session) SplitWindow(windowName, command string) error {
 	return nil
 }
 
+// KillWindow terminates a named tmux window in the session.
+func (s *Session) KillWindow(windowName string) error {
+	target := s.Name + ":" + windowName
+	output, err := s.runner()("tmux", "kill-window", "-t", target)
+	if err != nil {
+		if trimmed := strings.TrimSpace(string(output)); trimmed != "" {
+			return errors.New(trimmed)
+		}
+		return err
+	}
+	return nil
+}
+
+// IsWindowNotFound reports whether err signals that tmux could not find the
+// targeted window. It matches the literal "can't find window: <name>" output
+// tmux emits when kill-window targets a missing window in an existing
+// session. Callers that want to treat a missing window as a soft failure
+// (e.g. "ensure this window exists") should consult this helper instead of
+// blanket-ignoring kill-window errors.
+func IsWindowNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "can't find window:")
+}
+
 // Kill terminates the tmux session if it exists.
 func (s *Session) Kill() error {
 	exists, err := s.Exists()

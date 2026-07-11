@@ -485,6 +485,62 @@ func TestSessionKill(t *testing.T) {
 	}
 }
 
+func TestSessionKillWindow(t *testing.T) {
+	tests := []struct {
+		name      string
+		response  fakeResponse
+		wantErr   error
+		wantCalls []execCall
+	}{
+		{
+			name:     "kills named window",
+			response: fakeResponse{err: nil},
+			wantCalls: []execCall{
+				{name: "tmux", args: []string{"kill-window", "-t", "proj:OpenCode"}},
+			},
+		},
+		{
+			name:     "surfaces tmux output on failure",
+			response: fakeResponse{output: []byte("window not found\n"), err: errors.New("exit status 1")},
+			wantErr:  errors.New("window not found"),
+			wantCalls: []execCall{
+				{name: "tmux", args: []string{"kill-window", "-t", "proj:OpenCode"}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &fakeRunner{responses: []fakeResponse{tt.response}}
+			session := tmux.NewSession("proj", "/tmp", tmux.WithRunner(fake.Run))
+
+			err := session.KillWindow("OpenCode")
+
+			if tt.wantErr == nil && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.wantErr != nil {
+				if err == nil {
+					t.Fatalf("expected error %v but got nil", tt.wantErr)
+				}
+				if err.Error() != tt.wantErr.Error() {
+					t.Fatalf("expected error %v, got %v", tt.wantErr, err)
+				}
+			}
+
+			if len(fake.calls) != len(tt.wantCalls) {
+				t.Fatalf("expected %d calls, got %d", len(tt.wantCalls), len(fake.calls))
+			}
+			for i, call := range tt.wantCalls {
+				if !call.equal(fake.calls[i]) {
+					t.Fatalf("call %d mismatch: want %#v, got %#v", i, call, fake.calls[i])
+				}
+			}
+		})
+	}
+}
+
 type execCall struct {
 	name string
 	args []string
