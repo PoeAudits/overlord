@@ -2,41 +2,85 @@
   "schema_version": "1",
   "artifact_kind": "benchmark_unified_compact",
   "vector": {
-    "complexity_avg_ccn": 0.0,
-    "complexity_warning_ratio": 0.0,
-    "complexity_avg_nloc": 0.0,
-    "duplication_percentage": 0.0,
-    "duplication_line_ratio": 0.0
+    "complexity_avg_ccn": 3.1,
+    "complexity_warning_ratio": 0.016581632653061226,
+    "complexity_avg_nloc": 13.9,
+    "duplication_percentage": 3.22,
+    "duplication_line_ratio": 0.03215350706599248
   },
-  "analyzers": {},
-  "mutation": {
-    "runs": [
-      {
-        "framework": "gremlins",
-        "language": "go",
-        "status": "successful",
-        "mutation_score": null,
-        "killed_count": null,
-        "survived_count": null,
-        "timeout_count": null,
-        "error_count": null,
-        "message": null,
+  "analyzers": {
+    "lizard": {
+      "status": "successful",
+      "message": "13 functions exceeded lizard warning thresholds; inspect the lizard stdout artifact for details",
+      "artifacts": {
+        "stdout": "/home/thomas/Overlord/core/tools/overlord/.benchmark/lizard/latest/lizard-stdout.txt",
+        "condensed_report": "/home/thomas/Overlord/core/tools/overlord/.benchmark/lizard/latest/lizard-condensed.json"
+      },
+      "summary": {
+        "total_nloc": 12752.0,
+        "avg_nloc": 13.9,
+        "avg_ccn": 3.1,
+        "avg_token": 88.9,
+        "function_count": 784.0,
+        "warning_count": 13.0,
+        "function_ratio": 0.02,
+        "nloc_ratio": 0.08,
+        "ccn_outlier_baseline": 8,
+        "ccn_outlier_score": 1957
+      }
+    },
+    "treesitter": {
+      "status": "successful",
+      "message": null,
+      "artifacts": {
+        "stdout": "/home/thomas/Overlord/core/tools/overlord/.benchmark/treesitter/latest/treesitter-stdout.txt",
+        "json_report": "/home/thomas/Overlord/core/tools/overlord/.benchmark/treesitter/latest/treesitter-index.json",
+        "condensed_report": "/home/thomas/Overlord/core/tools/overlord/.benchmark/treesitter/latest/treesitter-condensed.json"
+      },
+      "summary": {
         "summary": {
-          "artifacts": {
-            "stdout": "/home/thomas/Overlord/core/tools/overlord/.benchmark/gremlins/latest/gremlins-stdout.txt",
-            "stderr": "/home/thomas/Overlord/core/tools/overlord/.benchmark/gremlins/latest/gremlins-stderr.txt",
-            "raw_report": "/home/thomas/Overlord/core/tools/overlord/.benchmark/gremlins/latest/gremlins-report.json",
-            "condensed_report": "/home/thomas/Overlord/core/tools/overlord/.benchmark/gremlins/latest/gremlins-condensed.json"
+          "file_count": 82,
+          "language_counts": {
+            "go": 82
           },
-          "return_code": 0,
-          "command": [
-            "sh",
-            "-lc",
-            "mkdir -p /benchmark-scratch && rm -rf /benchmark-scratch/workspace && mkdir -p /benchmark-scratch/workspace && cp -a /workspace/source/. /benchmark-scratch/workspace/ && cd /benchmark-scratch/workspace && export PATH=/go/bin:/usr/local/go/bin:$PATH && /go/bin/gremlins unleash . --output /benchmark-scratch/gremlins-report.json"
-          ],
-          "test_command": "go test ./..."
+          "parse_error_count": 0,
+          "parse_error_file_count": 0,
+          "parse_status_counts": {
+            "ok": 82
+          },
+          "range_count": 2797
         }
       }
-    ]
+    },
+    "jscpd": {
+      "status": "successful",
+      "message": null,
+      "artifacts": {
+        "json_report": "/home/thomas/Overlord/core/tools/overlord/.benchmark/jscpd/latest/jscpd-report.json",
+        "html_report": "/home/thomas/Overlord/core/tools/overlord/.benchmark/jscpd/latest/html",
+        "condensed_report": "/home/thomas/Overlord/core/tools/overlord/.benchmark/jscpd/latest/jscpd-condensed.json"
+      },
+      "summary": {
+        "duplicated_lines": 496.0,
+        "total_lines": 15426.0
+      }
+    },
+    "structural_context": {
+      "status": "successful",
+      "message": "structural scope generated",
+      "artifacts": {
+        "json_report": "/home/thomas/Overlord/core/tools/overlord/.benchmark/structural_context/latest/structural-context.json"
+      },
+      "summary": {
+        "summary": {
+          "scope_count": 2797,
+          "function_fact_count": 500,
+          "duplicate_fact_count": 36,
+          "mapped_function_fact_count": 500,
+          "mapped_duplicate_fact_count": 36,
+          "unmapped_fact_count": 0
+        }
+      }
+    }
   }
 }

@@ -1,0 +1,786 @@
+{
+  "analyzer": "jscpd",
+  "file_burden": [
+    {
+      "duplicated_lines": 322,
+      "pair_count": 24,
+      "path": "workspace/target/internal/tmux/tmux_test.go"
+    },
+    {
+      "duplicated_lines": 114,
+      "pair_count": 6,
+      "path": "workspace/target/internal/registry/resolve_example_test.go"
+    },
+    {
+      "duplicated_lines": 74,
+      "pair_count": 5,
+      "path": "workspace/target/internal/stack/session_test.go"
+    },
+    {
+      "duplicated_lines": 71,
+      "pair_count": 3,
+      "path": "workspace/target/internal/registry/types_test.go"
+    },
+    {
+      "duplicated_lines": 56,
+      "pair_count": 4,
+      "path": "workspace/target/internal/cmd/start_url_test.go"
+    },
+    {
+      "duplicated_lines": 48,
+      "pair_count": 4,
+      "path": "workspace/target/internal/stack/stop_test.go"
+    },
+    {
+      "duplicated_lines": 43,
+      "pair_count": 2,
+      "path": "workspace/target/internal/cmd/add.go"
+    },
+    {
+      "duplicated_lines": 43,
+      "pair_count": 2,
+      "path": "workspace/target/internal/cmd/new.go"
+    },
+    {
+      "duplicated_lines": 34,
+      "pair_count": 2,
+      "path": "workspace/target/internal/cmd/new_workflow_test.go"
+    },
+    {
+      "duplicated_lines": 28,
+      "pair_count": 2,
+      "path": "workspace/target/internal/cmd/start_manage_test.go"
+    },
+    {
+      "duplicated_lines": 26,
+      "pair_count": 2,
+      "path": "workspace/target/internal/cmd/root_test.go"
+    },
+    {
+      "duplicated_lines": 24,
+      "pair_count": 2,
+      "path": "workspace/target/internal/cmd/add_test.go"
+    },
+    {
+      "duplicated_lines": 24,
+      "pair_count": 2,
+      "path": "workspace/target/internal/cmd/oc_test.go"
+    },
+    {
+      "duplicated_lines": 22,
+      "pair_count": 1,
+      "path": "workspace/target/internal/stack/integration_test.go"
+    },
+    {
+      "duplicated_lines": 18,
+      "pair_count": 2,
+      "path": "workspace/target/internal/fileutil/fileutil_test.go"
+    },
+    {
+      "duplicated_lines": 18,
+      "pair_count": 2,
+      "path": "workspace/target/internal/tmux/tmux.go"
+    },
+    {
+      "duplicated_lines": 14,
+      "pair_count": 2,
+      "path": "workspace/target/internal/registry/store_test.go"
+    },
+    {
+      "duplicated_lines": 14,
+      "pair_count": 2,
+      "path": "workspace/target/internal/stack/opencode_binary_test.go"
+    },
+    {
+      "duplicated_lines": 10,
+      "pair_count": 1,
+      "path": "workspace/target/internal/cmd/open.go"
+    },
+    {
+      "duplicated_lines": 10,
+      "pair_count": 1,
+      "path": "workspace/target/internal/cmd/unarchive.go"
+    },
+    {
+      "duplicated_lines": 9,
+      "pair_count": 1,
+      "path": "workspace/target/internal/templates/templates_test.go"
+    }
+  ],
+  "limits": {
+    "max_detailed_entries": 50,
+    "max_files": 25
+  },
+  "schema_version": "1",
+  "summary": {
+    "duplicate_pair_count": 36,
+    "duplicated_lines": 496.0,
+    "invalid_duplicate_pair_count": 2,
+    "percentage": 3.22,
+    "total_lines": 15426.0
+  },
+  "top_duplicate_pairs": [
+    {
+      "duplicated_lines": 32,
+      "first": {
+        "line_range": {
+          "end": 105,
+          "start": 74
+        },
+        "path": "workspace/target/internal/cmd/add.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 93,
+          "start": 66
+        },
+        "path": "workspace/target/internal/cmd/new.go"
+      }
+    },
+    {
+      "duplicated_lines": 31,
+      "first": {
+        "line_range": {
+          "end": 704,
+          "start": 674
+        },
+        "path": "workspace/target/internal/registry/types_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 625,
+          "start": 595
+        },
+        "path": "workspace/target/internal/registry/types_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 27,
+      "first": {
+        "line_range": {
+          "end": 265,
+          "start": 239
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 145,
+          "start": 119
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 22,
+      "first": {
+        "line_range": {
+          "end": 153,
+          "start": 132
+        },
+        "path": "workspace/target/internal/stack/integration_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 126,
+          "start": 104
+        },
+        "path": "workspace/target/internal/stack/session_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 20,
+      "first": {
+        "line_range": {
+          "end": 57,
+          "start": 38
+        },
+        "path": "workspace/target/internal/registry/resolve_example_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 28,
+          "start": 9
+        },
+        "path": "workspace/target/internal/registry/resolve_example_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 20,
+      "first": {
+        "line_range": {
+          "end": 126,
+          "start": 107
+        },
+        "path": "workspace/target/internal/registry/resolve_example_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 28,
+          "start": 9
+        },
+        "path": "workspace/target/internal/registry/resolve_example_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 18,
+      "first": {
+        "line_range": {
+          "end": 205,
+          "start": 188
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 145,
+          "start": 128
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 18,
+      "first": {
+        "line_range": {
+          "end": 488,
+          "start": 471
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 145,
+          "start": 128
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 17,
+      "first": {
+        "line_range": {
+          "end": 105,
+          "start": 89
+        },
+        "path": "workspace/target/internal/cmd/new_workflow_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 32,
+          "start": 16
+        },
+        "path": "workspace/target/internal/cmd/new_workflow_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 17,
+      "first": {
+        "line_range": {
+          "end": 83,
+          "start": 67
+        },
+        "path": "workspace/target/internal/registry/resolve_example_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 25,
+          "start": 9
+        },
+        "path": "workspace/target/internal/registry/resolve_example_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 16,
+      "first": {
+        "line_range": {
+          "end": 89,
+          "start": 74
+        },
+        "path": "workspace/target/internal/cmd/start_url_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 58,
+          "start": 43
+        },
+        "path": "workspace/target/internal/cmd/start_url_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 16,
+      "first": {
+        "line_range": {
+          "end": 175,
+          "start": 160
+        },
+        "path": "workspace/target/internal/stack/session_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 119,
+          "start": 104
+        },
+        "path": "workspace/target/internal/stack/session_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 15,
+      "first": {
+        "line_range": {
+          "end": 320,
+          "start": 306
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 145,
+          "start": 131
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 15,
+      "first": {
+        "line_range": {
+          "end": 407,
+          "start": 393
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 193,
+          "start": 119
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 14,
+      "first": {
+        "line_range": {
+          "end": 102,
+          "start": 89
+        },
+        "path": "workspace/target/internal/cmd/start_manage_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 40,
+          "start": 28
+        },
+        "path": "workspace/target/internal/cmd/start_manage_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 13,
+      "first": {
+        "line_range": {
+          "end": 57,
+          "start": 45
+        },
+        "path": "workspace/target/internal/cmd/root_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 23,
+          "start": 11
+        },
+        "path": "workspace/target/internal/cmd/root_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 13,
+      "first": {
+        "line_range": {
+          "end": 49,
+          "start": 37
+        },
+        "path": "workspace/target/internal/stack/stop_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 25,
+          "start": 12
+        },
+        "path": "workspace/target/internal/stack/stop_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 12,
+      "first": {
+        "line_range": {
+          "end": 146,
+          "start": 135
+        },
+        "path": "workspace/target/internal/cmd/add_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 133,
+          "start": 122
+        },
+        "path": "workspace/target/internal/cmd/add_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 12,
+      "first": {
+        "line_range": {
+          "end": 170,
+          "start": 159
+        },
+        "path": "workspace/target/internal/cmd/oc_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 121,
+          "start": 110
+        },
+        "path": "workspace/target/internal/cmd/oc_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 12,
+      "first": {
+        "line_range": {
+          "end": 69,
+          "start": 58
+        },
+        "path": "workspace/target/internal/cmd/start_url_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 38,
+          "start": 27
+        },
+        "path": "workspace/target/internal/cmd/start_url_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 12,
+      "first": {
+        "line_range": {
+          "end": 299,
+          "start": 288
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 119,
+          "start": 108
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 12,
+      "first": {
+        "line_range": {
+          "end": 462,
+          "start": 451
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 119,
+          "start": 108
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 11,
+      "first": {
+        "line_range": {
+          "end": 371,
+          "start": 361
+        },
+        "path": "workspace/target/internal/cmd/add.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 405,
+          "start": 395
+        },
+        "path": "workspace/target/internal/cmd/new.go"
+      }
+    },
+    {
+      "duplicated_lines": 11,
+      "first": {
+        "line_range": {
+          "end": 130,
+          "start": 120
+        },
+        "path": "workspace/target/internal/stack/stop_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 22,
+          "start": 12
+        },
+        "path": "workspace/target/internal/stack/stop_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 11,
+      "first": {
+        "line_range": {
+          "end": 179,
+          "start": 169
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 119,
+          "start": 109
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 10,
+      "first": {
+        "line_range": {
+          "end": 103,
+          "start": 94
+        },
+        "path": "workspace/target/internal/cmd/open.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 48,
+          "start": 39
+        },
+        "path": "workspace/target/internal/cmd/unarchive.go"
+      }
+    },
+    {
+      "duplicated_lines": 10,
+      "first": {
+        "line_range": {
+          "end": 135,
+          "start": 126
+        },
+        "path": "workspace/target/internal/stack/session_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 96,
+          "start": 87
+        },
+        "path": "workspace/target/internal/stack/session_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 10,
+      "first": {
+        "line_range": {
+          "end": 188,
+          "start": 179
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 128,
+          "start": 119
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 9,
+      "first": {
+        "line_range": {
+          "end": 309,
+          "start": 301
+        },
+        "path": "workspace/target/internal/fileutil/fileutil_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 269,
+          "start": 261
+        },
+        "path": "workspace/target/internal/fileutil/fileutil_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 9,
+      "first": {
+        "line_range": {
+          "end": 73,
+          "start": 65
+        },
+        "path": "workspace/target/internal/registry/types_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 27,
+          "start": 19
+        },
+        "path": "workspace/target/internal/templates/templates_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 9,
+      "first": {
+        "line_range": {
+          "end": 89,
+          "start": 81
+        },
+        "path": "workspace/target/internal/tmux/tmux.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 70,
+          "start": 62
+        },
+        "path": "workspace/target/internal/tmux/tmux.go"
+      }
+    },
+    {
+      "duplicated_lines": 8,
+      "first": {
+        "line_range": {
+          "end": 160,
+          "start": 153
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 88,
+          "start": 81
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 8,
+      "first": {
+        "line_range": {
+          "end": 439,
+          "start": 432
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 220,
+          "start": 213
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 7,
+      "first": {
+        "line_range": {
+          "end": 203,
+          "start": 197
+        },
+        "path": "workspace/target/internal/registry/store_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 166,
+          "start": 160
+        },
+        "path": "workspace/target/internal/registry/store_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 7,
+      "first": {
+        "line_range": {
+          "end": 63,
+          "start": 57
+        },
+        "path": "workspace/target/internal/stack/opencode_binary_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 31,
+          "start": 25
+        },
+        "path": "workspace/target/internal/stack/opencode_binary_test.go"
+      }
+    },
+    {
+      "duplicated_lines": 7,
+      "first": {
+        "line_range": {
+          "end": 111,
+          "start": 105
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      },
+      "second": {
+        "line_range": {
+          "end": 91,
+          "start": 85
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "action": "excluded_from_condensed_hotspots",
+      "analyzer": "jscpd",
+      "duplicate_index": 5,
+      "duplicated_lines": 12,
+      "first": {
+        "line_range": {
+          "end": 239,
+          "start": 228
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      },
+      "invalid_sides": [
+        "second"
+      ],
+      "reason": "invalid_line_range",
+      "second": {
+        "line_range": {
+          "end": 119,
+          "start": 168
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      }
+    },
+    {
+      "action": "excluded_from_condensed_hotspots",
+      "analyzer": "jscpd",
+      "duplicate_index": 9,
+      "duplicated_lines": 11,
+      "first": {
+        "line_range": {
+          "end": 387,
+          "start": 377
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      },
+      "invalid_sides": [
+        "second"
+      ],
+      "reason": "invalid_line_range",
+      "second": {
+        "line_range": {
+          "end": 119,
+          "start": 169
+        },
+        "path": "workspace/target/internal/tmux/tmux_test.go"
+      }
+    }
+  ]
+}

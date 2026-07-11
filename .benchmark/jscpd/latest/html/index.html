@@ -1,0 +1,505 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Copy/Paste Detector Report</title><link href="styles/tailwind.css" rel="stylesheet"><link href="styles/prism.css" rel="stylesheet"></head><body class="bg-gray-100"><header class="bg-white shadow py-4"><div class="container mx-auto px-4"><h1 class="text-3xl font-semibold text-gray-800">jscpd - copy/paste report</h1></div></header><main class="container mx-auto my-8 p-4 bg-white shadow rounded"><section class="mb-8" id="dashboard"><h2 class="text-2xl font-semibold text-gray-700 mb-4">Dashboard</h2><div class="grid grid-cols-4 gap-4"><div class="bg-blue-200 p-4 rounded text-center"><h3 class="text-lg font-semibold text-blue-800 mb-2">Total Files</h3><span class="text-4xl font-bold text-blue-800">82</span></div><div class="bg-green-200 p-4 rounded text-center"><h3 class="text-lg font-semibold text-green-800 mb-2">Total Lines of Code</h3><span class="text-4xl font-bold text-green-800">15426</span></div><div class="bg-yellow-200 p-4 rounded text-center"><h3 class="text-lg font-semibold text-yellow-800 mb-2">Number of Clones</h3><span class="text-4xl font-bold text-yellow-800">38</span></div><div class="bg-red-200 p-4 rounded text-center"><h3 class="text-lg font-semibold text-red-800 mb-2">Duplicated Lines</h3><span class="text-4xl font-bold text-red-800">496 (3.22%)</span></div></div></section><section class="mb-8" id="formats"><h2 class="text-2xl font-semibold text-gray-700 mb-4">Formats with Duplications</h2><table class="w-full table-auto"><thead><tr class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal"><th class="py-3 px-6 text-left">Format</th><th class="py-3 px-6 text-left">Files</th><th class="py-3 px-6 text-left">Lines</th><th class="py-3 px-6 text-left">Clones</th><th class="py-3 px-6 text-left">Duplicated Lines</th><th class="py-3 px-6 text-left">Duplicated Tokens</th></tr></thead><tbody><tr class="bg-white border-b border-gray-200 text-gray-800 text-sm"><td class="py-3 px-6"><a class="text-blue-600 hover:underline" href="#go-clones">go</a></td><td class="py-3 px-6">82</td><td class="py-3 px-6">15426</td><td class="py-3 px-6">38</td><td class="py-3 px-6">496</td><td class="py-3 px-6">4744</td></tr></tbody></table></section><section class="mb-8" id="txt-clones"><a name="go-clones"></a><h2 class="text-2xl font-semibold text-gray-700 mb-4">go</h2><div class="divide-y divide-gray-200 border-b-2"><div class="py-4"><p class="text-gray-600">workspace/target/internal/tmux/tmux_test.go (Line 105:2 - Line 111:2), workspace/target/internal/tmux/tmux_test.go (Line 85:2 - Line 91:2)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn0" onclick="toggleCodeBlock('cloneGroup0', 'expandBtn0', 'collapseBtn0')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn0" onclick="toggleCodeBlock('cloneGroup0', 'expandBtn0', 'collapseBtn0')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup0"><code class="language-go text-sm text-gray-800">,
+			wantCalls: []execCall{
+				{name: &quot;tmux&quot;, args: []string{&quot;has-session&quot;, &quot;-t&quot;, &quot;proj&quot;}},
+				{name: &quot;tmux&quot;, args: []string{&quot;new-session&quot;, &quot;-d&quot;, &quot;-s&quot;, &quot;proj&quot;, &quot;-n&quot;, &quot;base&quot;, &quot;-c&quot;, &quot;/tmp&quot;}},
+			},
+		},
+	}</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/tmux/tmux_test.go (Line 153:48 - Line 160:9), workspace/target/internal/tmux/tmux_test.go (Line 81:31 - Line 88:7)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn1" onclick="toggleCodeBlock('cloneGroup1', 'expandBtn1', 'collapseBtn1')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn1" onclick="toggleCodeBlock('cloneGroup1', 'expandBtn1', 'collapseBtn1')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup1"><code class="language-go text-sm text-gray-800">,
+			responses: []fakeResponse{
+				{err: &amp;fakeExitError{code: 1, msg: &quot;missing&quot;}},
+				{err: nil},
+			},
+			wantCalls: []execCall{
+				{name: &quot;tmux&quot;, args: []string{&quot;has-session&quot;, &quot;-t&quot;, &quot;proj&quot;}},
+				{name: &quot;tmux&quot;, args: []string{&quot;new-session&quot;, &quot;-d&quot;, &quot;-s&quot;, &quot;proj&quot;, &quot;-n&quot;, &quot;server&quot;</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/tmux/tmux_test.go (Line 169:2 - Line 179:18), workspace/target/internal/tmux/tmux_test.go (Line 109:4 - Line 119:7)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn2" onclick="toggleCodeBlock('cloneGroup2', 'expandBtn2', 'collapseBtn2')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn2" onclick="toggleCodeBlock('cloneGroup2', 'expandBtn2', 'collapseBtn2')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup2"><code class="language-go text-sm text-gray-800">},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &amp;fakeRunner{responses: append([]fakeResponse(nil), tt.responses...)}
+			session := tmux.NewSession(&quot;proj&quot;, &quot;/tmp&quot;, tmux.WithRunner(fake.Run))
+
+			err := session.CreateWithCommand</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/tmux/tmux_test.go (Line 179:12 - Line 188:2), workspace/target/internal/tmux/tmux_test.go (Line 119:2 - Line 128:3)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn3" onclick="toggleCodeBlock('cloneGroup3', 'expandBtn3', 'collapseBtn3')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn3" onclick="toggleCodeBlock('cloneGroup3', 'expandBtn3', 'collapseBtn3')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup3"><code class="language-go text-sm text-gray-800">)
+
+			if tt.wantErr == nil &amp;&amp; err != nil {
+				t.Fatalf(&quot;unexpected error: %v&quot;, err)
+			}
+			if tt.wantErr != nil {
+				if err == nil {
+					t.Fatalf(&quot;expected error %v but got nil&quot;, tt.wantErr)
+				}
+				if !errors.Is(err, tt.wantErr) {</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/tmux/tmux_test.go (Line 188:8 - Line 205:21), workspace/target/internal/tmux/tmux_test.go (Line 128:2 - Line 145:29)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn4" onclick="toggleCodeBlock('cloneGroup4', 'expandBtn4', 'collapseBtn4')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn4" onclick="toggleCodeBlock('cloneGroup4', 'expandBtn4', 'collapseBtn4')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup4"><code class="language-go text-sm text-gray-800">) {
+					t.Fatalf(&quot;expected error %v, got %v&quot;, tt.wantErr, err)
+				}
+			}
+
+			if len(fake.calls) != len(tt.wantCalls) {
+				t.Fatalf(&quot;expected %d calls, got %d&quot;, len(tt.wantCalls), len(fake.calls))
+			}
+			for i, call := range tt.wantCalls {
+				if !call.equal(fake.calls[i]) {
+					t.Fatalf(&quot;call %d mismatch: want %#v, got %#v&quot;, i, call, fake.calls[i])
+				}
+			}
+		})
+	}
+}
+
+func TestSessionNewWindow</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/tmux/tmux_test.go (Line 228:19 - Line 239:10), workspace/target/internal/tmux/tmux_test.go (Line 168:17 - Line 119:7)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn5" onclick="toggleCodeBlock('cloneGroup5', 'expandBtn5', 'collapseBtn5')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn5" onclick="toggleCodeBlock('cloneGroup5', 'expandBtn5', 'collapseBtn5')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup5"><code class="language-go text-sm text-gray-800">,
+			wantCalls: []execCall{{name: &quot;tmux&quot;, args: []string{&quot;has-session&quot;, &quot;-t&quot;, &quot;proj&quot;}}},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &amp;fakeRunner{responses: append([]fakeResponse(nil), tt.responses...)}
+			session := tmux.NewSession(&quot;proj&quot;, &quot;/tmp&quot;, tmux.WithRunner(fake.Run))
+
+			err := session.NewWindow</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/tmux/tmux_test.go (Line 239:14 - Line 265:23), workspace/target/internal/tmux/tmux_test.go (Line 119:2 - Line 145:29)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn6" onclick="toggleCodeBlock('cloneGroup6', 'expandBtn6', 'collapseBtn6')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn6" onclick="toggleCodeBlock('cloneGroup6', 'expandBtn6', 'collapseBtn6')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup6"><code class="language-go text-sm text-gray-800">)
+
+			if tt.wantErr == nil &amp;&amp; err != nil {
+				t.Fatalf(&quot;unexpected error: %v&quot;, err)
+			}
+			if tt.wantErr != nil {
+				if err == nil {
+					t.Fatalf(&quot;expected error %v but got nil&quot;, tt.wantErr)
+				}
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf(&quot;expected error %v, got %v&quot;, tt.wantErr, err)
+				}
+			}
+
+			if len(fake.calls) != len(tt.wantCalls) {
+				t.Fatalf(&quot;expected %d calls, got %d&quot;, len(tt.wantCalls), len(fake.calls))
+			}
+			for i, call := range tt.wantCalls {
+				if !call.equal(fake.calls[i]) {
+					t.Fatalf(&quot;call %d mismatch: want %#v, got %#v&quot;, i, call, fake.calls[i])
+				}
+			}
+		})
+	}
+}
+
+func TestSessionSplitWindow</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/tmux/tmux_test.go (Line 288:24 - Line 299:12), workspace/target/internal/tmux/tmux_test.go (Line 108:7 - Line 119:7)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn7" onclick="toggleCodeBlock('cloneGroup7', 'expandBtn7', 'collapseBtn7')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn7" onclick="toggleCodeBlock('cloneGroup7', 'expandBtn7', 'collapseBtn7')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup7"><code class="language-go text-sm text-gray-800">}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &amp;fakeRunner{responses: append([]fakeResponse(nil), tt.responses...)}
+			session := tmux.NewSession(&quot;proj&quot;, &quot;/tmp&quot;, tmux.WithRunner(fake.Run))
+
+			err := session.SplitWindow</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/tmux/tmux_test.go (Line 306:4 - Line 320:23), workspace/target/internal/tmux/tmux_test.go (Line 131:4 - Line 145:29)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn8" onclick="toggleCodeBlock('cloneGroup8', 'expandBtn8', 'collapseBtn8')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn8" onclick="toggleCodeBlock('cloneGroup8', 'expandBtn8', 'collapseBtn8')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup8"><code class="language-go text-sm text-gray-800">}
+
+			if len(fake.calls) != len(tt.wantCalls) {
+				t.Fatalf(&quot;expected %d calls, got %d&quot;, len(tt.wantCalls), len(fake.calls))
+			}
+			for i, call := range tt.wantCalls {
+				if !call.equal(fake.calls[i]) {
+					t.Fatalf(&quot;call %d mismatch: want %#v, got %#v&quot;, i, call, fake.calls[i])
+				}
+			}
+		})
+	}
+}
+
+func TestSessionSourceLocal</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/tmux/tmux_test.go (Line 377:7 - Line 387:3), workspace/target/internal/tmux/tmux_test.go (Line 169:2 - Line 119:4)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn9" onclick="toggleCodeBlock('cloneGroup9', 'expandBtn9', 'collapseBtn9')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn9" onclick="toggleCodeBlock('cloneGroup9', 'expandBtn9', 'collapseBtn9')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup9"><code class="language-go text-sm text-gray-800">}},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &amp;fakeRunner{responses: append([]fakeResponse(nil), tt.responses...)}
+			session := tmux.NewSession(&quot;proj&quot;, &quot;/tmp&quot;, tmux.WithRunner(fake.Run))
+
+			if</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/tmux/tmux_test.go (Line 393:15 - Line 407:2), workspace/target/internal/tmux/tmux_test.go (Line 119:7 - Line 193:4)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn10" onclick="toggleCodeBlock('cloneGroup10', 'expandBtn10', 'collapseBtn10')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn10" onclick="toggleCodeBlock('cloneGroup10', 'expandBtn10', 'collapseBtn10')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup10"><code class="language-go text-sm text-gray-800">()
+
+			if tt.wantErr == nil &amp;&amp; err != nil {
+				t.Fatalf(&quot;unexpected error: %v&quot;, err)
+			}
+			if tt.wantErr != nil {
+				if err == nil {
+					t.Fatalf(&quot;expected error %v but got nil&quot;, tt.wantErr)
+				}
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf(&quot;expected error %v, got %v&quot;, tt.wantErr, err)
+				}
+			}
+
+			if len(fake.calls) != 1</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/tmux/tmux_test.go (Line 432:25 - Line 439:15), workspace/target/internal/tmux/tmux_test.go (Line 213:38 - Line 220:13)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn11" onclick="toggleCodeBlock('cloneGroup11', 'expandBtn11', 'collapseBtn11')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn11" onclick="toggleCodeBlock('cloneGroup11', 'expandBtn11', 'collapseBtn11')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup11"><code class="language-go text-sm text-gray-800">,
+			responses: []fakeResponse{
+				{err: nil},
+				{err: nil},
+			},
+			wantCalls: []execCall{
+				{name: &quot;tmux&quot;, args: []string{&quot;has-session&quot;, &quot;-t&quot;, &quot;proj&quot;}},
+				{name: &quot;tmux&quot;, args: []string{&quot;kill-session&quot;</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/tmux/tmux_test.go (Line 451:7 - Line 462:5), workspace/target/internal/tmux/tmux_test.go (Line 108:7 - Line 119:7)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn12" onclick="toggleCodeBlock('cloneGroup12', 'expandBtn12', 'collapseBtn12')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn12" onclick="toggleCodeBlock('cloneGroup12', 'expandBtn12', 'collapseBtn12')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup12"><code class="language-go text-sm text-gray-800">}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &amp;fakeRunner{responses: append([]fakeResponse(nil), tt.responses...)}
+			session := tmux.NewSession(&quot;proj&quot;, &quot;/tmp&quot;, tmux.WithRunner(fake.Run))
+
+			err := session.Kill</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/tmux/tmux_test.go (Line 471:2 - Line 488:5), workspace/target/internal/tmux/tmux_test.go (Line 128:2 - Line 145:5)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn13" onclick="toggleCodeBlock('cloneGroup13', 'expandBtn13', 'collapseBtn13')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn13" onclick="toggleCodeBlock('cloneGroup13', 'expandBtn13', 'collapseBtn13')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup13"><code class="language-go text-sm text-gray-800">err.Error() != tt.wantErr.Error() {
+					t.Fatalf(&quot;expected error %v, got %v&quot;, tt.wantErr, err)
+				}
+			}
+
+			if len(fake.calls) != len(tt.wantCalls) {
+				t.Fatalf(&quot;expected %d calls, got %d&quot;, len(tt.wantCalls), len(fake.calls))
+			}
+			for i, call := range tt.wantCalls {
+				if !call.equal(fake.calls[i]) {
+					t.Fatalf(&quot;call %d mismatch: want %#v, got %#v&quot;, i, call, fake.calls[i])
+				}
+			}
+		})
+	}
+}
+
+type</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/tmux/tmux.go (Line 81:7 - Line 89:11), workspace/target/internal/tmux/tmux.go (Line 62:2 - Line 70:7)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn14" onclick="toggleCodeBlock('cloneGroup14', 'expandBtn14', 'collapseBtn14')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn14" onclick="toggleCodeBlock('cloneGroup14', 'expandBtn14', 'collapseBtn14')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup14"><code class="language-go text-sm text-gray-800">) error {
+	exists, err := s.Exists()
+	if err != nil {
+		return err
+	}
+	if exists {
+		return fmt.Errorf(&quot;tmux session %q: %w&quot;, s.Name, ErrSessionExists)
+	}
+	output, err := s.runner()(&quot;tmux&quot;, &quot;new-session&quot;, &quot;-d&quot;, &quot;-s&quot;, s.Name, &quot;-n&quot;, windowName</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/stack/stop_test.go (Line 37:27 - Line 49:4), workspace/target/internal/stack/stop_test.go (Line 12:24 - Line 25:7)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn15" onclick="toggleCodeBlock('cloneGroup15', 'expandBtn15', 'collapseBtn15')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn15" onclick="toggleCodeBlock('cloneGroup15', 'expandBtn15', 'collapseBtn15')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup15"><code class="language-go text-sm text-gray-800">(t *testing.T) {
+	prevLookPath := commandLookPath
+	prevExec := commandExec
+	t.Cleanup(func() {
+		commandLookPath = prevLookPath
+		commandExec = prevExec
+	})
+	commandLookPath = func(file string) (string, error) { return &quot;/usr/bin/&quot; + file, nil }
+	commandExec = func(name string, args ...string) *exec.Cmd {
+		return exec.Command(&quot;sh&quot;, &quot;-c&quot;, &quot;exit 0&quot;)
+	}
+
+	var</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/stack/stop_test.go (Line 120:43 - Line 130:25), workspace/target/internal/stack/stop_test.go (Line 12:24 - Line 22:5)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn16" onclick="toggleCodeBlock('cloneGroup16', 'expandBtn16', 'collapseBtn16')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn16" onclick="toggleCodeBlock('cloneGroup16', 'expandBtn16', 'collapseBtn16')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup16"><code class="language-go text-sm text-gray-800">(t *testing.T) {
+	prevLookPath := commandLookPath
+	prevExec := commandExec
+	t.Cleanup(func() {
+		commandLookPath = prevLookPath
+		commandExec = prevExec
+	})
+
+	commandLookPath = func(file string) (string, error) { return &quot;/usr/bin/&quot; + file, nil }
+	commandExec = func(name string, args ...string) *exec.Cmd {
+		return commandWithOutputAndExit</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/stack/session_test.go (Line 126:7 - Line 135:14), workspace/target/internal/stack/session_test.go (Line 87:2 - Line 96:14)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn17" onclick="toggleCodeBlock('cloneGroup17', 'expandBtn17', 'collapseBtn17')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn17" onclick="toggleCodeBlock('cloneGroup17', 'expandBtn17', 'collapseBtn17')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup17"><code class="language-go text-sm text-gray-800">))
+	if err != nil {
+		t.Fatalf(&quot;unexpected error: %v&quot;, err)
+	}
+
+	if len(result.ServiceResults) != 2 {
+		t.Fatalf(&quot;expected 2 service results, got %d&quot;, len(result.ServiceResults))
+	}
+	for _, sr := range result.ServiceResults {
+		if sr.Status != StatusStarted</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/stack/session_test.go (Line 160:2 - Line 175:5), workspace/target/internal/stack/session_test.go (Line 104:2 - Line 119:2)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn18" onclick="toggleCodeBlock('cloneGroup18', 'expandBtn18', 'collapseBtn18')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn18" onclick="toggleCodeBlock('cloneGroup18', 'expandBtn18', 'collapseBtn18')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup18"><code class="language-go text-sm text-gray-800">var commands []string
+	sessionCreated := false
+	runner := mockRunner(func(name string, args ...string) ([]byte, error) {
+		cmd := name + &quot; &quot; + strings.Join(args, &quot; &quot;)
+		commands = append(commands, cmd)
+		if name == &quot;tmux&quot; &amp;&amp; len(args) &gt; 0 {
+			switch args[0] {
+			case &quot;has-session&quot;:
+				if !sessionCreated {
+					return nil, &amp;exitError{code: 1}
+				}
+				return nil, nil
+			case &quot;new-session&quot;:
+				sessionCreated = true
+				return nil, nil
+			case</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/stack/opencode_binary_test.go (Line 57:7 - Line 63:11), workspace/target/internal/stack/opencode_binary_test.go (Line 25:10 - Line 31:7)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn19" onclick="toggleCodeBlock('cloneGroup19', 'expandBtn19', 'collapseBtn19')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn19" onclick="toggleCodeBlock('cloneGroup19', 'expandBtn19', 'collapseBtn19')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup19"><code class="language-go text-sm text-gray-800">, []byte(&quot;#!/bin/sh\nexit 0\n&quot;), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	prevPath := os.Getenv(&quot;PATH&quot;)
+	t.Cleanup(func() { _ = os.Setenv(&quot;PATH&quot;, prevPath) })
+	if err := os.Setenv(&quot;PATH&quot;, wrapperDir</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/stack/integration_test.go (Line 132:2 - Line 153:64), workspace/target/internal/stack/session_test.go (Line 104:2 - Line 126:7)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn20" onclick="toggleCodeBlock('cloneGroup20', 'expandBtn20', 'collapseBtn20')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn20" onclick="toggleCodeBlock('cloneGroup20', 'expandBtn20', 'collapseBtn20')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup20"><code class="language-go text-sm text-gray-800">var commands []string
+	sessionCreated := false
+	runner := mockRunner(func(name string, args ...string) ([]byte, error) {
+		cmd := name + &quot; &quot; + strings.Join(args, &quot; &quot;)
+		commands = append(commands, cmd)
+		if name == &quot;tmux&quot; &amp;&amp; len(args) &gt; 0 {
+			switch args[0] {
+			case &quot;has-session&quot;:
+				if !sessionCreated {
+					return nil, &amp;exitError{code: 1}
+				}
+				return nil, nil
+			case &quot;new-session&quot;:
+				sessionCreated = true
+				return nil, nil
+			}
+		}
+		return nil, nil
+	})
+
+	cfg := enabledConfig(&quot;opencode&quot;, &quot;frontend&quot;)
+	// No projects set — cfg.Projects is nil/empty by construction.</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/registry/types_test.go (Line 65:2 - Line 73:35), workspace/target/internal/templates/templates_test.go (Line 19:2 - Line 27:39)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn21" onclick="toggleCodeBlock('cloneGroup21', 'expandBtn21', 'collapseBtn21')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn21" onclick="toggleCodeBlock('cloneGroup21', 'expandBtn21', 'collapseBtn21')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup21"><code class="language-go text-sm text-gray-800">LanguageBase, true},
+		{Language(&quot;invalid&quot;), false},
+		{Language(&quot;&quot;), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.lang), func(t *testing.T) {
+			if got := tt.lang.IsValid(); got != tt.valid {
+				t.Errorf(&quot;Language.IsValid() = %v, want %v&quot;</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/registry/types_test.go (Line 674:30 - Line 704:33), workspace/target/internal/registry/types_test.go (Line 595:28 - Line 625:31)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn22" onclick="toggleCodeBlock('cloneGroup22', 'expandBtn22', 'collapseBtn22')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn22" onclick="toggleCodeBlock('cloneGroup22', 'expandBtn22', 'collapseBtn22')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup22"><code class="language-go text-sm text-gray-800">(t *testing.T) {
+	active := Project{
+		Path:        &quot;/home/user/active&quot;,
+		Category:    CategoryCLI,
+		Lang:        LanguageGo,
+		Created:     &quot;2026-01-01&quot;,
+		Description: &quot;Active project&quot;,
+		Status:      Status{State: StateActive},
+	}
+	archived := Project{
+		Path:        &quot;/home/user/archived&quot;,
+		Category:    CategoryWeb,
+		Lang:        LanguageTypeScript,
+		Created:     &quot;2026-01-02&quot;,
+		Description: &quot;Archived project&quot;,
+		Status:      Status{State: StateArchived},
+	}
+
+	tests := []struct {
+		name         string
+		projects     map[string]Project
+		wantNames    []string
+		wantNotNames []string
+	}{
+		{
+			name:      &quot;empty registry returns empty map&quot;,
+			projects:  map[string]Project{},
+			wantNames: []string{},
+		},
+		{
+			name: &quot;all archived projects returned&quot;</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/registry/store_test.go (Line 197:2 - Line 203:52), workspace/target/internal/registry/store_test.go (Line 160:2 - Line 166:32)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn23" onclick="toggleCodeBlock('cloneGroup23', 'expandBtn23', 'collapseBtn23')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn23" onclick="toggleCodeBlock('cloneGroup23', 'expandBtn23', 'collapseBtn23')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup23"><code class="language-go text-sm text-gray-800">if err := Save(registryPath, registry); err != nil {
+		t.Fatalf(&quot;Save() error = %v, want nil&quot;, err)
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(registryPath); errors.Is(err, fs.ErrNotExist) {
+		t.Fatal(&quot;registry file was not created in nested directory&quot;</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/registry/resolve_example_test.go (Line 38:35 - Line 57:5), workspace/target/internal/registry/resolve_example_test.go (Line 9:34 - Line 28:11)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn24" onclick="toggleCodeBlock('cloneGroup24', 'expandBtn24', 'collapseBtn24')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn24" onclick="toggleCodeBlock('cloneGroup24', 'expandBtn24', 'collapseBtn24')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup24"><code class="language-go text-sm text-gray-800">() {
+	reg := &amp;registry.Registry{
+		Version: 2,
+		Settings: registry.Settings{
+			BaseDir: &quot;/home/user/projects&quot;,
+		},
+		Projects: map[string]registry.Project{
+			&quot;overlord&quot;: {
+				Path:        &quot;core/tools/overlord&quot;,
+				Category:    registry.CategoryCoreTools,
+				Lang:        registry.LanguageGo,
+				Created:     &quot;2024-01-15&quot;,
+				Description: &quot;Project management CLI tool&quot;,
+				Aliases:     []string{&quot;ov&quot;, &quot;ol&quot;},
+				Status:      registry.Status{State: registry.StateActive},
+			},
+		},
+	}
+
+	results := reg.Resolve(&quot;ov&quot;</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/registry/resolve_example_test.go (Line 67:30 - Line 83:16), workspace/target/internal/registry/resolve_example_test.go (Line 9:34 - Line 25:2)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn25" onclick="toggleCodeBlock('cloneGroup25', 'expandBtn25', 'collapseBtn25')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn25" onclick="toggleCodeBlock('cloneGroup25', 'expandBtn25', 'collapseBtn25')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup25"><code class="language-go text-sm text-gray-800">() {
+	reg := &amp;registry.Registry{
+		Version: 2,
+		Settings: registry.Settings{
+			BaseDir: &quot;/home/user/projects&quot;,
+		},
+		Projects: map[string]registry.Project{
+			&quot;overlord&quot;: {
+				Path:        &quot;core/tools/overlord&quot;,
+				Category:    registry.CategoryCoreTools,
+				Lang:        registry.LanguageGo,
+				Created:     &quot;2024-01-15&quot;,
+				Description: &quot;Project management CLI tool&quot;,
+				Aliases:     []string{&quot;ov&quot;, &quot;ol&quot;},
+				Status:      registry.Status{State: registry.StateActive},
+			},
+			&quot;web-dashboard&quot;</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/registry/resolve_example_test.go (Line 107:35 - Line 126:7), workspace/target/internal/registry/resolve_example_test.go (Line 9:34 - Line 28:8)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn26" onclick="toggleCodeBlock('cloneGroup26', 'expandBtn26', 'collapseBtn26')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn26" onclick="toggleCodeBlock('cloneGroup26', 'expandBtn26', 'collapseBtn26')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup26"><code class="language-go text-sm text-gray-800">() {
+	reg := &amp;registry.Registry{
+		Version: 2,
+		Settings: registry.Settings{
+			BaseDir: &quot;/home/user/projects&quot;,
+		},
+		Projects: map[string]registry.Project{
+			&quot;overlord&quot;: {
+				Path:        &quot;core/tools/overlord&quot;,
+				Category:    registry.CategoryCoreTools,
+				Lang:        registry.LanguageGo,
+				Created:     &quot;2024-01-15&quot;,
+				Description: &quot;Project management CLI tool&quot;,
+				Aliases:     []string{&quot;ov&quot;, &quot;ol&quot;},
+				Status:      registry.Status{State: registry.StateActive},
+			},
+		},
+	}
+
+	result</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/fileutil/fileutil_test.go (Line 301:15 - Line 309:62), workspace/target/internal/fileutil/fileutil_test.go (Line 261:8 - Line 269:47)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn27" onclick="toggleCodeBlock('cloneGroup27', 'expandBtn27', 'collapseBtn27')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn27" onclick="toggleCodeBlock('cloneGroup27', 'expandBtn27', 'collapseBtn27')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup27"><code class="language-go text-sm text-gray-800">)
+
+		if err := MoveDirectory(srcDir, dstDir); err != nil {
+			t.Fatalf(&quot;MoveDirectory failed: %v&quot;, err)
+		}
+
+		assertFileExists(t, filepath.Join(dstDir, &quot;data&quot;, &quot;file.txt&quot;))
+		if _, err := os.Stat(srcDir); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf(&quot;expected source to be removed after fallback, stat err = %v&quot;</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/cmd/start_url_test.go (Line 58:34 - Line 69:36), workspace/target/internal/cmd/start_url_test.go (Line 27:4 - Line 38:24)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn28" onclick="toggleCodeBlock('cloneGroup28', 'expandBtn28', 'collapseBtn28')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn28" onclick="toggleCodeBlock('cloneGroup28', 'expandBtn28', 'collapseBtn28')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup28"><code class="language-go text-sm text-gray-800">, nil
+	}
+
+	var stdout bytes.Buffer
+	cmd := &amp;cobra.Command{}
+	cmd.SetOut(&amp;stdout)
+
+	if err := runStartURL(cmd, nil); err != nil {
+		t.Fatalf(&quot;runStartURL() returned error: %v&quot;, err)
+	}
+
+	if got := stdout.String(); got != &quot;https://opencode.tailnet.ts.net\n&quot;</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/cmd/start_url_test.go (Line 74:57 - Line 89:3), workspace/target/internal/cmd/start_url_test.go (Line 43:32 - Line 58:34)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn29" onclick="toggleCodeBlock('cloneGroup29', 'expandBtn29', 'collapseBtn29')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn29" onclick="toggleCodeBlock('cloneGroup29', 'expandBtn29', 'collapseBtn29')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup29"><code class="language-go text-sm text-gray-800">(t *testing.T) {
+	origLoadStackConfig := startURLLoadStackConfig
+	origRemoteOpenCodeURL := startURLRemoteOpenCodeURL
+	origRemote := startURLRemote
+	t.Cleanup(func() {
+		startURLLoadStackConfig = origLoadStackConfig
+		startURLRemoteOpenCodeURL = origRemoteOpenCodeURL
+		startURLRemote = origRemote
+	})
+
+	startURLRemote = true
+	startURLLoadStackConfig = func() (*stack.StackConfig, error) {
+		return stack.DefaultConfig(), nil
+	}
+	startURLRemoteOpenCodeURL = func(*stack.StackConfig) (string, error) {
+		return &quot;&quot;</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/cmd/start_manage_test.go (Line 89:8 - Line 102:4), workspace/target/internal/cmd/start_manage_test.go (Line 28:8 - Line 40:24)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn30" onclick="toggleCodeBlock('cloneGroup30', 'expandBtn30', 'collapseBtn30')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn30" onclick="toggleCodeBlock('cloneGroup30', 'expandBtn30', 'collapseBtn30')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup30"><code class="language-go text-sm text-gray-800">},
+			Services: map[string]stack.ServiceConfig{},
+		}, nil
+	}
+	startManageSaveStackConfig = func(cfg *stack.StackConfig) error {
+		saved = &amp;stack.StackConfig{
+			Version:  cfg.Version,
+			Projects: append([]string(nil), cfg.Projects...),
+			Services: cfg.Services,
+		}
+		return nil
+	}
+
+	var</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/cmd/root_test.go (Line 45:40 - Line 57:7), workspace/target/internal/cmd/root_test.go (Line 11:35 - Line 23:3)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn31" onclick="toggleCodeBlock('cloneGroup31', 'expandBtn31', 'collapseBtn31')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn31" onclick="toggleCodeBlock('cloneGroup31', 'expandBtn31', 'collapseBtn31')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup31"><code class="language-go text-sm text-gray-800">(t *testing.T) {
+	origRunList := rootRunList
+	origRunOpen := rootRunOpen
+	t.Cleanup(func() {
+		rootRunList = origRunList
+		rootRunOpen = origRunOpen
+	})
+
+	listCalled := false
+	openCalled := false
+	rootRunList = func(cmd *cobra.Command, args []string) error {
+		listCalled = true
+		return</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/cmd/open.go (Line 94:12 - Line 103:9), workspace/target/internal/cmd/unarchive.go (Line 39:20 - Line 48:11)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn32" onclick="toggleCodeBlock('cloneGroup32', 'expandBtn32', 'collapseBtn32')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn32" onclick="toggleCodeBlock('cloneGroup32', 'expandBtn32', 'collapseBtn32')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup32"><code class="language-go text-sm text-gray-800">) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC, tea.KeyEsc:
+			m.cancelled = true
+			return m, tea.Quit
+
+		case tea.KeyEnter:
+			if len(m.filtered</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/cmd/oc_test.go (Line 159:45 - Line 170:9), workspace/target/internal/cmd/oc_test.go (Line 110:41 - Line 121:6)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn33" onclick="toggleCodeBlock('cloneGroup33', 'expandBtn33', 'collapseBtn33')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn33" onclick="toggleCodeBlock('cloneGroup33', 'expandBtn33', 'collapseBtn33')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup33"><code class="language-go text-sm text-gray-800">(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv(&quot;HOME&quot;, home)
+
+	path, err := ocShimPath()
+	if err != nil {
+		t.Fatalf(&quot;ocShimPath() returned error: %v&quot;, err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf(&quot;MkdirAll() returned error: %v&quot;, err)
+	}
+	original</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/cmd/new_workflow_test.go (Line 89:49 - Line 105:12), workspace/target/internal/cmd/new_workflow_test.go (Line 16:40 - Line 32:17)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn34" onclick="toggleCodeBlock('cloneGroup34', 'expandBtn34', 'collapseBtn34')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn34" onclick="toggleCodeBlock('cloneGroup34', 'expandBtn34', 'collapseBtn34')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup34"><code class="language-go text-sm text-gray-800">(t *testing.T) {
+	origOpts := newOpts
+	origLoadRegistry := newLoadRegistry
+	origSaveRegistry := newSaveRegistry
+	t.Cleanup(func() {
+		newOpts = origOpts
+		newLoadRegistry = origLoadRegistry
+		newSaveRegistry = origSaveRegistry
+		*lifecycle.DefaultBus = *lifecycle.NewBus()
+	})
+
+	baseDir := t.TempDir()
+	reg := testRegistry(map[string]registry.Project{})
+	reg.Settings.BaseDir = baseDir
+
+	newOpts = newFlags{
+		category: string(registry.CategoryCLI</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/cmd/add_test.go (Line 135:8 - Line 146:21), workspace/target/internal/cmd/add_test.go (Line 122:12 - Line 133:39)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn35" onclick="toggleCodeBlock('cloneGroup35', 'expandBtn35', 'collapseBtn35')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn35" onclick="toggleCodeBlock('cloneGroup35', 'expandBtn35', 'collapseBtn35')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup35"><code class="language-go text-sm text-gray-800">), 0o644)
+
+		lang, err := detectLanguage(dir)
+		if err != nil {
+			t.Fatalf(&quot;unexpected error: %v&quot;, err)
+		}
+		if lang != registry.LanguagePython {
+			t.Errorf(&quot;lang = %q, want %q&quot;, lang, registry.LanguagePython)
+		}
+	})
+
+	t.Run(&quot;detects TypeScript&quot;</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/cmd/add.go (Line 74:15 - Line 105:67), workspace/target/internal/cmd/new.go (Line 66:15 - Line 93:48)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn36" onclick="toggleCodeBlock('cloneGroup36', 'expandBtn36', 'collapseBtn36')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn36" onclick="toggleCodeBlock('cloneGroup36', 'expandBtn36', 'collapseBtn36')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup36"><code class="language-go text-sm text-gray-800">() string {
+	validCats := make([]string, 0, len(registry.ValidCategories()))
+	for _, c := range registry.ValidCategories() {
+		validCats = append(validCats, string(c))
+	}
+
+	return fmt.Sprintf(`Usage: overlord add [path] [options]
+       overlord add &lt;name&gt; &lt;path&gt;   (legacy two-argument form)
+
+The project name is derived from the directory name by default.
+
+Categories (auto-detected from path, or use --category):
+  %s
+
+Language flags (auto-detected, or specify one):
+  --py    Python
+  --ts    TypeScript
+  --go    Go
+  --sol   Solidity
+  --base  Language-agnostic
+
+Options:
+  --name=&quot;...&quot;          Override auto-detected project name
+  --description=&quot;...&quot;   Project description
+  --alias=&lt;name&gt;        Add alias (can be repeated)
+  --category=&lt;cat&gt;      Override auto-detected category
+
+Examples:
+  overlord add                          # Add current directory
+  overlord add .                        # Same as above
+  overlord add --name=custom --py       # Custom name, Python
+  overlord add ../my-lib --sol          # Relative path, Solidity`</code></pre></div><div class="py-4"><p class="text-gray-600">workspace/target/internal/cmd/add.go (Line 361:4 - Line 371:13), workspace/target/internal/cmd/new.go (Line 395:8 - Line 405:16)</p><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2" id="expandBtn37" onclick="toggleCodeBlock('cloneGroup37', 'expandBtn37', 'collapseBtn37')">Show code</button><button class="bg-gray-500 text-white px-1 py-0.5 text-xs rounded focus:outline-none ml-2 hidden" id="collapseBtn37" onclick="toggleCodeBlock('cloneGroup37', 'expandBtn37', 'collapseBtn37')">Hide code</button><pre class="bg-gray-100 border border-gray-200 p-4 rounded mt-2 hidden" id="cloneGroup37"><code class="language-go text-sm text-gray-800">.aliases,
+		Tags:        []string{},
+		Status:      registry.Status{State: registry.StateActive},
+	}
+
+	if ctx.reg.Projects == nil {
+		ctx.reg.Projects = make(map[string]registry.Project)
+	}
+	ctx.reg.Projects[ctx.name] = project
+
+	if err := saveRegistry</code></pre></div><!-- Add more clone groups for .txt format as needed         // Add more clone groups for .txt format as needed--></div></section><!-- Add more sections for other formats and clone groups as needed--></main><footer class="bg-white shadow mt-8 py-4"><div class="container mx-auto px-4 text-center"><p class="text-sm text-gray-600">This report is generated by jscpd, an open-source copy/paste detector.</p><p class="text-sm text-gray-600">jscpd is licensed under the MIT License.</p><a class="text-blue-500 text-sm" href="https://github.com/kucherenko/jscpd" target="_blank" rel="noopener noreferrer">View jscpd on GitHub</a></div></footer><script src="js/prism.js"></script><script>function toggleCodeBlock(codeBlockId, expandBtnId, collapseBtnId) {
+  const codeBlock = document.getElementById(codeBlockId);
+  const expandBtn = document.getElementById(expandBtnId);
+  const collapseBtn = document.getElementById(collapseBtnId);
+
+  codeBlock.classList.toggle('hidden');
+  expandBtn.classList.toggle('hidden');
+  collapseBtn.classList.toggle('hidden');
+}</script></body></html>

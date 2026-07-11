@@ -1,0 +1,2389 @@
+{
+  "statistics": {
+    "detectionDate": "2026-05-29T17:40:45.129Z",
+    "formats": {
+      "go": {
+        "sources": {
+          "/workspace/target/internal/tmux/tmux_test.go": {
+            "lines": 534,
+            "tokens": 5247,
+            "sources": 1,
+            "clones": 28,
+            "duplicatedLines": 340,
+            "duplicatedTokens": 3628,
+            "percentage": 63.67,
+            "percentageTokens": 69.14,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/tmux/tmux.go": {
+            "lines": 226,
+            "tokens": 2090,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 16,
+            "duplicatedTokens": 202,
+            "percentage": 7.08,
+            "percentageTokens": 9.67,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/templates/templates_test.go": {
+            "lines": 372,
+            "tokens": 2808,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 8,
+            "duplicatedTokens": 107,
+            "percentage": 2.15,
+            "percentageTokens": 3.81,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/templates/templates.go": {
+            "lines": 198,
+            "tokens": 1378,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/templates/example_test.go": {
+            "lines": 65,
+            "tokens": 367,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/test_helpers_test.go": {
+            "lines": 50,
+            "tokens": 392,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/store_test.go": {
+            "lines": 172,
+            "tokens": 1555,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/store.go": {
+            "lines": 118,
+            "tokens": 867,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/stop_test.go": {
+            "lines": 145,
+            "tokens": 1303,
+            "sources": 1,
+            "clones": 4,
+            "duplicatedLines": 44,
+            "duplicatedTokens": 502,
+            "percentage": 30.34,
+            "percentageTokens": 38.53,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/stop.go": {
+            "lines": 45,
+            "tokens": 373,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/settings.go": {
+            "lines": 81,
+            "tokens": 647,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/session_test.go": {
+            "lines": 256,
+            "tokens": 2222,
+            "sources": 1,
+            "clones": 5,
+            "duplicatedLines": 69,
+            "duplicatedTokens": 742,
+            "percentage": 26.95,
+            "percentageTokens": 33.39,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/session.go": {
+            "lines": 158,
+            "tokens": 1231,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/service_test.go": {
+            "lines": 370,
+            "tokens": 3505,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/service.go": {
+            "lines": 235,
+            "tokens": 2183,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/opencode_binary_test.go": {
+            "lines": 70,
+            "tokens": 797,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 12,
+            "duplicatedTokens": 178,
+            "percentage": 17.14,
+            "percentageTokens": 22.33,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/opencode_binary.go": {
+            "lines": 70,
+            "tokens": 483,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/integration_test.go": {
+            "lines": 219,
+            "tokens": 1912,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 21,
+            "duplicatedTokens": 208,
+            "percentage": 9.59,
+            "percentageTokens": 10.88,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/endpoints_test.go": {
+            "lines": 89,
+            "tokens": 702,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/endpoints.go": {
+            "lines": 68,
+            "tokens": 521,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/config.go": {
+            "lines": 16,
+            "tokens": 84,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/stack/command.go": {
+            "lines": 5,
+            "tokens": 28,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/registry/types_test.go": {
+            "lines": 750,
+            "tokens": 5624,
+            "sources": 1,
+            "clones": 3,
+            "duplicatedLines": 68,
+            "duplicatedTokens": 543,
+            "percentage": 9.07,
+            "percentageTokens": 9.66,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/registry/types.go": {
+            "lines": 312,
+            "tokens": 2232,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/registry/store_test.go": {
+            "lines": 447,
+            "tokens": 3271,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 12,
+            "duplicatedTokens": 156,
+            "percentage": 2.68,
+            "percentageTokens": 4.77,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/registry/store.go": {
+            "lines": 145,
+            "tokens": 1083,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/registry/resolve_test.go": {
+            "lines": 461,
+            "tokens": 3550,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/registry/resolve_example_test.go": {
+            "lines": 197,
+            "tokens": 1409,
+            "sources": 1,
+            "clones": 6,
+            "duplicatedLines": 108,
+            "duplicatedTokens": 876,
+            "percentage": 54.82,
+            "percentageTokens": 62.17,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/registry/resolve.go": {
+            "lines": 146,
+            "tokens": 1174,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/registry/example_test.go": {
+            "lines": 56,
+            "tokens": 369,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/lifecycle/events_test.go": {
+            "lines": 127,
+            "tokens": 1187,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/lifecycle/events.go": {
+            "lines": 58,
+            "tokens": 308,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/lifecycle/bus_test.go": {
+            "lines": 265,
+            "tokens": 2407,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/lifecycle/bus.go": {
+            "lines": 81,
+            "tokens": 643,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/fileutil/fileutil_test.go": {
+            "lines": 423,
+            "tokens": 4047,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 16,
+            "duplicatedTokens": 200,
+            "percentage": 3.78,
+            "percentageTokens": 4.94,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/fileutil/fileutil.go": {
+            "lines": 228,
+            "tokens": 1874,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/unarchive.go": {
+            "lines": 329,
+            "tokens": 2644,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 9,
+            "duplicatedTokens": 104,
+            "percentage": 2.74,
+            "percentageTokens": 3.93,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/test_helpers_test.go": {
+            "lines": 26,
+            "tokens": 196,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/styles.go": {
+            "lines": 101,
+            "tokens": 966,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/start_url_test.go": {
+            "lines": 102,
+            "tokens": 811,
+            "sources": 1,
+            "clones": 4,
+            "duplicatedLines": 52,
+            "duplicatedTokens": 466,
+            "percentage": 50.98,
+            "percentageTokens": 57.46,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/start_url.go": {
+            "lines": 46,
+            "tokens": 309,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/start_test.go": {
+            "lines": 72,
+            "tokens": 523,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/start_stop.go": {
+            "lines": 59,
+            "tokens": 492,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/start_status_test.go": {
+            "lines": 62,
+            "tokens": 491,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/start_status.go": {
+            "lines": 119,
+            "tokens": 1127,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/start_manage_test.go": {
+            "lines": 122,
+            "tokens": 1089,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 26,
+            "duplicatedTokens": 218,
+            "percentage": 21.31,
+            "percentageTokens": 20.02,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/start_manage.go": {
+            "lines": 195,
+            "tokens": 1687,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/start_alias_test.go": {
+            "lines": 15,
+            "tokens": 127,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/start.go": {
+            "lines": 164,
+            "tokens": 1300,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/setup.go": {
+            "lines": 337,
+            "tokens": 824,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/root_test.go": {
+            "lines": 104,
+            "tokens": 846,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 24,
+            "duplicatedTokens": 206,
+            "percentage": 23.08,
+            "percentageTokens": 24.35,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/root.go": {
+            "lines": 191,
+            "tokens": 865,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/rm_workflow_test.go": {
+            "lines": 118,
+            "tokens": 1070,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/rm.go": {
+            "lines": 177,
+            "tokens": 1340,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/path_test.go": {
+            "lines": 108,
+            "tokens": 1024,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/path.go": {
+            "lines": 77,
+            "tokens": 557,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/open_workflow_test.go": {
+            "lines": 156,
+            "tokens": 1535,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/open_test.go": {
+            "lines": 133,
+            "tokens": 1020,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/open.go": {
+            "lines": 639,
+            "tokens": 5436,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 9,
+            "duplicatedTokens": 104,
+            "percentage": 1.41,
+            "percentageTokens": 1.91,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/oc_test.go": {
+            "lines": 192,
+            "tokens": 1693,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 22,
+            "duplicatedTokens": 236,
+            "percentage": 11.46,
+            "percentageTokens": 13.94,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/oc_shim.go": {
+            "lines": 119,
+            "tokens": 976,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/oc.go": {
+            "lines": 66,
+            "tokens": 491,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/new_workflow_test.go": {
+            "lines": 127,
+            "tokens": 1181,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 32,
+            "duplicatedTokens": 282,
+            "percentage": 25.2,
+            "percentageTokens": 23.88,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/new_test.go": {
+            "lines": 97,
+            "tokens": 1057,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/new.go": {
+            "lines": 461,
+            "tokens": 3444,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 41,
+            "duplicatedTokens": 177,
+            "percentage": 8.89,
+            "percentageTokens": 5.14,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/list_test.go": {
+            "lines": 199,
+            "tokens": 1537,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/list.go": {
+            "lines": 475,
+            "tokens": 3688,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/init.go": {
+            "lines": 182,
+            "tokens": 1261,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/info_test.go": {
+            "lines": 81,
+            "tokens": 716,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/info.go": {
+            "lines": 140,
+            "tokens": 1159,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/helpers.go": {
+            "lines": 269,
+            "tokens": 2277,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/detect.go": {
+            "lines": 204,
+            "tokens": 1575,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/constants.go": {
+            "lines": 23,
+            "tokens": 85,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/config.go": {
+            "lines": 73,
+            "tokens": 452,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/clear.go": {
+            "lines": 165,
+            "tokens": 1068,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/backup_test.go": {
+            "lines": 174,
+            "tokens": 1673,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/backup.go": {
+            "lines": 585,
+            "tokens": 5016,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/archive_workflow_test.go": {
+            "lines": 68,
+            "tokens": 657,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/archive.go": {
+            "lines": 231,
+            "tokens": 1750,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/add_test.go": {
+            "lines": 342,
+            "tokens": 3369,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 22,
+            "duplicatedTokens": 176,
+            "percentage": 6.43,
+            "percentageTokens": 5.22,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/internal/cmd/add.go": {
+            "lines": 433,
+            "tokens": 3221,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 41,
+            "duplicatedTokens": 177,
+            "percentage": 9.47,
+            "percentageTokens": 5.5,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/workspace/target/cmd/overlord/main.go": {
+            "lines": 10,
+            "tokens": 39,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 15426,
+          "tokens": 124537,
+          "sources": 82,
+          "clones": 38,
+          "duplicatedLines": 496,
+          "duplicatedTokens": 4744,
+          "percentage": 3.22,
+          "percentageTokens": 3.81,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      }
+    },
+    "total": {
+      "lines": 15426,
+      "tokens": 124537,
+      "sources": 82,
+      "clones": 38,
+      "duplicatedLines": 496,
+      "duplicatedTokens": 4744,
+      "percentage": 3.22,
+      "percentageTokens": 3.81,
+      "newDuplicatedLines": 0,
+      "newClones": 0
+    }
+  },
+  "duplicates": [
+    {
+      "format": "go",
+      "lines": 7,
+      "fragment": ",\n\t\t\twantCalls: []execCall{\n\t\t\t\t{name: \"tmux\", args: []string{\"has-session\", \"-t\", \"proj\"}},\n\t\t\t\t{name: \"tmux\", args: []string{\"new-session\", \"-d\", \"-s\", \"proj\", \"-n\", \"base\", \"-c\", \"/tmp\"}},\n\t\t\t},\n\t\t},\n\t}",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 105,
+        "end": 111,
+        "startLoc": {
+          "line": 105,
+          "column": 2,
+          "position": 879
+        },
+        "endLoc": {
+          "line": 111,
+          "column": 2,
+          "position": 966
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 85,
+        "end": 91,
+        "startLoc": {
+          "line": 85,
+          "column": 2,
+          "position": 645
+        },
+        "endLoc": {
+          "line": 91,
+          "column": 2,
+          "position": 732
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 8,
+      "fragment": ",\n\t\t\tresponses: []fakeResponse{\n\t\t\t\t{err: &fakeExitError{code: 1, msg: \"missing\"}},\n\t\t\t\t{err: nil},\n\t\t\t},\n\t\t\twantCalls: []execCall{\n\t\t\t\t{name: \"tmux\", args: []string{\"has-session\", \"-t\", \"proj\"}},\n\t\t\t\t{name: \"tmux\", args: []string{\"new-session\", \"-d\", \"-s\", \"proj\", \"-n\", \"server\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 153,
+        "end": 160,
+        "startLoc": {
+          "line": 153,
+          "column": 48,
+          "position": 1397
+        },
+        "endLoc": {
+          "line": 160,
+          "column": 9,
+          "position": 1508
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 81,
+        "end": 88,
+        "startLoc": {
+          "line": 81,
+          "column": 31,
+          "position": 601
+        },
+        "endLoc": {
+          "line": 88,
+          "column": 7,
+          "position": 712
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 11,
+      "fragment": "},\n\t\t},\n\t}\n\n\tfor _, tt := range tests {\n\t\ttt := tt\n\t\tt.Run(tt.name, func(t *testing.T) {\n\t\t\tfake := &fakeRunner{responses: append([]fakeResponse(nil), tt.responses...)}\n\t\t\tsession := tmux.NewSession(\"proj\", \"/tmp\", tmux.WithRunner(fake.Run))\n\n\t\t\terr := session.CreateWithCommand",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 169,
+        "end": 179,
+        "startLoc": {
+          "line": 169,
+          "column": 2,
+          "position": 1602
+        },
+        "endLoc": {
+          "line": 179,
+          "column": 18,
+          "position": 1719
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 109,
+        "end": 119,
+        "startLoc": {
+          "line": 109,
+          "column": 4,
+          "position": 958
+        },
+        "endLoc": {
+          "line": 119,
+          "column": 7,
+          "position": 1075
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 10,
+      "fragment": ")\n\n\t\t\tif tt.wantErr == nil && err != nil {\n\t\t\t\tt.Fatalf(\"unexpected error: %v\", err)\n\t\t\t}\n\t\t\tif tt.wantErr != nil {\n\t\t\t\tif err == nil {\n\t\t\t\t\tt.Fatalf(\"expected error %v but got nil\", tt.wantErr)\n\t\t\t\t}\n\t\t\t\tif !errors.Is(err, tt.wantErr) {",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 179,
+        "end": 188,
+        "startLoc": {
+          "line": 179,
+          "column": 12,
+          "position": 1725
+        },
+        "endLoc": {
+          "line": 188,
+          "column": 2,
+          "position": 1819
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 119,
+        "end": 128,
+        "startLoc": {
+          "line": 119,
+          "column": 2,
+          "position": 1077
+        },
+        "endLoc": {
+          "line": 128,
+          "column": 3,
+          "position": 1171
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 18,
+      "fragment": ") {\n\t\t\t\t\tt.Fatalf(\"expected error %v, got %v\", tt.wantErr, err)\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tif len(fake.calls) != len(tt.wantCalls) {\n\t\t\t\tt.Fatalf(\"expected %d calls, got %d\", len(tt.wantCalls), len(fake.calls))\n\t\t\t}\n\t\t\tfor i, call := range tt.wantCalls {\n\t\t\t\tif !call.equal(fake.calls[i]) {\n\t\t\t\t\tt.Fatalf(\"call %d mismatch: want %#v, got %#v\", i, call, fake.calls[i])\n\t\t\t\t}\n\t\t\t}\n\t\t})\n\t}\n}\n\nfunc TestSessionNewWindow",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 188,
+        "end": 205,
+        "startLoc": {
+          "line": 188,
+          "column": 8,
+          "position": 1817
+        },
+        "endLoc": {
+          "line": 205,
+          "column": 21,
+          "position": 1968
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 128,
+        "end": 145,
+        "startLoc": {
+          "line": 128,
+          "column": 2,
+          "position": 1187
+        },
+        "endLoc": {
+          "line": 145,
+          "column": 29,
+          "position": 1338
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 12,
+      "fragment": ",\n\t\t\twantCalls: []execCall{{name: \"tmux\", args: []string{\"has-session\", \"-t\", \"proj\"}}},\n\t\t},\n\t}\n\n\tfor _, tt := range tests {\n\t\ttt := tt\n\t\tt.Run(tt.name, func(t *testing.T) {\n\t\t\tfake := &fakeRunner{responses: append([]fakeResponse(nil), tt.responses...)}\n\t\t\tsession := tmux.NewSession(\"proj\", \"/tmp\", tmux.WithRunner(fake.Run))\n\n\t\t\terr := session.NewWindow",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 228,
+        "end": 239,
+        "startLoc": {
+          "line": 228,
+          "column": 19,
+          "position": 2196
+        },
+        "endLoc": {
+          "line": 239,
+          "column": 10,
+          "position": 2346
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 168,
+        "end": 119,
+        "startLoc": {
+          "line": 168,
+          "column": 17,
+          "position": 1569
+        },
+        "endLoc": {
+          "line": 119,
+          "column": 7,
+          "position": 1075
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 27,
+      "fragment": ")\n\n\t\t\tif tt.wantErr == nil && err != nil {\n\t\t\t\tt.Fatalf(\"unexpected error: %v\", err)\n\t\t\t}\n\t\t\tif tt.wantErr != nil {\n\t\t\t\tif err == nil {\n\t\t\t\t\tt.Fatalf(\"expected error %v but got nil\", tt.wantErr)\n\t\t\t\t}\n\t\t\t\tif !errors.Is(err, tt.wantErr) {\n\t\t\t\t\tt.Fatalf(\"expected error %v, got %v\", tt.wantErr, err)\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tif len(fake.calls) != len(tt.wantCalls) {\n\t\t\t\tt.Fatalf(\"expected %d calls, got %d\", len(tt.wantCalls), len(fake.calls))\n\t\t\t}\n\t\t\tfor i, call := range tt.wantCalls {\n\t\t\t\tif !call.equal(fake.calls[i]) {\n\t\t\t\t\tt.Fatalf(\"call %d mismatch: want %#v, got %#v\", i, call, fake.calls[i])\n\t\t\t\t}\n\t\t\t}\n\t\t})\n\t}\n}\n\nfunc TestSessionSplitWindow",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 239,
+        "end": 265,
+        "startLoc": {
+          "line": 239,
+          "column": 14,
+          "position": 2352
+        },
+        "endLoc": {
+          "line": 265,
+          "column": 23,
+          "position": 2595
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 119,
+        "end": 145,
+        "startLoc": {
+          "line": 119,
+          "column": 2,
+          "position": 1077
+        },
+        "endLoc": {
+          "line": 145,
+          "column": 29,
+          "position": 1338
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 12,
+      "fragment": "}},\n\t\t\t},\n\t\t},\n\t}\n\n\tfor _, tt := range tests {\n\t\ttt := tt\n\t\tt.Run(tt.name, func(t *testing.T) {\n\t\t\tfake := &fakeRunner{responses: append([]fakeResponse(nil), tt.responses...)}\n\t\t\tsession := tmux.NewSession(\"proj\", \"/tmp\", tmux.WithRunner(fake.Run))\n\n\t\t\terr := session.SplitWindow",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 288,
+        "end": 299,
+        "startLoc": {
+          "line": 288,
+          "column": 24,
+          "position": 2820
+        },
+        "endLoc": {
+          "line": 299,
+          "column": 12,
+          "position": 2942
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 108,
+        "end": 119,
+        "startLoc": {
+          "line": 108,
+          "column": 7,
+          "position": 953
+        },
+        "endLoc": {
+          "line": 119,
+          "column": 7,
+          "position": 1075
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 15,
+      "fragment": "}\n\n\t\t\tif len(fake.calls) != len(tt.wantCalls) {\n\t\t\t\tt.Fatalf(\"expected %d calls, got %d\", len(tt.wantCalls), len(fake.calls))\n\t\t\t}\n\t\t\tfor i, call := range tt.wantCalls {\n\t\t\t\tif !call.equal(fake.calls[i]) {\n\t\t\t\t\tt.Fatalf(\"call %d mismatch: want %#v, got %#v\", i, call, fake.calls[i])\n\t\t\t\t}\n\t\t\t}\n\t\t})\n\t}\n}\n\nfunc TestSessionSourceLocal",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 306,
+        "end": 320,
+        "startLoc": {
+          "line": 306,
+          "column": 4,
+          "position": 3009
+        },
+        "endLoc": {
+          "line": 320,
+          "column": 23,
+          "position": 3136
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 131,
+        "end": 145,
+        "startLoc": {
+          "line": 131,
+          "column": 4,
+          "position": 1211
+        },
+        "endLoc": {
+          "line": 145,
+          "column": 29,
+          "position": 1338
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 11,
+      "fragment": "}},\n\t\t},\n\t}\n\n\tfor _, tt := range tests {\n\t\ttt := tt\n\t\tt.Run(tt.name, func(t *testing.T) {\n\t\t\tfake := &fakeRunner{responses: append([]fakeResponse(nil), tt.responses...)}\n\t\t\tsession := tmux.NewSession(\"proj\", \"/tmp\", tmux.WithRunner(fake.Run))\n\n\t\t\tif",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 377,
+        "end": 387,
+        "startLoc": {
+          "line": 377,
+          "column": 7,
+          "position": 3726
+        },
+        "endLoc": {
+          "line": 387,
+          "column": 3,
+          "position": 3838
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 169,
+        "end": 119,
+        "startLoc": {
+          "line": 169,
+          "column": 2,
+          "position": 1601
+        },
+        "endLoc": {
+          "line": 119,
+          "column": 4,
+          "position": 1069
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 15,
+      "fragment": "()\n\n\t\t\tif tt.wantErr == nil && err != nil {\n\t\t\t\tt.Fatalf(\"unexpected error: %v\", err)\n\t\t\t}\n\t\t\tif tt.wantErr != nil {\n\t\t\t\tif err == nil {\n\t\t\t\t\tt.Fatalf(\"expected error %v but got nil\", tt.wantErr)\n\t\t\t\t}\n\t\t\t\tif !errors.Is(err, tt.wantErr) {\n\t\t\t\t\tt.Fatalf(\"expected error %v, got %v\", tt.wantErr, err)\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tif len(fake.calls) != 1",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 393,
+        "end": 407,
+        "startLoc": {
+          "line": 393,
+          "column": 15,
+          "position": 3893
+        },
+        "endLoc": {
+          "line": 407,
+          "column": 2,
+          "position": 4025
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 119,
+        "end": 193,
+        "startLoc": {
+          "line": 119,
+          "column": 7,
+          "position": 1076
+        },
+        "endLoc": {
+          "line": 193,
+          "column": 4,
+          "position": 1856
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 8,
+      "fragment": ",\n\t\t\tresponses: []fakeResponse{\n\t\t\t\t{err: nil},\n\t\t\t\t{err: nil},\n\t\t\t},\n\t\t\twantCalls: []execCall{\n\t\t\t\t{name: \"tmux\", args: []string{\"has-session\", \"-t\", \"proj\"}},\n\t\t\t\t{name: \"tmux\", args: []string{\"kill-session\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 432,
+        "end": 439,
+        "startLoc": {
+          "line": 432,
+          "column": 25,
+          "position": 4241
+        },
+        "endLoc": {
+          "line": 439,
+          "column": 15,
+          "position": 4324
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 213,
+        "end": 220,
+        "startLoc": {
+          "line": 213,
+          "column": 38,
+          "position": 2027
+        },
+        "endLoc": {
+          "line": 220,
+          "column": 13,
+          "position": 2110
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 12,
+      "fragment": "}},\n\t\t\t},\n\t\t},\n\t}\n\n\tfor _, tt := range tests {\n\t\ttt := tt\n\t\tt.Run(tt.name, func(t *testing.T) {\n\t\t\tfake := &fakeRunner{responses: append([]fakeResponse(nil), tt.responses...)}\n\t\t\tsession := tmux.NewSession(\"proj\", \"/tmp\", tmux.WithRunner(fake.Run))\n\n\t\t\terr := session.Kill",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 451,
+        "end": 462,
+        "startLoc": {
+          "line": 451,
+          "column": 7,
+          "position": 4469
+        },
+        "endLoc": {
+          "line": 462,
+          "column": 5,
+          "position": 4591
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 108,
+        "end": 119,
+        "startLoc": {
+          "line": 108,
+          "column": 7,
+          "position": 953
+        },
+        "endLoc": {
+          "line": 119,
+          "column": 7,
+          "position": 1075
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 18,
+      "fragment": "err.Error() != tt.wantErr.Error() {\n\t\t\t\t\tt.Fatalf(\"expected error %v, got %v\", tt.wantErr, err)\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tif len(fake.calls) != len(tt.wantCalls) {\n\t\t\t\tt.Fatalf(\"expected %d calls, got %d\", len(tt.wantCalls), len(fake.calls))\n\t\t\t}\n\t\t\tfor i, call := range tt.wantCalls {\n\t\t\t\tif !call.equal(fake.calls[i]) {\n\t\t\t\t\tt.Fatalf(\"call %d mismatch: want %#v, got %#v\", i, call, fake.calls[i])\n\t\t\t\t}\n\t\t\t}\n\t\t})\n\t}\n}\n\ntype",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 471,
+        "end": 488,
+        "startLoc": {
+          "line": 471,
+          "column": 2,
+          "position": 4674
+        },
+        "endLoc": {
+          "line": 488,
+          "column": 5,
+          "position": 4837
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/tmux/tmux_test.go",
+        "start": 128,
+        "end": 145,
+        "startLoc": {
+          "line": 128,
+          "column": 2,
+          "position": 1173
+        },
+        "endLoc": {
+          "line": 145,
+          "column": 5,
+          "position": 1336
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 9,
+      "fragment": ") error {\n\texists, err := s.Exists()\n\tif err != nil {\n\t\treturn err\n\t}\n\tif exists {\n\t\treturn fmt.Errorf(\"tmux session %q: %w\", s.Name, ErrSessionExists)\n\t}\n\toutput, err := s.runner()(\"tmux\", \"new-session\", \"-d\", \"-s\", s.Name, \"-n\", windowName",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/tmux/tmux.go",
+        "start": 81,
+        "end": 89,
+        "startLoc": {
+          "line": 81,
+          "column": 7,
+          "position": 616
+        },
+        "endLoc": {
+          "line": 89,
+          "column": 11,
+          "position": 717
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/tmux/tmux.go",
+        "start": 62,
+        "end": 70,
+        "startLoc": {
+          "line": 62,
+          "column": 2,
+          "position": 419
+        },
+        "endLoc": {
+          "line": 70,
+          "column": 7,
+          "position": 520
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 13,
+      "fragment": "(t *testing.T) {\n\tprevLookPath := commandLookPath\n\tprevExec := commandExec\n\tt.Cleanup(func() {\n\t\tcommandLookPath = prevLookPath\n\t\tcommandExec = prevExec\n\t})\n\tcommandLookPath = func(file string) (string, error) { return \"/usr/bin/\" + file, nil }\n\tcommandExec = func(name string, args ...string) *exec.Cmd {\n\t\treturn exec.Command(\"sh\", \"-c\", \"exit 0\")\n\t}\n\n\tvar",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/stack/stop_test.go",
+        "start": 37,
+        "end": 49,
+        "startLoc": {
+          "line": 37,
+          "column": 27,
+          "position": 260
+        },
+        "endLoc": {
+          "line": 49,
+          "column": 4,
+          "position": 394
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/stack/stop_test.go",
+        "start": 12,
+        "end": 25,
+        "startLoc": {
+          "line": 12,
+          "column": 24,
+          "position": 31
+        },
+        "endLoc": {
+          "line": 25,
+          "column": 7,
+          "position": 166
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 11,
+      "fragment": "(t *testing.T) {\n\tprevLookPath := commandLookPath\n\tprevExec := commandExec\n\tt.Cleanup(func() {\n\t\tcommandLookPath = prevLookPath\n\t\tcommandExec = prevExec\n\t})\n\n\tcommandLookPath = func(file string) (string, error) { return \"/usr/bin/\" + file, nil }\n\tcommandExec = func(name string, args ...string) *exec.Cmd {\n\t\treturn commandWithOutputAndExit",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/stack/stop_test.go",
+        "start": 120,
+        "end": 130,
+        "startLoc": {
+          "line": 120,
+          "column": 43,
+          "position": 1013
+        },
+        "endLoc": {
+          "line": 130,
+          "column": 25,
+          "position": 1130
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/stack/stop_test.go",
+        "start": 12,
+        "end": 22,
+        "startLoc": {
+          "line": 12,
+          "column": 24,
+          "position": 31
+        },
+        "endLoc": {
+          "line": 22,
+          "column": 5,
+          "position": 148
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 10,
+      "fragment": "))\n\tif err != nil {\n\t\tt.Fatalf(\"unexpected error: %v\", err)\n\t}\n\n\tif len(result.ServiceResults) != 2 {\n\t\tt.Fatalf(\"expected 2 service results, got %d\", len(result.ServiceResults))\n\t}\n\tfor _, sr := range result.ServiceResults {\n\t\tif sr.Status != StatusStarted",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/stack/session_test.go",
+        "start": 126,
+        "end": 135,
+        "startLoc": {
+          "line": 126,
+          "column": 7,
+          "position": 1128
+        },
+        "endLoc": {
+          "line": 135,
+          "column": 14,
+          "position": 1219
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/stack/session_test.go",
+        "start": 87,
+        "end": 96,
+        "startLoc": {
+          "line": 87,
+          "column": 2,
+          "position": 762
+        },
+        "endLoc": {
+          "line": 96,
+          "column": 14,
+          "position": 853
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 16,
+      "fragment": "var commands []string\n\tsessionCreated := false\n\trunner := mockRunner(func(name string, args ...string) ([]byte, error) {\n\t\tcmd := name + \" \" + strings.Join(args, \" \")\n\t\tcommands = append(commands, cmd)\n\t\tif name == \"tmux\" && len(args) > 0 {\n\t\t\tswitch args[0] {\n\t\t\tcase \"has-session\":\n\t\t\t\tif !sessionCreated {\n\t\t\t\t\treturn nil, &exitError{code: 1}\n\t\t\t\t}\n\t\t\t\treturn nil, nil\n\t\t\tcase \"new-session\":\n\t\t\t\tsessionCreated = true\n\t\t\t\treturn nil, nil\n\t\t\tcase",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/stack/session_test.go",
+        "start": 160,
+        "end": 175,
+        "startLoc": {
+          "line": 160,
+          "column": 2,
+          "position": 1390
+        },
+        "endLoc": {
+          "line": 175,
+          "column": 5,
+          "position": 1566
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/stack/session_test.go",
+        "start": 104,
+        "end": 119,
+        "startLoc": {
+          "line": 104,
+          "column": 2,
+          "position": 902
+        },
+        "endLoc": {
+          "line": 119,
+          "column": 2,
+          "position": 1078
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 7,
+      "fragment": ", []byte(\"#!/bin/sh\\nexit 0\\n\"), 0o755); err != nil {\n\t\tt.Fatal(err)\n\t}\n\n\tprevPath := os.Getenv(\"PATH\")\n\tt.Cleanup(func() { _ = os.Setenv(\"PATH\", prevPath) })\n\tif err := os.Setenv(\"PATH\", wrapperDir",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/stack/opencode_binary_test.go",
+        "start": 57,
+        "end": 63,
+        "startLoc": {
+          "line": 57,
+          "column": 7,
+          "position": 638
+        },
+        "endLoc": {
+          "line": 63,
+          "column": 11,
+          "position": 727
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/stack/opencode_binary_test.go",
+        "start": 25,
+        "end": 31,
+        "startLoc": {
+          "line": 25,
+          "column": 10,
+          "position": 256
+        },
+        "endLoc": {
+          "line": 31,
+          "column": 7,
+          "position": 345
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 22,
+      "fragment": "var commands []string\n\tsessionCreated := false\n\trunner := mockRunner(func(name string, args ...string) ([]byte, error) {\n\t\tcmd := name + \" \" + strings.Join(args, \" \")\n\t\tcommands = append(commands, cmd)\n\t\tif name == \"tmux\" && len(args) > 0 {\n\t\t\tswitch args[0] {\n\t\t\tcase \"has-session\":\n\t\t\t\tif !sessionCreated {\n\t\t\t\t\treturn nil, &exitError{code: 1}\n\t\t\t\t}\n\t\t\t\treturn nil, nil\n\t\t\tcase \"new-session\":\n\t\t\t\tsessionCreated = true\n\t\t\t\treturn nil, nil\n\t\t\t}\n\t\t}\n\t\treturn nil, nil\n\t})\n\n\tcfg := enabledConfig(\"opencode\", \"frontend\")\n\t// No projects set — cfg.Projects is nil/empty by construction.",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/stack/integration_test.go",
+        "start": 132,
+        "end": 153,
+        "startLoc": {
+          "line": 132,
+          "column": 2,
+          "position": 1096
+        },
+        "endLoc": {
+          "line": 153,
+          "column": 64,
+          "position": 1304
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/stack/session_test.go",
+        "start": 104,
+        "end": 126,
+        "startLoc": {
+          "line": 104,
+          "column": 2,
+          "position": 902
+        },
+        "endLoc": {
+          "line": 126,
+          "column": 7,
+          "position": 1111
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 9,
+      "fragment": "LanguageBase, true},\n\t\t{Language(\"invalid\"), false},\n\t\t{Language(\"\"), false},\n\t}\n\n\tfor _, tt := range tests {\n\t\tt.Run(string(tt.lang), func(t *testing.T) {\n\t\t\tif got := tt.lang.IsValid(); got != tt.valid {\n\t\t\t\tt.Errorf(\"Language.IsValid() = %v, want %v\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/registry/types_test.go",
+        "start": 65,
+        "end": 73,
+        "startLoc": {
+          "line": 65,
+          "column": 2,
+          "position": 515
+        },
+        "endLoc": {
+          "line": 73,
+          "column": 35,
+          "position": 622
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/templates/templates_test.go",
+        "start": 19,
+        "end": 27,
+        "startLoc": {
+          "line": 19,
+          "column": 2,
+          "position": 109
+        },
+        "endLoc": {
+          "line": 27,
+          "column": 39,
+          "position": 216
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 31,
+      "fragment": "(t *testing.T) {\n\tactive := Project{\n\t\tPath:        \"/home/user/active\",\n\t\tCategory:    CategoryCLI,\n\t\tLang:        LanguageGo,\n\t\tCreated:     \"2026-01-01\",\n\t\tDescription: \"Active project\",\n\t\tStatus:      Status{State: StateActive},\n\t}\n\tarchived := Project{\n\t\tPath:        \"/home/user/archived\",\n\t\tCategory:    CategoryWeb,\n\t\tLang:        LanguageTypeScript,\n\t\tCreated:     \"2026-01-02\",\n\t\tDescription: \"Archived project\",\n\t\tStatus:      Status{State: StateArchived},\n\t}\n\n\ttests := []struct {\n\t\tname         string\n\t\tprojects     map[string]Project\n\t\twantNames    []string\n\t\twantNotNames []string\n\t}{\n\t\t{\n\t\t\tname:      \"empty registry returns empty map\",\n\t\t\tprojects:  map[string]Project{},\n\t\t\twantNames: []string{},\n\t\t},\n\t\t{\n\t\t\tname: \"all archived projects returned\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/registry/types_test.go",
+        "start": 674,
+        "end": 704,
+        "startLoc": {
+          "line": 674,
+          "column": 30,
+          "position": 4995
+        },
+        "endLoc": {
+          "line": 704,
+          "column": 33,
+          "position": 5213
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/registry/types_test.go",
+        "start": 595,
+        "end": 625,
+        "startLoc": {
+          "line": 595,
+          "column": 28,
+          "position": 4360
+        },
+        "endLoc": {
+          "line": 625,
+          "column": 31,
+          "position": 4578
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 7,
+      "fragment": "if err := Save(registryPath, registry); err != nil {\n\t\tt.Fatalf(\"Save() error = %v, want nil\", err)\n\t}\n\n\t// Verify file exists\n\tif _, err := os.Stat(registryPath); errors.Is(err, fs.ErrNotExist) {\n\t\tt.Fatal(\"registry file was not created in nested directory\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/registry/store_test.go",
+        "start": 197,
+        "end": 203,
+        "startLoc": {
+          "line": 197,
+          "column": 2,
+          "position": 1302
+        },
+        "endLoc": {
+          "line": 203,
+          "column": 52,
+          "position": 1380
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/registry/store_test.go",
+        "start": 160,
+        "end": 166,
+        "startLoc": {
+          "line": 160,
+          "column": 2,
+          "position": 1006
+        },
+        "endLoc": {
+          "line": 166,
+          "column": 32,
+          "position": 1084
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 20,
+      "fragment": "() {\n\treg := &registry.Registry{\n\t\tVersion: 2,\n\t\tSettings: registry.Settings{\n\t\t\tBaseDir: \"/home/user/projects\",\n\t\t},\n\t\tProjects: map[string]registry.Project{\n\t\t\t\"overlord\": {\n\t\t\t\tPath:        \"core/tools/overlord\",\n\t\t\t\tCategory:    registry.CategoryCoreTools,\n\t\t\t\tLang:        registry.LanguageGo,\n\t\t\t\tCreated:     \"2024-01-15\",\n\t\t\t\tDescription: \"Project management CLI tool\",\n\t\t\t\tAliases:     []string{\"ov\", \"ol\"},\n\t\t\t\tStatus:      registry.Status{State: registry.StateActive},\n\t\t\t},\n\t\t},\n\t}\n\n\tresults := reg.Resolve(\"ov\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/registry/resolve_example_test.go",
+        "start": 38,
+        "end": 57,
+        "startLoc": {
+          "line": 38,
+          "column": 35,
+          "position": 242
+        },
+        "endLoc": {
+          "line": 57,
+          "column": 5,
+          "position": 396
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/registry/resolve_example_test.go",
+        "start": 9,
+        "end": 28,
+        "startLoc": {
+          "line": 9,
+          "column": 34,
+          "position": 22
+        },
+        "endLoc": {
+          "line": 28,
+          "column": 11,
+          "position": 176
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 17,
+      "fragment": "() {\n\treg := &registry.Registry{\n\t\tVersion: 2,\n\t\tSettings: registry.Settings{\n\t\t\tBaseDir: \"/home/user/projects\",\n\t\t},\n\t\tProjects: map[string]registry.Project{\n\t\t\t\"overlord\": {\n\t\t\t\tPath:        \"core/tools/overlord\",\n\t\t\t\tCategory:    registry.CategoryCoreTools,\n\t\t\t\tLang:        registry.LanguageGo,\n\t\t\t\tCreated:     \"2024-01-15\",\n\t\t\t\tDescription: \"Project management CLI tool\",\n\t\t\t\tAliases:     []string{\"ov\", \"ol\"},\n\t\t\t\tStatus:      registry.Status{State: registry.StateActive},\n\t\t\t},\n\t\t\t\"web-dashboard\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/registry/resolve_example_test.go",
+        "start": 67,
+        "end": 83,
+        "startLoc": {
+          "line": 67,
+          "column": 30,
+          "position": 462
+        },
+        "endLoc": {
+          "line": 83,
+          "column": 16,
+          "position": 600
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/registry/resolve_example_test.go",
+        "start": 9,
+        "end": 25,
+        "startLoc": {
+          "line": 9,
+          "column": 34,
+          "position": 22
+        },
+        "endLoc": {
+          "line": 25,
+          "column": 2,
+          "position": 160
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 20,
+      "fragment": "() {\n\treg := &registry.Registry{\n\t\tVersion: 2,\n\t\tSettings: registry.Settings{\n\t\t\tBaseDir: \"/home/user/projects\",\n\t\t},\n\t\tProjects: map[string]registry.Project{\n\t\t\t\"overlord\": {\n\t\t\t\tPath:        \"core/tools/overlord\",\n\t\t\t\tCategory:    registry.CategoryCoreTools,\n\t\t\t\tLang:        registry.LanguageGo,\n\t\t\t\tCreated:     \"2024-01-15\",\n\t\t\t\tDescription: \"Project management CLI tool\",\n\t\t\t\tAliases:     []string{\"ov\", \"ol\"},\n\t\t\t\tStatus:      registry.Status{State: registry.StateActive},\n\t\t\t},\n\t\t},\n\t}\n\n\tresult",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/registry/resolve_example_test.go",
+        "start": 107,
+        "end": 126,
+        "startLoc": {
+          "line": 107,
+          "column": 35,
+          "position": 763
+        },
+        "endLoc": {
+          "line": 126,
+          "column": 7,
+          "position": 909
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/registry/resolve_example_test.go",
+        "start": 9,
+        "end": 28,
+        "startLoc": {
+          "line": 9,
+          "column": 34,
+          "position": 22
+        },
+        "endLoc": {
+          "line": 28,
+          "column": 8,
+          "position": 168
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 9,
+      "fragment": ")\n\n\t\tif err := MoveDirectory(srcDir, dstDir); err != nil {\n\t\t\tt.Fatalf(\"MoveDirectory failed: %v\", err)\n\t\t}\n\n\t\tassertFileExists(t, filepath.Join(dstDir, \"data\", \"file.txt\"))\n\t\tif _, err := os.Stat(srcDir); !errors.Is(err, os.ErrNotExist) {\n\t\t\tt.Fatalf(\"expected source to be removed after fallback, stat err = %v\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/fileutil/fileutil_test.go",
+        "start": 301,
+        "end": 309,
+        "startLoc": {
+          "line": 301,
+          "column": 15,
+          "position": 2736
+        },
+        "endLoc": {
+          "line": 309,
+          "column": 62,
+          "position": 2836
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/fileutil/fileutil_test.go",
+        "start": 261,
+        "end": 269,
+        "startLoc": {
+          "line": 261,
+          "column": 8,
+          "position": 2303
+        },
+        "endLoc": {
+          "line": 269,
+          "column": 47,
+          "position": 2403
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 12,
+      "fragment": ", nil\n\t}\n\n\tvar stdout bytes.Buffer\n\tcmd := &cobra.Command{}\n\tcmd.SetOut(&stdout)\n\n\tif err := runStartURL(cmd, nil); err != nil {\n\t\tt.Fatalf(\"runStartURL() returned error: %v\", err)\n\t}\n\n\tif got := stdout.String(); got != \"https://opencode.tailnet.ts.net\\n\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/cmd/start_url_test.go",
+        "start": 58,
+        "end": 69,
+        "startLoc": {
+          "line": 58,
+          "column": 34,
+          "position": 428
+        },
+        "endLoc": {
+          "line": 69,
+          "column": 36,
+          "position": 524
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/cmd/start_url_test.go",
+        "start": 27,
+        "end": 38,
+        "startLoc": {
+          "line": 27,
+          "column": 4,
+          "position": 167
+        },
+        "endLoc": {
+          "line": 38,
+          "column": 24,
+          "position": 263
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 16,
+      "fragment": "(t *testing.T) {\n\torigLoadStackConfig := startURLLoadStackConfig\n\torigRemoteOpenCodeURL := startURLRemoteOpenCodeURL\n\torigRemote := startURLRemote\n\tt.Cleanup(func() {\n\t\tstartURLLoadStackConfig = origLoadStackConfig\n\t\tstartURLRemoteOpenCodeURL = origRemoteOpenCodeURL\n\t\tstartURLRemote = origRemote\n\t})\n\n\tstartURLRemote = true\n\tstartURLLoadStackConfig = func() (*stack.StackConfig, error) {\n\t\treturn stack.DefaultConfig(), nil\n\t}\n\tstartURLRemoteOpenCodeURL = func(*stack.StackConfig) (string, error) {\n\t\treturn \"\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/cmd/start_url_test.go",
+        "start": 74,
+        "end": 89,
+        "startLoc": {
+          "line": 74,
+          "column": 57,
+          "position": 551
+        },
+        "endLoc": {
+          "line": 89,
+          "column": 3,
+          "position": 688
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/cmd/start_url_test.go",
+        "start": 43,
+        "end": 58,
+        "startLoc": {
+          "line": 43,
+          "column": 32,
+          "position": 290
+        },
+        "endLoc": {
+          "line": 58,
+          "column": 34,
+          "position": 427
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 14,
+      "fragment": "},\n\t\t\tServices: map[string]stack.ServiceConfig{},\n\t\t}, nil\n\t}\n\tstartManageSaveStackConfig = func(cfg *stack.StackConfig) error {\n\t\tsaved = &stack.StackConfig{\n\t\t\tVersion:  cfg.Version,\n\t\t\tProjects: append([]string(nil), cfg.Projects...),\n\t\t\tServices: cfg.Services,\n\t\t}\n\t\treturn nil\n\t}\n\n\tvar",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/cmd/start_manage_test.go",
+        "start": 89,
+        "end": 102,
+        "startLoc": {
+          "line": 89,
+          "column": 8,
+          "position": 755
+        },
+        "endLoc": {
+          "line": 102,
+          "column": 4,
+          "position": 864
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/cmd/start_manage_test.go",
+        "start": 28,
+        "end": 40,
+        "startLoc": {
+          "line": 28,
+          "column": 8,
+          "position": 160
+        },
+        "endLoc": {
+          "line": 40,
+          "column": 24,
+          "position": 268
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 13,
+      "fragment": "(t *testing.T) {\n\torigRunList := rootRunList\n\torigRunOpen := rootRunOpen\n\tt.Cleanup(func() {\n\t\trootRunList = origRunList\n\t\trootRunOpen = origRunOpen\n\t})\n\n\tlistCalled := false\n\topenCalled := false\n\trootRunList = func(cmd *cobra.Command, args []string) error {\n\t\tlistCalled = true\n\t\treturn",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/cmd/root_test.go",
+        "start": 45,
+        "end": 57,
+        "startLoc": {
+          "line": 45,
+          "column": 40,
+          "position": 295
+        },
+        "endLoc": {
+          "line": 57,
+          "column": 7,
+          "position": 398
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/cmd/root_test.go",
+        "start": 11,
+        "end": 23,
+        "startLoc": {
+          "line": 11,
+          "column": 35,
+          "position": 28
+        },
+        "endLoc": {
+          "line": 23,
+          "column": 3,
+          "position": 131
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 10,
+      "fragment": ") Update(msg tea.Msg) (tea.Model, tea.Cmd) {\n\tswitch msg := msg.(type) {\n\tcase tea.KeyMsg:\n\t\tswitch msg.Type {\n\t\tcase tea.KeyCtrlC, tea.KeyEsc:\n\t\t\tm.cancelled = true\n\t\t\treturn m, tea.Quit\n\n\t\tcase tea.KeyEnter:\n\t\t\tif len(m.filtered",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/cmd/open.go",
+        "start": 94,
+        "end": 103,
+        "startLoc": {
+          "line": 94,
+          "column": 12,
+          "position": 504
+        },
+        "endLoc": {
+          "line": 103,
+          "column": 9,
+          "position": 608
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/cmd/unarchive.go",
+        "start": 39,
+        "end": 48,
+        "startLoc": {
+          "line": 39,
+          "column": 20,
+          "position": 167
+        },
+        "endLoc": {
+          "line": 48,
+          "column": 11,
+          "position": 271
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 12,
+      "fragment": "(t *testing.T) {\n\thome := t.TempDir()\n\tt.Setenv(\"HOME\", home)\n\n\tpath, err := ocShimPath()\n\tif err != nil {\n\t\tt.Fatalf(\"ocShimPath() returned error: %v\", err)\n\t}\n\tif err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {\n\t\tt.Fatalf(\"MkdirAll() returned error: %v\", err)\n\t}\n\toriginal",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/cmd/oc_test.go",
+        "start": 159,
+        "end": 170,
+        "startLoc": {
+          "line": 159,
+          "column": 45,
+          "position": 1346
+        },
+        "endLoc": {
+          "line": 170,
+          "column": 9,
+          "position": 1464
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/cmd/oc_test.go",
+        "start": 110,
+        "end": 121,
+        "startLoc": {
+          "line": 110,
+          "column": 41,
+          "position": 872
+        },
+        "endLoc": {
+          "line": 121,
+          "column": 6,
+          "position": 990
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 17,
+      "fragment": "(t *testing.T) {\n\torigOpts := newOpts\n\torigLoadRegistry := newLoadRegistry\n\torigSaveRegistry := newSaveRegistry\n\tt.Cleanup(func() {\n\t\tnewOpts = origOpts\n\t\tnewLoadRegistry = origLoadRegistry\n\t\tnewSaveRegistry = origSaveRegistry\n\t\t*lifecycle.DefaultBus = *lifecycle.NewBus()\n\t})\n\n\tbaseDir := t.TempDir()\n\treg := testRegistry(map[string]registry.Project{})\n\treg.Settings.BaseDir = baseDir\n\n\tnewOpts = newFlags{\n\t\tcategory: string(registry.CategoryCLI",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/cmd/new_workflow_test.go",
+        "start": 89,
+        "end": 105,
+        "startLoc": {
+          "line": 89,
+          "column": 49,
+          "position": 810
+        },
+        "endLoc": {
+          "line": 105,
+          "column": 12,
+          "position": 951
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/cmd/new_workflow_test.go",
+        "start": 16,
+        "end": 32,
+        "startLoc": {
+          "line": 16,
+          "column": 40,
+          "position": 41
+        },
+        "endLoc": {
+          "line": 32,
+          "column": 17,
+          "position": 182
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 12,
+      "fragment": "), 0o644)\n\n\t\tlang, err := detectLanguage(dir)\n\t\tif err != nil {\n\t\t\tt.Fatalf(\"unexpected error: %v\", err)\n\t\t}\n\t\tif lang != registry.LanguagePython {\n\t\t\tt.Errorf(\"lang = %q, want %q\", lang, registry.LanguagePython)\n\t\t}\n\t})\n\n\tt.Run(\"detects TypeScript\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/cmd/add_test.go",
+        "start": 135,
+        "end": 146,
+        "startLoc": {
+          "line": 135,
+          "column": 8,
+          "position": 1272
+        },
+        "endLoc": {
+          "line": 146,
+          "column": 21,
+          "position": 1360
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/cmd/add_test.go",
+        "start": 122,
+        "end": 133,
+        "startLoc": {
+          "line": 122,
+          "column": 12,
+          "position": 1137
+        },
+        "endLoc": {
+          "line": 133,
+          "column": 39,
+          "position": 1225
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 32,
+      "fragment": "() string {\n\tvalidCats := make([]string, 0, len(registry.ValidCategories()))\n\tfor _, c := range registry.ValidCategories() {\n\t\tvalidCats = append(validCats, string(c))\n\t}\n\n\treturn fmt.Sprintf(`Usage: overlord add [path] [options]\n       overlord add <name> <path>   (legacy two-argument form)\n\nThe project name is derived from the directory name by default.\n\nCategories (auto-detected from path, or use --category):\n  %s\n\nLanguage flags (auto-detected, or specify one):\n  --py    Python\n  --ts    TypeScript\n  --go    Go\n  --sol   Solidity\n  --base  Language-agnostic\n\nOptions:\n  --name=\"...\"          Override auto-detected project name\n  --description=\"...\"   Project description\n  --alias=<name>        Add alias (can be repeated)\n  --category=<cat>      Override auto-detected category\n\nExamples:\n  overlord add                          # Add current directory\n  overlord add .                        # Same as above\n  overlord add --name=custom --py       # Custom name, Python\n  overlord add ../my-lib --sol          # Relative path, Solidity`",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/cmd/add.go",
+        "start": 74,
+        "end": 105,
+        "startLoc": {
+          "line": 74,
+          "column": 15,
+          "position": 186
+        },
+        "endLoc": {
+          "line": 105,
+          "column": 67,
+          "position": 265
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/cmd/new.go",
+        "start": 66,
+        "end": 93,
+        "startLoc": {
+          "line": 66,
+          "column": 15,
+          "position": 203
+        },
+        "endLoc": {
+          "line": 93,
+          "column": 48,
+          "position": 282
+        }
+      }
+    },
+    {
+      "format": "go",
+      "lines": 11,
+      "fragment": ".aliases,\n\t\tTags:        []string{},\n\t\tStatus:      registry.Status{State: registry.StateActive},\n\t}\n\n\tif ctx.reg.Projects == nil {\n\t\tctx.reg.Projects = make(map[string]registry.Project)\n\t}\n\tctx.reg.Projects[ctx.name] = project\n\n\tif err := saveRegistry",
+      "tokens": 0,
+      "firstFile": {
+        "name": "workspace/target/internal/cmd/add.go",
+        "start": 361,
+        "end": 371,
+        "startLoc": {
+          "line": 361,
+          "column": 4,
+          "position": 2505
+        },
+        "endLoc": {
+          "line": 371,
+          "column": 13,
+          "position": 2603
+        }
+      },
+      "secondFile": {
+        "name": "workspace/target/internal/cmd/new.go",
+        "start": 395,
+        "end": 405,
+        "startLoc": {
+          "line": 395,
+          "column": 8,
+          "position": 2852
+        },
+        "endLoc": {
+          "line": 405,
+          "column": 16,
+          "position": 2950
+        }
+      }
+    }
+  ]
+}

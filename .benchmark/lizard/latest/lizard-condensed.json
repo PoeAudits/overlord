@@ -1,0 +1,772 @@
+{
+  "analyzer": "lizard",
+  "file_rollups": [
+    {
+      "avg_ccn": 9.2,
+      "function_count": 10,
+      "max_ccn": 15,
+      "path": "/workspace/target/internal/cmd/setup.go",
+      "total_nloc": 327,
+      "warning_functions": 4
+    },
+    {
+      "avg_ccn": 15.667,
+      "function_count": 3,
+      "max_ccn": 23,
+      "path": "/workspace/target/internal/cmd/rm.go",
+      "total_nloc": 214,
+      "warning_functions": 2
+    },
+    {
+      "avg_ccn": 12.75,
+      "function_count": 4,
+      "max_ccn": 22,
+      "path": "/workspace/target/internal/cmd/archive.go",
+      "total_nloc": 227,
+      "warning_functions": 2
+    },
+    {
+      "avg_ccn": 6.9,
+      "function_count": 10,
+      "max_ccn": 17,
+      "path": "/workspace/target/internal/cmd/add.go",
+      "total_nloc": 351,
+      "warning_functions": 2
+    },
+    {
+      "avg_ccn": 9.75,
+      "function_count": 4,
+      "max_ccn": 17,
+      "path": "/workspace/target/internal/cmd/clear.go",
+      "total_nloc": 153,
+      "warning_functions": 2
+    },
+    {
+      "avg_ccn": 5.875,
+      "function_count": 8,
+      "max_ccn": 16,
+      "path": "/workspace/target/internal/cmd/detect.go",
+      "total_nloc": 194,
+      "warning_functions": 2
+    },
+    {
+      "avg_ccn": 10.667,
+      "function_count": 3,
+      "max_ccn": 15,
+      "path": "/workspace/target/internal/stack/session.go",
+      "total_nloc": 172,
+      "warning_functions": 2
+    },
+    {
+      "avg_ccn": 10.333,
+      "function_count": 3,
+      "max_ccn": 15,
+      "path": "/workspace/target/internal/cmd/init.go",
+      "total_nloc": 171,
+      "warning_functions": 2
+    },
+    {
+      "avg_ccn": 6.333,
+      "function_count": 6,
+      "max_ccn": 14,
+      "path": "/workspace/target/internal/cmd/start.go",
+      "total_nloc": 145,
+      "warning_functions": 2
+    },
+    {
+      "avg_ccn": 10.667,
+      "function_count": 3,
+      "max_ccn": 14,
+      "path": "/workspace/target/internal/cmd/new_workflow_test.go",
+      "total_nloc": 141,
+      "warning_functions": 2
+    },
+    {
+      "avg_ccn": 4.407,
+      "function_count": 27,
+      "max_ccn": 13,
+      "path": "/workspace/target/internal/cmd/backup.go",
+      "total_nloc": 486,
+      "warning_functions": 2
+    },
+    {
+      "avg_ccn": 8.8,
+      "function_count": 5,
+      "max_ccn": 13,
+      "path": "/workspace/target/internal/stack/store_test.go",
+      "total_nloc": 193,
+      "warning_functions": 2
+    },
+    {
+      "avg_ccn": 5.273,
+      "function_count": 11,
+      "max_ccn": 11,
+      "path": "/workspace/target/internal/registry/store_test.go",
+      "total_nloc": 326,
+      "warning_functions": 0
+    },
+    {
+      "avg_ccn": 3.267,
+      "function_count": 15,
+      "max_ccn": 11,
+      "path": "/workspace/target/internal/registry/types.go",
+      "total_nloc": 164,
+      "warning_functions": 0
+    },
+    {
+      "avg_ccn": 5.333,
+      "function_count": 3,
+      "max_ccn": 11,
+      "path": "/workspace/target/internal/cmd/open.go",
+      "total_nloc": 56,
+      "warning_functions": 0
+    },
+    {
+      "avg_ccn": 3.571,
+      "function_count": 14,
+      "max_ccn": 10,
+      "path": "/workspace/target/internal/cmd/unarchive.go",
+      "total_nloc": 201,
+      "warning_functions": 0
+    },
+    {
+      "avg_ccn": 2.25,
+      "function_count": 20,
+      "max_ccn": 10,
+      "path": "/workspace/target/internal/stack/session_test.go",
+      "total_nloc": 149,
+      "warning_functions": 0
+    },
+    {
+      "avg_ccn": 7.8,
+      "function_count": 5,
+      "max_ccn": 10,
+      "path": "/workspace/target/internal/stack/integration_test.go",
+      "total_nloc": 145,
+      "warning_functions": 0
+    },
+    {
+      "avg_ccn": 7.0,
+      "function_count": 4,
+      "max_ccn": 10,
+      "path": "/workspace/target/internal/cmd/start_manage.go",
+      "total_nloc": 126,
+      "warning_functions": 0
+    },
+    {
+      "avg_ccn": 5.0,
+      "function_count": 10,
+      "max_ccn": 9,
+      "path": "/workspace/target/internal/fileutil/fileutil.go",
+      "total_nloc": 162,
+      "warning_functions": 0
+    },
+    {
+      "avg_ccn": 5.8,
+      "function_count": 5,
+      "max_ccn": 9,
+      "path": "/workspace/target/internal/cmd/oc_test.go",
+      "total_nloc": 121,
+      "warning_functions": 0
+    },
+    {
+      "avg_ccn": 6.25,
+      "function_count": 4,
+      "max_ccn": 9,
+      "path": "/workspace/target/internal/registry/store.go",
+      "total_nloc": 86,
+      "warning_functions": 0
+    },
+    {
+      "avg_ccn": 4.2,
+      "function_count": 5,
+      "max_ccn": 9,
+      "path": "/workspace/target/internal/cmd/oc_shim.go",
+      "total_nloc": 64,
+      "warning_functions": 0
+    },
+    {
+      "avg_ccn": 9.0,
+      "function_count": 1,
+      "max_ccn": 9,
+      "path": "/workspace/target/internal/cmd/archive_workflow_test.go",
+      "total_nloc": 41,
+      "warning_functions": 0
+    },
+    {
+      "avg_ccn": 2.6,
+      "function_count": 15,
+      "max_ccn": 8,
+      "path": "/workspace/target/internal/registry/types_test.go",
+      "total_nloc": 602,
+      "warning_functions": 0
+    }
+  ],
+  "limits": {
+    "max_detailed_entries": 50,
+    "max_files": 25,
+    "warning_ccn_threshold": 12
+  },
+  "schema_version": "1",
+  "summary": {
+    "avg_ccn": 3.1,
+    "avg_nloc": 13.9,
+    "ccn_outlier_baseline": 8,
+    "ccn_outlier_score": 1957,
+    "function_count": 784,
+    "total_nloc": 12752.0,
+    "warning_count": 13
+  },
+  "top_functions": [
+    {
+      "above_warning_threshold": true,
+      "ccn": 23,
+      "line_range": {
+        "end": 178,
+        "start": 52
+      },
+      "name": "runRm",
+      "nloc": 105,
+      "path": "/workspace/target/internal/cmd/rm.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 23,
+      "line_range": {
+        "end": 178,
+        "start": 52
+      },
+      "name": "runRm",
+      "nloc": 105,
+      "path": "/workspace/target/internal/cmd/rm.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 22,
+      "line_range": {
+        "end": 177,
+        "start": 58
+      },
+      "name": "runArchive",
+      "nloc": 92,
+      "path": "/workspace/target/internal/cmd/archive.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 22,
+      "line_range": {
+        "end": 177,
+        "start": 58
+      },
+      "name": "runArchive",
+      "nloc": 92,
+      "path": "/workspace/target/internal/cmd/archive.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 17,
+      "line_range": {
+        "end": 346,
+        "start": 251
+      },
+      "name": "buildAddContext",
+      "nloc": 84,
+      "path": "/workspace/target/internal/cmd/add.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 17,
+      "line_range": {
+        "end": 346,
+        "start": 251
+      },
+      "name": "buildAddContext",
+      "nloc": 84,
+      "path": "/workspace/target/internal/cmd/add.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 17,
+      "line_range": {
+        "end": 138,
+        "start": 50
+      },
+      "name": "runClear",
+      "nloc": 66,
+      "path": "/workspace/target/internal/cmd/clear.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 17,
+      "line_range": {
+        "end": 138,
+        "start": 50
+      },
+      "name": "runClear",
+      "nloc": 66,
+      "path": "/workspace/target/internal/cmd/clear.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 16,
+      "line_range": {
+        "end": 127,
+        "start": 51
+      },
+      "name": "runDetect",
+      "nloc": 65,
+      "path": "/workspace/target/internal/cmd/detect.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 16,
+      "line_range": {
+        "end": 127,
+        "start": 51
+      },
+      "name": "runDetect",
+      "nloc": 65,
+      "path": "/workspace/target/internal/cmd/detect.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 15,
+      "line_range": {
+        "end": 148,
+        "start": 42
+      },
+      "name": "StartStack",
+      "nloc": 82,
+      "path": "/workspace/target/internal/stack/session.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 15,
+      "line_range": {
+        "end": 148,
+        "start": 42
+      },
+      "name": "StartStack",
+      "nloc": 82,
+      "path": "/workspace/target/internal/stack/session.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 15,
+      "line_range": {
+        "end": 183,
+        "start": 70
+      },
+      "name": "runInitCmd",
+      "nloc": 81,
+      "path": "/workspace/target/internal/cmd/init.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 15,
+      "line_range": {
+        "end": 183,
+        "start": 70
+      },
+      "name": "runInitCmd",
+      "nloc": 81,
+      "path": "/workspace/target/internal/cmd/init.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 15,
+      "line_range": {
+        "end": 120,
+        "start": 48
+      },
+      "name": "runSetup",
+      "nloc": 53,
+      "path": "/workspace/target/internal/cmd/setup.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 15,
+      "line_range": {
+        "end": 120,
+        "start": 48
+      },
+      "name": "runSetup",
+      "nloc": 53,
+      "path": "/workspace/target/internal/cmd/setup.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 14,
+      "line_range": {
+        "end": 87,
+        "start": 16
+      },
+      "name": "TestRunNew_CreatesProjectAndRegistersIt",
+      "nloc": 57,
+      "path": "/workspace/target/internal/cmd/new_workflow_test.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 14,
+      "line_range": {
+        "end": 87,
+        "start": 16
+      },
+      "name": "TestRunNew_CreatesProjectAndRegistersIt",
+      "nloc": 57,
+      "path": "/workspace/target/internal/cmd/new_workflow_test.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 14,
+      "line_range": {
+        "end": 139,
+        "start": 66
+      },
+      "name": "doStart",
+      "nloc": 55,
+      "path": "/workspace/target/internal/cmd/start.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 14,
+      "line_range": {
+        "end": 139,
+        "start": 66
+      },
+      "name": "doStart",
+      "nloc": 55,
+      "path": "/workspace/target/internal/cmd/start.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 13,
+      "line_range": {
+        "end": 153,
+        "start": 89
+      },
+      "name": "runBackup",
+      "nloc": 56,
+      "path": "/workspace/target/internal/cmd/backup.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 13,
+      "line_range": {
+        "end": 153,
+        "start": 89
+      },
+      "name": "runBackup",
+      "nloc": 56,
+      "path": "/workspace/target/internal/cmd/backup.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 13,
+      "line_range": {
+        "end": 99,
+        "start": 42
+      },
+      "name": "TestSaveThenLoad_RoundTrip",
+      "nloc": 54,
+      "path": "/workspace/target/internal/stack/store_test.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 13,
+      "line_range": {
+        "end": 99,
+        "start": 42
+      },
+      "name": "TestSaveThenLoad_RoundTrip",
+      "nloc": 54,
+      "path": "/workspace/target/internal/stack/store_test.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 13,
+      "line_range": {
+        "end": 323,
+        "start": 265
+      },
+      "name": "setupGitIgnore",
+      "nloc": 44,
+      "path": "/workspace/target/internal/cmd/setup.go"
+    },
+    {
+      "above_warning_threshold": true,
+      "ccn": 13,
+      "line_range": {
+        "end": 323,
+        "start": 265
+      },
+      "name": "setupGitIgnore",
+      "nloc": 44,
+      "path": "/workspace/target/internal/cmd/setup.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 11,
+      "line_range": {
+        "end": 448,
+        "start": 377
+      },
+      "name": "TestSaveLoad_RoundTrip",
+      "nloc": 57,
+      "path": "/workspace/target/internal/registry/store_test.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 11,
+      "line_range": {
+        "end": 440,
+        "start": 395
+      },
+      "name": "addPathToZip",
+      "nloc": 41,
+      "path": "/workspace/target/internal/cmd/backup.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 11,
+      "line_range": {
+        "end": 227,
+        "start": 190
+      },
+      "name": "cloneOrInitRepo",
+      "nloc": 35,
+      "path": "/workspace/target/internal/cmd/setup.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 11,
+      "line_range": {
+        "end": 192,
+        "start": 146
+      },
+      "name": "Validate",
+      "nloc": 34,
+      "path": "/workspace/target/internal/registry/types.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 11,
+      "line_range": {
+        "end": 125,
+        "start": 94
+      },
+      "name": "Update",
+      "nloc": 28,
+      "path": "/workspace/target/internal/cmd/open.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 10,
+      "line_range": {
+        "end": 375,
+        "start": 305
+      },
+      "name": "TestSave_BackupCreated",
+      "nloc": 54,
+      "path": "/workspace/target/internal/registry/store_test.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 10,
+      "line_range": {
+        "end": 154,
+        "start": 95
+      },
+      "name": "runStartAdd",
+      "nloc": 48,
+      "path": "/workspace/target/internal/cmd/start_manage.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 10,
+      "line_range": {
+        "end": 124,
+        "start": 81
+      },
+      "name": "TestIntegration_RemoveAndPersistProjects",
+      "nloc": 36,
+      "path": "/workspace/target/internal/stack/integration_test.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 10,
+      "line_range": {
+        "end": 157,
+        "start": 102
+      },
+      "name": "TestStartStack_SuccessfulStart",
+      "nloc": 34,
+      "path": "/workspace/target/internal/stack/session_test.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 10,
+      "line_range": {
+        "end": 65,
+        "start": 39
+      },
+      "name": "Update",
+      "nloc": 24,
+      "path": "/workspace/target/internal/cmd/unarchive.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 9,
+      "line_range": {
+        "end": 69,
+        "start": 14
+      },
+      "name": "TestRunArchive_MovesDirectoryAndUpdatesRegistry",
+      "nloc": 41,
+      "path": "/workspace/target/internal/cmd/archive_workflow_test.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 9,
+      "line_range": {
+        "end": 252,
+        "start": 211
+      },
+      "name": "updateBackupTags",
+      "nloc": 39,
+      "path": "/workspace/target/internal/cmd/backup.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 9,
+      "line_range": {
+        "end": 93,
+        "start": 49
+      },
+      "name": "runStartList",
+      "nloc": 39,
+      "path": "/workspace/target/internal/cmd/start_manage.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 9,
+      "line_range": {
+        "end": 170,
+        "start": 127
+      },
+      "name": "runUnarchive",
+      "nloc": 35,
+      "path": "/workspace/target/internal/cmd/unarchive.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 9,
+      "line_range": {
+        "end": 193,
+        "start": 159
+      },
+      "name": "TestEnsureOCShimInstalled_SkipsUnmanagedShim",
+      "nloc": 32,
+      "path": "/workspace/target/internal/cmd/oc_test.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 9,
+      "line_range": {
+        "end": 100,
+        "start": 65
+      },
+      "name": "CopyDirectory",
+      "nloc": 30,
+      "path": "/workspace/target/internal/fileutil/fileutil.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 9,
+      "line_range": {
+        "end": 100,
+        "start": 60
+      },
+      "name": "Save",
+      "nloc": 30,
+      "path": "/workspace/target/internal/registry/store.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 9,
+      "line_range": {
+        "end": 79,
+        "start": 48
+      },
+      "name": "inspectOCShim",
+      "nloc": 28,
+      "path": "/workspace/target/internal/cmd/oc_shim.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 9,
+      "line_range": {
+        "end": 220,
+        "start": 185
+      },
+      "name": "TestIntegration_SessionAlreadyExistsIdempotency",
+      "nloc": 28,
+      "path": "/workspace/target/internal/stack/integration_test.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 9,
+      "line_range": {
+        "end": 135,
+        "start": 104
+      },
+      "name": "ExpandPath",
+      "nloc": 26,
+      "path": "/workspace/target/internal/registry/store.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 8,
+      "line_range": {
+        "end": 512,
+        "start": 458
+      },
+      "name": "TestRegistryYAMLMarshaling",
+      "nloc": 44,
+      "path": "/workspace/target/internal/registry/types_test.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 8,
+      "line_range": {
+        "end": 119,
+        "start": 55
+      },
+      "name": "TestRunRm_ForceSkipDoesNotRemoveProject",
+      "nloc": 43,
+      "path": "/workspace/target/internal/cmd/rm_workflow_test.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 8,
+      "line_range": {
+        "end": 95,
+        "start": 44
+      },
+      "name": "TestLoad_ValidFile",
+      "nloc": 42,
+      "path": "/workspace/target/internal/registry/store_test.go"
+    },
+    {
+      "above_warning_threshold": false,
+      "ccn": 8,
+      "line_range": {
+        "end": 298,
+        "start": 252
+      },
+      "name": "runNewValidate",
+      "nloc": 39,
+      "path": "/workspace/target/internal/cmd/new.go"
+    }
+  ]
+}

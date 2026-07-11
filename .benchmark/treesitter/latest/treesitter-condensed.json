@@ -1,0 +1,1207 @@
+{
+  "analyzer": "treesitter",
+  "artifact_kind": "treesitter_condensed",
+  "limits": {
+    "max_files": 25,
+    "max_names": 25,
+    "max_ranges": 50
+  },
+  "schema_version": "1",
+  "summary": {
+    "file_count": 82,
+    "language_counts": {
+      "go": 82
+    },
+    "parse_error_count": 0,
+    "parse_error_file_count": 0,
+    "parse_status_counts": {
+      "ok": 82
+    },
+    "range_count": 2797
+  },
+  "top_call_names": [
+    {
+      "count": 342,
+      "name": "t.Fatalf"
+    },
+    {
+      "count": 271,
+      "name": "len"
+    },
+    {
+      "count": 170,
+      "name": "t.Errorf"
+    },
+    {
+      "count": 162,
+      "name": "fmt.Errorf"
+    },
+    {
+      "count": 137,
+      "name": "fmt.Printf"
+    },
+    {
+      "count": 115,
+      "name": "filepath.Join"
+    },
+    {
+      "count": 92,
+      "name": "append"
+    },
+    {
+      "count": 81,
+      "name": "t.Fatal"
+    },
+    {
+      "count": 80,
+      "name": "t.Run"
+    },
+    {
+      "count": 72,
+      "name": "fmt.Sprintf"
+    },
+    {
+      "count": 62,
+      "name": "err.Error"
+    },
+    {
+      "count": 60,
+      "name": "strings.Contains"
+    },
+    {
+      "count": 55,
+      "name": "string"
+    },
+    {
+      "count": 54,
+      "name": "t.TempDir"
+    },
+    {
+      "count": 47,
+      "name": "cmdError"
+    },
+    {
+      "count": 43,
+      "name": "fmt.Fprintf"
+    },
+    {
+      "count": 36,
+      "name": "t.Cleanup"
+    },
+    {
+      "count": 33,
+      "name": "fmt.Println"
+    },
+    {
+      "count": 31,
+      "name": "make"
+    },
+    {
+      "count": 28,
+      "name": "os.Stat"
+    },
+    {
+      "count": 26,
+      "name": "errors.New"
+    },
+    {
+      "count": 25,
+      "name": "lipgloss.NewStyle"
+    },
+    {
+      "count": 23,
+      "name": "lipgloss.NewStyle().Foreground"
+    },
+    {
+      "count": 21,
+      "name": "errors.Is"
+    },
+    {
+      "count": 20,
+      "name": "s.Warn.Render"
+    }
+  ],
+  "top_files_by_branch_loop_density": [
+    {
+      "branch_loop_density": 14.5,
+      "language": "go",
+      "path": "internal/cmd/rm.go"
+    },
+    {
+      "branch_loop_density": 10.333333333333334,
+      "language": "go",
+      "path": "internal/cmd/archive.go"
+    },
+    {
+      "branch_loop_density": 8.0,
+      "language": "go",
+      "path": "internal/cmd/start_manage.go"
+    },
+    {
+      "branch_loop_density": 7.75,
+      "language": "go",
+      "path": "internal/stack/store_test.go"
+    },
+    {
+      "branch_loop_density": 7.666666666666667,
+      "language": "go",
+      "path": "internal/cmd/clear.go"
+    },
+    {
+      "branch_loop_density": 7.5,
+      "language": "go",
+      "path": "internal/cmd/init.go"
+    },
+    {
+      "branch_loop_density": 6.666666666666667,
+      "language": "go",
+      "path": "internal/stack/session.go"
+    },
+    {
+      "branch_loop_density": 6.5,
+      "language": "go",
+      "path": "internal/cmd/setup.go"
+    },
+    {
+      "branch_loop_density": 5.5,
+      "language": "go",
+      "path": "internal/stack/integration_test.go"
+    },
+    {
+      "branch_loop_density": 5.0,
+      "language": "go",
+      "path": "internal/registry/store.go"
+    },
+    {
+      "branch_loop_density": 5.0,
+      "language": "go",
+      "path": "internal/stack/stop.go"
+    },
+    {
+      "branch_loop_density": 4.777777777777778,
+      "language": "go",
+      "path": "internal/cmd/add.go"
+    },
+    {
+      "branch_loop_density": 4.6,
+      "language": "go",
+      "path": "internal/registry/resolve.go"
+    },
+    {
+      "branch_loop_density": 4.571428571428571,
+      "language": "go",
+      "path": "internal/cmd/detect.go"
+    },
+    {
+      "branch_loop_density": 4.333333333333333,
+      "language": "go",
+      "path": "internal/registry/store_test.go"
+    },
+    {
+      "branch_loop_density": 4.0,
+      "language": "go",
+      "path": "internal/cmd/start_stop.go"
+    },
+    {
+      "branch_loop_density": 4.0,
+      "language": "go",
+      "path": "internal/registry/example_test.go"
+    },
+    {
+      "branch_loop_density": 3.9473684210526314,
+      "language": "go",
+      "path": "internal/tmux/tmux_test.go"
+    },
+    {
+      "branch_loop_density": 3.9,
+      "language": "go",
+      "path": "internal/fileutil/fileutil.go"
+    },
+    {
+      "branch_loop_density": 3.8,
+      "language": "go",
+      "path": "internal/cmd/start.go"
+    },
+    {
+      "branch_loop_density": 3.6666666666666665,
+      "language": "go",
+      "path": "internal/stack/store.go"
+    },
+    {
+      "branch_loop_density": 3.5384615384615383,
+      "language": "go",
+      "path": "internal/cmd/new.go"
+    },
+    {
+      "branch_loop_density": 3.4444444444444446,
+      "language": "go",
+      "path": "internal/cmd/backup.go"
+    },
+    {
+      "branch_loop_density": 3.0588235294117645,
+      "language": "go",
+      "path": "internal/templates/templates_test.go"
+    },
+    {
+      "branch_loop_density": 3.0,
+      "language": "go",
+      "path": "internal/cmd/start_alias_test.go"
+    }
+  ],
+  "top_files_by_function_count": [
+    {
+      "function_count": 49,
+      "language": "go",
+      "path": "internal/stack/service.go"
+    },
+    {
+      "function_count": 34,
+      "language": "go",
+      "path": "internal/fileutil/fileutil_test.go"
+    },
+    {
+      "function_count": 31,
+      "language": "go",
+      "path": "internal/lifecycle/bus_test.go"
+    },
+    {
+      "function_count": 30,
+      "language": "go",
+      "path": "internal/stack/service_test.go"
+    },
+    {
+      "function_count": 29,
+      "language": "go",
+      "path": "internal/cmd/add_test.go"
+    },
+    {
+      "function_count": 29,
+      "language": "go",
+      "path": "internal/cmd/open.go"
+    },
+    {
+      "function_count": 27,
+      "language": "go",
+      "path": "internal/cmd/backup.go"
+    },
+    {
+      "function_count": 27,
+      "language": "go",
+      "path": "internal/registry/types_test.go"
+    },
+    {
+      "function_count": 27,
+      "language": "go",
+      "path": "internal/stack/session_test.go"
+    },
+    {
+      "function_count": 23,
+      "language": "go",
+      "path": "internal/cmd/helpers.go"
+    },
+    {
+      "function_count": 23,
+      "language": "go",
+      "path": "internal/cmd/list.go"
+    },
+    {
+      "function_count": 19,
+      "language": "go",
+      "path": "internal/tmux/tmux_test.go"
+    },
+    {
+      "function_count": 18,
+      "language": "go",
+      "path": "internal/registry/resolve_test.go"
+    },
+    {
+      "function_count": 18,
+      "language": "go",
+      "path": "internal/stack/stop_test.go"
+    },
+    {
+      "function_count": 17,
+      "language": "go",
+      "path": "internal/cmd/open_workflow_test.go"
+    },
+    {
+      "function_count": 17,
+      "language": "go",
+      "path": "internal/templates/templates_test.go"
+    },
+    {
+      "function_count": 15,
+      "language": "go",
+      "path": "internal/cmd/oc_test.go"
+    },
+    {
+      "function_count": 15,
+      "language": "go",
+      "path": "internal/cmd/unarchive.go"
+    },
+    {
+      "function_count": 15,
+      "language": "go",
+      "path": "internal/registry/types.go"
+    },
+    {
+      "function_count": 14,
+      "language": "go",
+      "path": "internal/tmux/tmux.go"
+    },
+    {
+      "function_count": 13,
+      "language": "go",
+      "path": "internal/cmd/new.go"
+    },
+    {
+      "function_count": 12,
+      "language": "go",
+      "path": "internal/registry/store_test.go"
+    },
+    {
+      "function_count": 12,
+      "language": "go",
+      "path": "internal/stack/endpoints_test.go"
+    },
+    {
+      "function_count": 11,
+      "language": "go",
+      "path": "internal/cmd/backup_test.go"
+    },
+    {
+      "function_count": 11,
+      "language": "go",
+      "path": "internal/cmd/path_test.go"
+    }
+  ],
+  "top_files_by_nesting_depth": [
+    {
+      "language": "go",
+      "max_nesting_depth": 26,
+      "path": "internal/cmd/backup_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 26,
+      "path": "internal/registry/types_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 24,
+      "path": "internal/tmux/tmux_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 23,
+      "path": "internal/stack/service_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 23,
+      "path": "internal/stack/store.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 22,
+      "path": "internal/registry/resolve_example_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 22,
+      "path": "internal/stack/integration_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 22,
+      "path": "internal/stack/session_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 22,
+      "path": "internal/stack/store_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 21,
+      "path": "internal/cmd/add_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 21,
+      "path": "internal/lifecycle/events_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 21,
+      "path": "internal/registry/resolve_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 20,
+      "path": "internal/cmd/open_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 20,
+      "path": "internal/fileutil/fileutil_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 20,
+      "path": "internal/lifecycle/bus_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 20,
+      "path": "internal/registry/resolve.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 19,
+      "path": "internal/cmd/detect.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 19,
+      "path": "internal/registry/store_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 19,
+      "path": "internal/stack/service.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 18,
+      "path": "internal/cmd/archive_workflow_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 18,
+      "path": "internal/cmd/info_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 18,
+      "path": "internal/cmd/list_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 18,
+      "path": "internal/cmd/rm_workflow_test.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 18,
+      "path": "internal/cmd/start_manage.go"
+    },
+    {
+      "language": "go",
+      "max_nesting_depth": 18,
+      "path": "internal/cmd/start_manage_test.go"
+    }
+  ],
+  "top_structurally_complex_ranges": [
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 110,
+        "start": 69
+      },
+      "path": "internal/cmd/archive.go",
+      "range_id": "internal/cmd/archive.go:control_loop:for_statement:69:2:110:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 122,
+        "start": 88
+      },
+      "path": "internal/stack/session.go",
+      "range_id": "internal/stack/session.go:control_loop:for_statement:88:2:122:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 414,
+        "start": 381
+      },
+      "path": "internal/tmux/tmux_test.go",
+      "range_id": "internal/tmux/tmux_test.go:control_loop:for_statement:381:2:414:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 127,
+        "start": 95
+      },
+      "path": "internal/cmd/rm.go",
+      "range_id": "internal/cmd/rm.go:control_branch:if_statement:95:2:127:3",
+      "range_kind": "control_branch"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 142,
+        "start": 113
+      },
+      "path": "internal/tmux/tmux_test.go",
+      "range_id": "internal/tmux/tmux_test.go:control_loop:for_statement:113:2:142:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 202,
+        "start": 173
+      },
+      "path": "internal/tmux/tmux_test.go",
+      "range_id": "internal/tmux/tmux_test.go:control_loop:for_statement:173:2:202:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 262,
+        "start": 233
+      },
+      "path": "internal/tmux/tmux_test.go",
+      "range_id": "internal/tmux/tmux_test.go:control_loop:for_statement:233:2:262:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 485,
+        "start": 456
+      },
+      "path": "internal/tmux/tmux_test.go",
+      "range_id": "internal/tmux/tmux_test.go:control_loop:for_statement:456:2:485:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 70,
+        "start": 42
+      },
+      "path": "internal/tmux/tmux_test.go",
+      "range_id": "internal/tmux/tmux_test.go:control_loop:for_statement:42:2:70:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 246,
+        "start": 219
+      },
+      "path": "internal/cmd/backup.go",
+      "range_id": "internal/cmd/backup.go:control_loop:for_statement:219:2:246:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 143,
+        "start": 116
+      },
+      "path": "internal/cmd/start_manage.go",
+      "range_id": "internal/cmd/start_manage.go:control_loop:for_statement:116:2:143:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 4,
+        "start": 3
+      },
+      "language": "go",
+      "line_range": {
+        "end": 122,
+        "start": 97
+      },
+      "path": "internal/cmd/rm.go",
+      "range_id": "internal/cmd/rm.go:control_loop:for_statement:97:3:122:4",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 160,
+        "start": 135
+      },
+      "path": "internal/registry/resolve_test.go",
+      "range_id": "internal/registry/resolve_test.go:control_loop:for_statement:135:2:160:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 86,
+        "start": 62
+      },
+      "path": "internal/cmd/clear.go",
+      "range_id": "internal/cmd/clear.go:control_loop:for_statement:62:2:86:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 174,
+        "start": 150
+      },
+      "path": "internal/lifecycle/bus_test.go",
+      "range_id": "internal/lifecycle/bus_test.go:control_loop:for_statement:150:2:174:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 185,
+        "start": 161
+      },
+      "path": "internal/stack/service_test.go",
+      "range_id": "internal/stack/service_test.go:control_loop:for_statement:161:2:185:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 317,
+        "start": 293
+      },
+      "path": "internal/tmux/tmux_test.go",
+      "range_id": "internal/tmux/tmux_test.go:control_loop:for_statement:293:2:317:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 121,
+        "start": 98
+      },
+      "path": "internal/cmd/detect.go",
+      "range_id": "internal/cmd/detect.go:control_loop:for_statement:98:2:121:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 176,
+        "start": 153
+      },
+      "path": "internal/cmd/init.go",
+      "range_id": "internal/cmd/init.go:control_loop:for_statement:153:2:176:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 90,
+        "start": 68
+      },
+      "path": "internal/lifecycle/events_test.go",
+      "range_id": "internal/lifecycle/events_test.go:control_loop:for_statement:68:2:90:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 302,
+        "start": 280
+      },
+      "path": "internal/registry/store_test.go",
+      "range_id": "internal/registry/store_test.go:control_loop:for_statement:280:2:302:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 117,
+        "start": 97
+      },
+      "path": "internal/registry/resolve_test.go",
+      "range_id": "internal/registry/resolve_test.go:control_loop:for_statement:97:2:117:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 671,
+        "start": 651
+      },
+      "path": "internal/registry/types_test.go",
+      "range_id": "internal/registry/types_test.go:control_loop:for_statement:651:2:671:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 750,
+        "start": 730
+      },
+      "path": "internal/registry/types_test.go",
+      "range_id": "internal/registry/types_test.go:control_loop:for_statement:730:2:750:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 163,
+        "start": 144
+      },
+      "path": "internal/cmd/start.go",
+      "range_id": "internal/cmd/start.go:control_loop:for_statement:144:2:163:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 185,
+        "start": 166
+      },
+      "path": "internal/cmd/start_manage.go",
+      "range_id": "internal/cmd/start_manage.go:control_loop:for_statement:166:2:185:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 148,
+        "start": 129
+      },
+      "path": "internal/fileutil/fileutil_test.go",
+      "range_id": "internal/fileutil/fileutil_test.go:control_loop:for_statement:129:2:148:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 135,
+        "start": 117
+      },
+      "path": "internal/cmd/list_test.go",
+      "range_id": "internal/cmd/list_test.go:control_loop:for_statement:117:2:135:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 336,
+        "start": 319
+      },
+      "path": "internal/cmd/list.go",
+      "range_id": "internal/cmd/list.go:control_loop:for_statement:319:2:336:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 637,
+        "start": 620
+      },
+      "path": "internal/cmd/open.go",
+      "range_id": "internal/cmd/open.go:control_branch:if_statement:620:2:637:3",
+      "range_kind": "control_branch"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 89,
+        "start": 72
+      },
+      "path": "internal/cmd/start_manage.go",
+      "range_id": "internal/cmd/start_manage.go:control_branch:if_statement:72:2:89:3",
+      "range_kind": "control_branch"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 112,
+        "start": 95
+      },
+      "path": "internal/registry/resolve.go",
+      "range_id": "internal/registry/resolve.go:control_loop:for_statement:95:2:112:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 301,
+        "start": 285
+      },
+      "path": "internal/cmd/add_test.go",
+      "range_id": "internal/cmd/add_test.go:control_loop:for_statement:285:2:301:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 390,
+        "start": 374
+      },
+      "path": "internal/cmd/backup.go",
+      "range_id": "internal/cmd/backup.go:control_loop:for_statement:374:2:390:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 310,
+        "start": 294
+      },
+      "path": "internal/registry/types.go",
+      "range_id": "internal/registry/types.go:control_loop:for_statement:294:2:310:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 127,
+        "start": 112
+      },
+      "path": "internal/lifecycle/events_test.go",
+      "range_id": "internal/lifecycle/events_test.go:control_loop:for_statement:112:2:127:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 4,
+        "start": 3
+      },
+      "language": "go",
+      "line_range": {
+        "end": 111,
+        "start": 96
+      },
+      "path": "internal/stack/session.go",
+      "range_id": "internal/stack/session.go:control_branch:if_statement:96:3:111:4",
+      "range_kind": "control_branch"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 372,
+        "start": 357
+      },
+      "path": "internal/templates/templates_test.go",
+      "range_id": "internal/templates/templates_test.go:control_loop:for_statement:357:2:372:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 4,
+        "start": 3
+      },
+      "language": "go",
+      "line_range": {
+        "end": 223,
+        "start": 209
+      },
+      "path": "internal/cmd/add_test.go",
+      "range_id": "internal/cmd/add_test.go:control_loop:for_statement:209:3:223:4",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 4,
+        "start": 3
+      },
+      "language": "go",
+      "line_range": {
+        "end": 244,
+        "start": 230
+      },
+      "path": "internal/cmd/backup.go",
+      "range_id": "internal/cmd/backup.go:control_branch:if_statement:230:3:244:4",
+      "range_kind": "control_branch"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 278,
+        "start": 264
+      },
+      "path": "internal/cmd/backup.go",
+      "range_id": "internal/cmd/backup.go:control_loop:for_statement:264:2:278:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 68,
+        "start": 54
+      },
+      "path": "internal/cmd/open_test.go",
+      "range_id": "internal/cmd/open_test.go:control_loop:for_statement:54:2:68:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 97,
+        "start": 83
+      },
+      "path": "internal/fileutil/fileutil.go",
+      "range_id": "internal/fileutil/fileutil.go:control_loop:for_statement:83:2:97:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 123,
+        "start": 109
+      },
+      "path": "internal/registry/store.go",
+      "range_id": "internal/registry/store.go:control_branch:if_statement:109:2:123:3",
+      "range_kind": "control_branch"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 98,
+        "start": 84
+      },
+      "path": "internal/stack/store_test.go",
+      "range_id": "internal/stack/store_test.go:control_loop:for_statement:84:2:98:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 207,
+        "start": 194
+      },
+      "path": "internal/cmd/list.go",
+      "range_id": "internal/cmd/list.go:control_loop:for_statement:194:2:207:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 334,
+        "start": 321
+      },
+      "path": "internal/cmd/open.go",
+      "range_id": "internal/cmd/open.go:control_loop:for_statement:321:2:334:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 355,
+        "start": 342
+      },
+      "path": "internal/cmd/open.go",
+      "range_id": "internal/cmd/open.go:control_loop:for_statement:342:2:355:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 3,
+        "start": 2
+      },
+      "language": "go",
+      "line_range": {
+        "end": 105,
+        "start": 92
+      },
+      "path": "internal/cmd/start.go",
+      "range_id": "internal/cmd/start.go:control_loop:for_statement:92:2:105:3",
+      "range_kind": "control_loop"
+    },
+    {
+      "column_range": {
+        "end": 4,
+        "start": 3
+      },
+      "language": "go",
+      "line_range": {
+        "end": 88,
+        "start": 75
+      },
+      "path": "internal/cmd/start_manage.go",
+      "range_id": "internal/cmd/start_manage.go:control_loop:for_statement:75:3:88:4",
+      "range_kind": "control_loop"
+    }
+  ]
+}
