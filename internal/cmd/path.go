@@ -17,17 +17,18 @@ var (
 )
 
 var pathCmd = &cobra.Command{
-	Use:   "path [name]",
-	Short: "Print a project path",
-	Long: `Print the full filesystem path for a project in the registry.
+	Use:   "path [name...]",
+	Short: "Print project paths",
+	Long: `Print the full filesystem path for one or more projects in the registry.
 
-The name argument can be a project name, alias, or fuzzy match. If no name is
+Name arguments can be project names, aliases, or fuzzy matches. If no name is
 provided, an interactive fuzzy finder is shown.
 
 Examples:
   overlord path overlord
-  overlord path oc`,
-	Args: cobra.MaximumNArgs(1),
+  overlord path oc
+  overlord path overlord oc`,
+	Args: cobra.ArbitraryArgs,
 	RunE: runPath,
 }
 
@@ -41,20 +42,36 @@ func runPath(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var selectedName string
-	var project registry.Project
 	if len(args) == 0 {
-		selectedName, project, err = pathShowPicker(reg, "")
-	} else {
-		selectedName, project, err = resolvePathMatch(reg, args[0])
-	}
-	if err != nil {
-		return err
-	}
-	if selectedName == "" {
-		return nil
+		selectedName, project, err := pathShowPicker(reg, "")
+		if err != nil || selectedName == "" {
+			return err
+		}
+		return printProjectPath(cmd, reg, project)
 	}
 
+	projects := make([]registry.Project, 0, len(args))
+	for _, query := range args {
+		selectedName, project, err := resolvePathMatch(reg, query)
+		if err != nil {
+			return err
+		}
+		if selectedName == "" {
+			return nil
+		}
+		projects = append(projects, project)
+	}
+
+	for _, project := range projects {
+		if err := printProjectPath(cmd, reg, project); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func printProjectPath(cmd *cobra.Command, reg *registry.Registry, project registry.Project) error {
 	projectPath, err := fileutil.ExpandProjectPath(project.Path, reg.Settings.BaseDir)
 	if err != nil {
 		return cmdError("path", fmt.Sprintf("failed to expand path for '%s'", project.Path), err.Error())

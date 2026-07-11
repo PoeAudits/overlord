@@ -60,6 +60,24 @@ func TestRunPath_PrintsExpandedPathForAlias(t *testing.T) {
 	}
 }
 
+func TestRunPath_PrintsExpandedPathsForMultipleArgs(t *testing.T) {
+	reg := testRegistry(map[string]registry.Project{
+		"overlord": testProject("core/tools/overlord", registry.CategoryCoreTools, registry.LanguageGo, registry.StateActive),
+		"opencode": testProject("core/tools/opencode", registry.CategoryCoreTools, registry.LanguageTypeScript, registry.StateActive, "oc"),
+	})
+	reg.Settings.BaseDir = "/home/thomas/Overlord"
+	withPathRegistry(t, reg)
+	cmd, stdout := withPathStdout()
+
+	if err := runPath(cmd, []string{"overlord", "oc"}); err != nil {
+		t.Fatalf("runPath() returned error: %v", err)
+	}
+	want := "/home/thomas/Overlord/core/tools/overlord\n/home/thomas/Overlord/core/tools/opencode\n"
+	if got := stdout.String(); got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
+	}
+}
+
 func TestRunPath_NoMatchReturnsPathError(t *testing.T) {
 	withPathRegistry(t, testRegistry(map[string]registry.Project{}))
 
