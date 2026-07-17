@@ -2,18 +2,24 @@
 
 ## Purpose and lifecycle
 
-Overlord is a retained internal-production-tooling Project: a Go CLI that
-maintains a local, versioned registry of development Projects, resolves their
-paths, and opens their Workspaces in tmux. It can also run an optional local
-startup stack for OpenCode and related services. Its current supported behavior
-is the source, tests, [README](README.md), and [agent guide](AGENTS.md), not
-historical plans.
+Overlord is a retained, frequently used single-host Go CLI. Its dependable core
+maintains the local Project catalog, creates Projects, resolves their paths, and
+lists them for human and AI use. It also contains older Workspace/tmux,
+workstation-startup, archive, and backup capabilities accumulated early in the
+system's development. Those capabilities are usable but are not automatically
+the right long-term boundaries. Its current supported behavior is the source,
+tests, [README](README.md), and [agent guide](AGENTS.md), not historical plans.
 
 Overlord supplies host infrastructure to Alice; it does **not** own Alice
 coordination truth, workflow policy, Efforts, Work Items, Runs, Conversations,
 or the Coordination Journal. Live CLI commands can mutate the registry, tmux
 sessions, files, and managed services. Treat operational commands as live
 actions, not read-only inspection.
+
+The current operating contract is one computer, one filesystem, one human
+operator, and effectively one mutating Overlord process at a time. Concurrent
+read-only path/list operations are normal; multi-writer and multi-machine
+coordination are not current requirements.
 
 ## Ownership and boundaries
 
@@ -144,6 +150,13 @@ configured by `speech-outbox.settings.directory` (default
 coordination data. OpenCode Desktop is likewise a locally launched application;
 OpenCode server ownership and application state remain external.
 
+The stack and tmux mechanisms are early practical implementations rather than
+accepted future architecture. The owner relies on `overlord start` for initial
+workstation setup, but it does not currently provide a satisfactory way to
+reload an active OpenCode configuration consistently. A redesign must decide
+whether startup, configuration reload, service lifecycle, and Workspace/tmux
+control remain Overlord modules or become narrower owner adapters elsewhere.
+
 ## Backup and archive boundaries
 
 `overlord backup` creates a timestamped zip in the home directory from Projects
@@ -152,6 +165,13 @@ Projects include tracked plus non-ignored untracked files; fallback traversal
 filters generated/cache directories. `.env*` is always excluded, but a backup
 is not a secrets-management, retention, restore, or off-host replication
 system.
+
+Backup is an occasionally used and valued portable export: the owner wants one
+command that collects important local source/configuration for transfer to an
+external drive. Its possible future role in moving or reproducing the broader
+workstation/AOS setup is unresolved. Do not silently broaden the present
+selective Project zip into machine restore or configuration migration without a
+new manifest, inclusion, secret, verification, and restoration contract.
 
 `archive` moves a Project directory to `archive/<name>` beneath `base_dir` and
 marks it archived; `unarchive` moves it to the chosen category and marks it
@@ -239,9 +259,20 @@ is historical validation evidence, not mutable runtime state.
 
 ### Future direction (not current behavior)
 
-The current implementation is a local CLI with internal Go seams, YAML files,
-and tmux/process adapters. A narrow adapter/API direction may later expose
-registry discovery or stack control to coordinators through an explicit stable
-interface. No such external coordination API, shared ownership model,
+Treat the current implementation as overhaul input, not a shape to preserve
+through incremental hardening. Preserve the high-value Project catalog/create/
+path/list behavior while designing deeper boundaries for:
+
+- Project identity, metadata quality, discovery, creation, and validation.
+- Workspace selection and lifecycle without assuming tmux names are the model.
+- Workstation startup and reliable OpenCode configuration reload.
+- Verified portable backup and, only if justified, workstation setup migration.
+- Narrow machine-readable interfaces for future callers without transferring
+  authorization, scheduling, or coordination truth into Overlord.
+
+Archive/unarchive is currently low-use and should not drive the redesign. A
+simple validation command may be useful, but it is not the product direction by
+itself. No external coordination API, multi-machine ownership model,
 transaction protocol, or Alice-state adapter exists today; future work must not
-reinterpret local registry entries or stack configuration as Alice truth.
+reinterpret local registry entries, tmux sessions, or stack configuration as
+Alice truth.

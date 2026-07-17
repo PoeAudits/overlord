@@ -13,6 +13,7 @@ import (
 var (
 	ErrSessionExists   = errors.New("tmux session already exists")
 	ErrSessionNotFound = errors.New("tmux session not found")
+	ErrNotInSession    = errors.New("not inside a tmux session")
 )
 
 // CommandRunner executes system commands. Assign a custom function for testing.
@@ -44,6 +45,45 @@ func WithRunner(runner CommandRunner) Option {
 	return func(s *Session) {
 		s.Runner = runner
 	}
+}
+
+// OpenWindowInCurrentSession selects an existing named window or creates one
+// rooted at dir in the tmux session containing the current client.
+func OpenWindowInCurrentSession(name, dir string, runner CommandRunner) error {
+	if os.Getenv("TMUX") == "" {
+		return ErrNotInSession
+	}
+	if runner == nil {
+		runner = defaultRunner
+	}
+
+	output, err := runner("tmux", "display-message", "-p", "#S")
+	if err != nil {
+		return fmt.Errorf("failed to determine current tmux session: %w", err)
+	}
+	sessionName := strings.TrimSpace(string(output))
+	if sessionName == "" {
+		return errors.New("tmux returned an empty current session name")
+	}
+
+	output, err = runner("tmux", "list-windows", "-t", sessionName, "-F", "#{window_name}")
+	if err != nil {
+		return fmt.Errorf("failed to list windows in tmux session %q: %w", sessionName, err)
+	}
+	for _, windowName := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		if windowName != name {
+			continue
+		}
+		if _, err := runner("tmux", "select-window", "-t", sessionName+":"+name); err != nil {
+			return fmt.Errorf("failed to select tmux window %q: %w", name, err)
+		}
+		return nil
+	}
+
+	if _, err := runner("tmux", "new-window", "-t", sessionName, "-n", name, "-c", dir); err != nil {
+		return fmt.Errorf("failed to create tmux window %q: %w", name, err)
+	}
+	return nil
 }
 
 // Exists reports whether the tmux session already exists.

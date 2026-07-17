@@ -35,6 +35,7 @@ Project Lifecycle:
   add          Register an existing project directory
   open         Open a project workspace in tmux
   path         Print a project path
+  switch       Open a project window in the current tmux session
   info         Show detailed information about a project
   rm           Remove projects from the registry (keeps files)
   clear        Permanently remove projects and their files

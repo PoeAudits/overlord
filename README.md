@@ -62,6 +62,7 @@ Common commands:
 ```sh
 overlord list
 overlord path project-a project-b
+overlord switch example
 overlord info example
 overlord add /path/to/project --category=web --ts
 overlord new example --category=web --ts
@@ -74,6 +75,16 @@ overlord backup --dry-run
 `overlord <name>` is shorthand for `overlord open <name>`. `open` resolves the
 Project, creates or reuses its tmux Workspace session, sources `.tmux.local`
 when present, and attaches or switches the current tmux client.
+
+`overlord switch <name>` resolves a Project name, alias, or fuzzy match and
+opens it in the current tmux session. It selects an existing window named for
+the Project or creates one rooted at the Project directory:
+
+```sh
+overlord switch agentbench
+```
+
+Outside tmux, use `overlord open <name>` to open a Project Workspace.
 
 ## Startup stack
 
