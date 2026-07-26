@@ -88,16 +88,20 @@ Outside tmux, use `overlord open <name>` to open a Project Workspace.
 
 ## Startup stack
 
-`overlord start` (alias `overlord up`) manages enabled services in the
-`StartServer` tmux session. Supported service adapters currently include
+`overlord start` manages enabled services in the `StartServer` tmux session,
+then restores the saved bare-terminal workspace checkpoint. `overlord up`
+starts only the independent `StartServer` stack. Supported service adapters currently include
 OpenCode, OpenCode Desktop, speech outbox, a frontend, Tailscale Serve,
 Phoenix, and Ollama. Configuration lives in
 `~/.config/overlord/stack.yaml`; missing configuration receives safe defaults.
+The default configuration leaves Phoenix, speech outbox, and OpenCode Desktop disabled.
 
 ```sh
 overlord start
+overlord start save
+overlord start checkpoints
+overlord start revert 0
 overlord start status
-overlord start list
 overlord start restart opencode phoenix
 overlord start stop
 overlord start url
@@ -109,6 +113,13 @@ Startup preflight may skip an incompatible OpenCode Desktop package while
 leaving the rest of the stack available. Targeted restart recreates only named,
 enabled service windows. `overlord code` ensures the stack is available and
 attaches the current directory to the configured OpenCode server.
+
+`overlord start save` must run from tmux. It records session, window, pane,
+directory, selection, and layout topology (never commands, processes, history,
+scrollback, or environment) in the versioned, atomically written
+`~/.config/overlord/workspace-checkpoints.yaml`. The current checkpoint and two
+previous checkpoints are retained. `overlord start revert <index>` promotes an
+archive without changing live tmux sessions.
 
 T3 Code integration was removed. Historical T3 plans and instructions are not
 current startup-stack documentation.

@@ -6,7 +6,6 @@ const DefaultConfigPath = "~/.config/overlord/stack.yaml"
 // StackConfig represents the complete stack configuration for overlord start.
 type StackConfig struct {
 	Version  int                      `yaml:"version"`
-	Projects []string                 `yaml:"projects"`
 	Services map[string]ServiceConfig `yaml:"services"`
 }
 

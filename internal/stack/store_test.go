@@ -19,9 +19,6 @@ func TestLoad_DefaultConfigWhenFileNotExist(t *testing.T) {
 	if config.Version != 1 {
 		t.Errorf("expected Version 1, got %d", config.Version)
 	}
-	if len(config.Projects) != 0 {
-		t.Errorf("expected empty Projects, got %v", config.Projects)
-	}
 	if len(config.Services) != 7 {
 		t.Errorf("expected 7 default services, got %d", len(config.Services))
 	}
@@ -33,8 +30,9 @@ func TestLoad_DefaultConfigWhenFileNotExist(t *testing.T) {
 			t.Errorf("expected default service %q to exist", name)
 			continue
 		}
-		if !svc.Enabled {
-			t.Errorf("expected service %q to be enabled", name)
+		shouldBeEnabled := name != "speech-outbox" && name != "opencode-desktop" && name != "phoenix"
+		if svc.Enabled != shouldBeEnabled {
+			t.Errorf("service %q enabled = %v, want %v", name, svc.Enabled, shouldBeEnabled)
 		}
 	}
 
@@ -64,8 +62,7 @@ func TestSaveThenLoad_RoundTrip(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "stack.yaml")
 
 	original := &StackConfig{
-		Version:  1,
-		Projects: []string{"project-a", "project-b"},
+		Version: 1,
 		Services: map[string]ServiceConfig{
 			"opencode": {
 				Enabled:  true,
@@ -89,14 +86,6 @@ func TestSaveThenLoad_RoundTrip(t *testing.T) {
 
 	if loaded.Version != original.Version {
 		t.Errorf("Version mismatch: got %d, want %d", loaded.Version, original.Version)
-	}
-	if len(loaded.Projects) != len(original.Projects) {
-		t.Fatalf("Projects length mismatch: got %d, want %d", len(loaded.Projects), len(original.Projects))
-	}
-	for i, p := range loaded.Projects {
-		if p != original.Projects[i] {
-			t.Errorf("Projects[%d] mismatch: got %q, want %q", i, p, original.Projects[i])
-		}
 	}
 	if len(loaded.Services) != len(original.Services) {
 		t.Fatalf("Services length mismatch: got %d, want %d", len(loaded.Services), len(original.Services))
@@ -124,8 +113,7 @@ func TestSave_CreatesBackup(t *testing.T) {
 
 	// Write initial config
 	first := &StackConfig{
-		Version:  1,
-		Projects: []string{"first"},
+		Version: 1,
 		Services: map[string]ServiceConfig{
 			"opencode": {Enabled: true, Settings: map[string]string{}},
 		},
@@ -142,8 +130,7 @@ func TestSave_CreatesBackup(t *testing.T) {
 
 	// Save again with different config — should create .bak
 	second := &StackConfig{
-		Version:  1,
-		Projects: []string{"second"},
+		Version: 1,
 		Services: map[string]ServiceConfig{
 			"opencode": {Enabled: false, Settings: map[string]string{}},
 		},
@@ -169,8 +156,7 @@ func TestSave_AtomicWrite(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "stack.yaml")
 
 	config := &StackConfig{
-		Version:  1,
-		Projects: []string{},
+		Version: 1,
 		Services: map[string]ServiceConfig{
 			"opencode": {Enabled: true, Settings: map[string]string{}},
 		},

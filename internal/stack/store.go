@@ -81,8 +81,7 @@ func Save(path string, config *StackConfig) error {
 // It is used as the initial configuration when no stack.yaml exists.
 func DefaultConfig() *StackConfig {
 	return &StackConfig{
-		Version:  1,
-		Projects: []string{},
+		Version: 1,
 		Services: map[string]ServiceConfig{
 			"opencode": {
 				Enabled: true,
@@ -92,11 +91,11 @@ func DefaultConfig() *StackConfig {
 				},
 			},
 			"speech-outbox": {
-				Enabled:  true,
+				Enabled:  false,
 				Settings: map[string]string{},
 			},
 			"opencode-desktop": {
-				Enabled: true,
+				Enabled: false,
 				Settings: map[string]string{
 					openCodeDesktopBinaryKey: defaultOpenCodeDesktopBinary,
 				},
@@ -115,7 +114,7 @@ func DefaultConfig() *StackConfig {
 				},
 			},
 			"phoenix": {
-				Enabled: true,
+				Enabled: false,
 				Settings: map[string]string{
 					phoenixHostKey:      defaultPhoenixHost,
 					phoenixPortKey:      strconv.Itoa(defaultPhoenixPort),

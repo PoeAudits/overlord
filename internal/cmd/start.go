@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/PoeAudits/overlord/internal/registry"
+	"github.com/PoeAudits/overlord/internal/checkpoint"
 	"github.com/PoeAudits/overlord/internal/stack"
 	"github.com/PoeAudits/overlord/internal/tmux"
 )
@@ -15,7 +15,7 @@ import (
 // Package-level so other files in cmd can register subcommands via startCmd.AddCommand().
 var startCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start development stack and open projects",
+	Short: "Start development stack and restore workspace checkpoint",
 	Args:  cobra.NoArgs,
 	RunE:  runStart,
 }
@@ -36,11 +36,11 @@ var topLevelUpCmd = &cobra.Command{
 }
 
 var (
-	startLoadStackConfig    = loadStackConfig
-	startLoadRegistry       = loadRegistry
-	startStack              = stack.StartStack
-	startEnsureProject      = ensureProjectSession
-	startOpenProjectSession = openProject
+	startLoadStackConfig   = loadStackConfig
+	startStack             = stack.StartStack
+	startLoadCheckpoints   = func() (*checkpoint.Store, error) { return checkpoint.Load(checkpoint.DefaultPath) }
+	startRestoreCheckpoint = tmux.RestoreCheckpoint
+	startAttach            = func(name string) error { return tmux.NewSession(name, "").AttachOrSwitch() }
 )
 
 func init() {
@@ -58,11 +58,10 @@ func runStartUp(cmd *cobra.Command, args []string) error {
 }
 
 // doStart contains the shared logic for both start and start up.
-// When silent is true, only stack services are ensured; project sessions are
+// When silent is true, only stack services are ensured; workspace sessions are
 // not opened and no tmux client switch/attach occurs.
 //
-// Order of operations: start the stack before opening project sessions so the
-// StartServer session is created first among the sessions this command starts.
+// StartServer is intentionally independent from workspace restoration.
 func doStart(silent bool) error {
 	cfg, err := startLoadStackConfig()
 	if err != nil {
@@ -71,8 +70,6 @@ func doStart(silent bool) error {
 
 	s := NewStyles()
 
-	// Start the stack before opening project sessions so its tmux session keeps a
-	// stable first-created position relative to the sessions spawned here.
 	result, err := startStack(cfg)
 	if err != nil {
 		return cmdError("start", "failed to start stack", err.Error())
@@ -82,38 +79,9 @@ func doStart(silent bool) error {
 		return nil
 	}
 
-	reg, err := startLoadRegistry()
+	store, err := startLoadCheckpoints()
 	if err != nil {
-		return cmdError("start", "failed to load registry", err.Error())
-	}
-
-	// Resolve configured projects. Collect successful resolutions; warn on failures.
-	resolved := make([]openTarget, 0, len(cfg.Projects))
-	for _, projectName := range cfg.Projects {
-		res, err := reg.ResolveOne(projectName)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s could not resolve project %q: %v\n",
-				s.Warn.Render("Warning:"), projectName, err)
-			continue
-		}
-		if res.Project.Status.State == registry.StateArchived {
-			fmt.Fprintf(os.Stderr, "%s skipping archived project %q (restore with 'overlord unarchive %s')\n",
-				s.Warn.Render("Warning:"), res.Name, res.Name)
-			continue
-		}
-		resolved = append(resolved, openTarget{name: res.Name, project: res.Project})
-	}
-
-	// Create background sessions for all but the last project after starting the
-	// stack. The final project is still attached last below.
-	if len(resolved) > 1 {
-		for _, rp := range resolved[:len(resolved)-1] {
-			recordLastOpened(rp.name, rp.project, reg)
-			if err := startEnsureProject(rp.name, rp.project, reg); err != nil {
-				fmt.Fprintf(os.Stderr, "%s failed to create session for %q: %v\n",
-					s.Warn.Render("Warning:"), rp.name, err)
-			}
-		}
+		return cmdError("start", "failed to load workspace checkpoints", err.Error())
 	}
 
 	// Print status table to stderr (design decision D4: all output before tmux attach).
@@ -126,16 +94,27 @@ func doStart(silent bool) error {
 		fmt.Fprintf(os.Stderr, "%s %s\n", s.Warn.Render("Warning:"), w)
 	}
 
-	// No projects resolved -- attach to the stack session.
-	if len(resolved) == 0 {
-		session := tmux.NewSession(stack.SessionName, "")
-		return session.AttachOrSwitch()
+	if store.Current == nil {
+		fmt.Fprintf(os.Stderr, "%s no workspace checkpoint saved; attaching %s\n", s.Warn.Render("Warning:"), stack.SessionName)
+		return startAttach(stack.SessionName)
 	}
-
-	// Attach to the last project (design decision D4: attach is the final action).
-	lastRP := resolved[len(resolved)-1]
-	recordLastOpened(lastRP.name, lastRP.project, reg)
-	return startOpenProjectSession(lastRP.name, lastRP.project, reg)
+	available := startRestoreCheckpoint(store.Current, nil, func(format string, args ...any) {
+		fmt.Fprintf(os.Stderr, "%s %s\n", s.Warn.Render("Warning:"), fmt.Sprintf(format, args...))
+	})
+	target := ""
+	for _, name := range available {
+		if name == store.Current.AttachSession {
+			target = name
+			break
+		}
+	}
+	if target == "" && len(available) > 0 {
+		target = available[0]
+	}
+	if target == "" {
+		target = stack.SessionName
+	}
+	return startAttach(target)
 }
 
 // printStackStatus writes a styled status table to stderr.

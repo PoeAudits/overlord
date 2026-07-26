@@ -21,8 +21,8 @@ func TestIntegration_DefaultServicesOnFreshConfig(t *testing.T) {
 	}
 
 	services := DefaultServices(cfg)
-	if len(services) != 7 {
-		t.Fatalf("expected 7 default services, got %d", len(services))
+	if len(services) != 4 {
+		t.Fatalf("expected 4 enabled default services, got %d", len(services))
 	}
 
 	expectedOrder := []struct {
@@ -30,11 +30,8 @@ func TestIntegration_DefaultServicesOnFreshConfig(t *testing.T) {
 		windowName string
 	}{
 		{"opencode", "OpenCode"},
-		{"speech-outbox", "AliceSpeech"},
-		{"opencode-desktop", "OpenCodeDesktop"},
 		{"frontend", "FrontEnd"},
 		{"tailscale", "Tailscale"},
-		{"phoenix", "Phoenix"},
 		{"ollama", "Ollama"},
 	}
 
@@ -49,83 +46,7 @@ func TestIntegration_DefaultServicesOnFreshConfig(t *testing.T) {
 	}
 }
 
-// --- Test 2: Add and persist projects ---
-
-func TestIntegration_AddAndPersistProjects(t *testing.T) {
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "stack.yaml")
-
-	cfg := DefaultConfig()
-	cfg.Projects = append(cfg.Projects, "alpha", "beta", "gamma")
-
-	if err := Save(configPath, cfg); err != nil {
-		t.Fatalf("Save failed: %v", err)
-	}
-
-	loaded, err := Load(configPath)
-	if err != nil {
-		t.Fatalf("Load failed: %v", err)
-	}
-
-	want := []string{"alpha", "beta", "gamma"}
-	if len(loaded.Projects) != len(want) {
-		t.Fatalf("expected %d projects, got %d", len(want), len(loaded.Projects))
-	}
-	for i, p := range want {
-		if loaded.Projects[i] != p {
-			t.Errorf("Projects[%d] = %q, want %q", i, loaded.Projects[i], p)
-		}
-	}
-}
-
-// --- Test 3: Remove and persist projects ---
-
-func TestIntegration_RemoveAndPersistProjects(t *testing.T) {
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "stack.yaml")
-
-	cfg := DefaultConfig()
-	cfg.Projects = []string{"alpha", "beta", "gamma"}
-
-	if err := Save(configPath, cfg); err != nil {
-		t.Fatalf("initial Save failed: %v", err)
-	}
-
-	// Remove "beta" from the projects list.
-	loaded, err := Load(configPath)
-	if err != nil {
-		t.Fatalf("Load failed: %v", err)
-	}
-
-	var filtered []string
-	for _, p := range loaded.Projects {
-		if p != "beta" {
-			filtered = append(filtered, p)
-		}
-	}
-	loaded.Projects = filtered
-
-	if err := Save(configPath, loaded); err != nil {
-		t.Fatalf("second Save failed: %v", err)
-	}
-
-	reloaded, err := Load(configPath)
-	if err != nil {
-		t.Fatalf("reload failed: %v", err)
-	}
-
-	want := []string{"alpha", "gamma"}
-	if len(reloaded.Projects) != len(want) {
-		t.Fatalf("expected %d projects after removal, got %d", len(want), len(reloaded.Projects))
-	}
-	for i, p := range want {
-		if reloaded.Projects[i] != p {
-			t.Errorf("Projects[%d] = %q, want %q", i, reloaded.Projects[i], p)
-		}
-	}
-}
-
-// --- Test 4: StartStack with no projects configured ---
+// --- Test 2: StartStack with no workspace configuration ---
 
 func TestIntegration_StartStackNoProjects(t *testing.T) {
 	// Reset the lifecycle bus to avoid interference from other tests.
@@ -152,7 +73,6 @@ func TestIntegration_StartStackNoProjects(t *testing.T) {
 	})
 
 	cfg := enabledConfig("opencode", "frontend")
-	// No projects set — cfg.Projects is nil/empty by construction.
 
 	result, err := StartStack(cfg, tmux.WithRunner(runner))
 	if err != nil {
@@ -182,7 +102,7 @@ func TestIntegration_StartStackNoProjects(t *testing.T) {
 	}
 }
 
-// --- Test 5: Session already exists (idempotency) ---
+// --- Test 3: Session already exists (idempotency) ---
 
 func TestIntegration_SessionAlreadyExistsIdempotency(t *testing.T) {
 	// Reset the lifecycle bus to avoid interference.
