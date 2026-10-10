@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/spf13/cobra"
 
@@ -41,6 +42,7 @@ var (
 	startLoadCheckpoints   = func() (*checkpoint.Store, error) { return checkpoint.Load(checkpoint.DefaultPath) }
 	startRestoreCheckpoint = tmux.RestoreCheckpoint
 	startAttach            = func(name string) error { return tmux.NewSession(name, "").AttachOrSwitch() }
+	startLaunchDesktopApp  = func(id string) error { return exec.Command("gtk-launch", id).Run() }
 )
 
 func init() {
@@ -92,6 +94,18 @@ func doStart(silent bool) error {
 	// Print any warnings from StartStack.
 	for _, w := range result.Warnings {
 		fmt.Fprintf(os.Stderr, "%s %s\n", s.Warn.Render("Warning:"), w)
+	}
+
+	// Use installed desktop entries so application-specific flags stay with the
+	// desktop launcher. These apps are not owned by the tmux service stack.
+	for _, app := range []struct{ name, id string }{
+		{"T3 Code", "t3code-nightly.desktop"},
+		{"ChatGPT", "chatgpt.desktop"},
+		{"OpenCode Desktop", "ai.opencode.desktop.desktop"},
+	} {
+		if err := startLaunchDesktopApp(app.id); err != nil {
+			fmt.Fprintf(os.Stderr, "%s failed to open %s: %v\n", s.Warn.Render("Warning:"), app.name, err)
+		}
 	}
 
 	if store.Current == nil {

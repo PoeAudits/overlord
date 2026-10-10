@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/PoeAudits/overlord/internal/checkpoint"
@@ -14,18 +16,24 @@ func TestDoStartSilentSkipsRegistryAndProjectSessions(t *testing.T) {
 	origLoadCheckpoints := startLoadCheckpoints
 	origRestoreCheckpoint := startRestoreCheckpoint
 	origAttach := startAttach
+	origLaunch := startLaunchDesktopApp
 	t.Cleanup(func() {
 		startLoadStackConfig = origLoadStackConfig
 		startStack = origStartStack
 		startLoadCheckpoints = origLoadCheckpoints
 		startRestoreCheckpoint = origRestoreCheckpoint
 		startAttach = origAttach
+		startLaunchDesktopApp = origLaunch
 	})
 
 	loadCheckpointsCalled := false
 	restoreCheckpointCalled := false
 	attachCalled := false
 	startStackCalled := false
+	startLaunchDesktopApp = func(string) error {
+		t.Fatal("silent startup must not launch desktop apps")
+		return nil
+	}
 
 	startLoadStackConfig = func() (*stack.StackConfig, error) {
 		return &stack.StackConfig{Services: map[string]stack.ServiceConfig{}}, nil
@@ -66,6 +74,9 @@ func TestDoStartSilentSkipsRegistryAndProjectSessions(t *testing.T) {
 }
 
 func TestDoStartRestoresCheckpointAndAttachesSavedSession(t *testing.T) {
+	origLaunch := startLaunchDesktopApp
+	t.Cleanup(func() { startLaunchDesktopApp = origLaunch })
+	startLaunchDesktopApp = func(string) error { return nil }
 	origLoadStackConfig, origStartStack := startLoadStackConfig, startStack
 	origLoadCheckpoints, origRestore, origAttach := startLoadCheckpoints, startRestoreCheckpoint, startAttach
 	t.Cleanup(func() {
@@ -93,6 +104,17 @@ func TestDoStartRestoresCheckpointAndAttachesSavedSession(t *testing.T) {
 }
 
 func TestDoStartWithoutCheckpointAttachesStartServer(t *testing.T) {
+	origLaunch := startLaunchDesktopApp
+	t.Cleanup(func() { startLaunchDesktopApp = origLaunch })
+	var launched []string
+	startLaunchDesktopApp = func(id string) error {
+		launched = append(launched, id)
+		// A missing app must not prevent the other apps or tmux from opening.
+		if id == "t3code-nightly.desktop" {
+			return errors.New("desktop entry not installed")
+		}
+		return nil
+	}
 	origLoadStackConfig, origStartStack := startLoadStackConfig, startStack
 	origLoadCheckpoints, origAttach := startLoadCheckpoints, startAttach
 	t.Cleanup(func() {
@@ -105,11 +127,21 @@ func TestDoStartWithoutCheckpointAttachesStartServer(t *testing.T) {
 	startStack = func(*stack.StackConfig, ...tmux.Option) (*stack.StartResult, error) { return &stack.StartResult{}, nil }
 	startLoadCheckpoints = func() (*checkpoint.Store, error) { return &checkpoint.Store{}, nil }
 	var attached string
-	startAttach = func(name string) error { attached = name; return nil }
+	startAttach = func(name string) error {
+		if len(launched) != 3 {
+			t.Fatal("desktop apps must be launched before tmux attach")
+		}
+		attached = name
+		return nil
+	}
 	if err := doStart(false); err != nil {
 		t.Fatal(err)
 	}
 	if attached != stack.SessionName {
 		t.Fatalf("attached %q, want %q", attached, stack.SessionName)
+	}
+	want := []string{"t3code-nightly.desktop", "chatgpt.desktop", "ai.opencode.desktop.desktop"}
+	if !reflect.DeepEqual(launched, want) {
+		t.Fatalf("launched %v, want %v", launched, want)
 	}
 }

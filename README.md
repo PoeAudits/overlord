@@ -89,8 +89,11 @@ Outside tmux, use `overlord open <name>` to open a Project Workspace.
 ## Startup stack
 
 `overlord start` manages enabled services through the `StartServer` tmux session,
-then restores the saved bare-terminal workspace checkpoint. `overlord up`
-starts only the independent `StartServer` stack. Supported service adapters currently include
+then restores the saved bare-terminal workspace checkpoint. It also opens the installed T3 Code
+(Nightly), ChatGPT app (not the web shortcut), and OpenCode Desktop using
+`gtk-launch`. Missing apps produce warnings without blocking workspace startup.
+`overlord up` starts only the independent `StartServer` stack without desktop
+apps. Supported service adapters currently include
 OpenCode, speech outbox, a frontend, Tailscale Serve,
 Phoenix, and Ollama. Configuration lives in
 `~/.config/overlord/stack.yaml`; missing configuration receives safe defaults.
@@ -120,9 +123,9 @@ scrollback, or environment) in the versioned, atomically written
 previous checkpoints are retained. `overlord start revert <index>` promotes an
 archive without changing live tmux sessions.
 
-T3 Code currently has no Overlord startup integration. A future integration
-must be designed after the ordinary packaged application works. `overlord start
-stop` stops only the stack's tmux session and intentionally leaves all Tailscale
+Desktop apps are separate from the stack: `overlord code` does not launch them,
+and `overlord start stop` does not close them. It stops only the stack's tmux
+session and intentionally leaves all Tailscale
 Serve routes in place because those routes can be shared with unrelated
 workflows.
 

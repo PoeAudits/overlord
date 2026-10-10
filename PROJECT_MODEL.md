@@ -124,9 +124,10 @@ configuration yields an in-memory version-1 default; commands that save it use
 an atomic write and `.bak` replacement. Enabled default adapters start in this
 order: `opencode`, `speech-outbox`, `frontend`,
 `tailscale`, `phoenix`, and `ollama`. They run in named windows of the
-`StartServer` tmux session. T3 Code currently has no Overlord startup adapter;
-a future integration must be designed after the ordinary packaged application
-works.
+`StartServer` tmux session. Separately, `overlord start` launches the installed
+T3 Code (Nightly), ChatGPT, and OpenCode Desktop applications through their
+desktop entries using `gtk-launch`. Launch failures are warnings; desktop apps
+are not stack services and are not closed by `overlord start stop`.
 
 `overlord start` creates the stack before opening configured Project Workspaces;
 `overlord up` / `overlord start up` only ensures the stack. Starting an existing
