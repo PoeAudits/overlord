@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+
+set -u
+
+if ! command -v tmux >/dev/null 2>&1; then
+  printf 'ta: tmux is not installed\n' >&2
+  exit 1
+fi
+
+sessions=()
+while IFS= read -r session; do
+  [[ $session =~ ^ta-.*-[0-9]+$ ]] || sessions+=("$session")
+done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null)
+
+if ((${#sessions[@]} == 0)); then
+  printf 'No tmux sessions.\n'
+  exit 1
+fi
+
+selected=0
+menu_lines=$((${#sessions[@]} + 1))
+
+restore_cursor() {
+  printf '\033[?25h'
+}
+
+trap restore_cursor EXIT
+printf '\033[?25l'
+
+render_menu() {
+  local index
+
+  printf 'Select a tmux session:\033[K\n'
+  for index in "${!sessions[@]}"; do
+    if ((index == selected)); then
+      printf '> %s\033[K\n' "${sessions[index]}"
+    else
+      printf '  %s\033[K\n' "${sessions[index]}"
+    fi
+  done
+}
+
+render_menu
+
+while true; do
+  IFS= read -rsn1 key
+
+  case "$key" in
+    '')
+      break
+      ;;
+    q)
+      exit 0
+      ;;
+    $'\033')
+      sequence=''
+      IFS= read -rsn2 -t 0.1 sequence || true
+      case "$sequence" in
+        '[A')
+          if ((selected > 0)); then
+            ((selected--))
+          fi
+          ;;
+        '[B')
+          if ((selected < ${#sessions[@]} - 1)); then
+            ((selected++))
+          fi
+          ;;
+        '')
+          exit 0
+          ;;
+      esac
+      ;;
+    *)
+      continue
+      ;;
+  esac
+
+  printf '\033[%dA' "$menu_lines"
+  render_menu
+done
+
+session=${sessions[selected]}
+mapfile -t windows < <(tmux list-windows -t "$session" -F '#{window_index}' 2>/dev/null)
+
+if ((${#windows[@]} == 0)); then
+  printf 'ta: session no longer exists: %s\n' "$session" >&2
+  exit 1
+fi
+
+restore_cursor
+linked_session="ta-${session}-$$"
+
+cleanup() {
+  tmux kill-session -t "=$linked_session" 2>/dev/null || true
+}
+
+trap cleanup EXIT HUP INT TERM
+
+tmux new-session -d -t "=$session" -s "$linked_session" || exit 1
+tmux select-window -t "=$linked_session:${windows[0]}" || exit 1
+tmux attach-session -t "=$linked_session"

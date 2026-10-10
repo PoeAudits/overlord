@@ -48,8 +48,8 @@ only a stack adapter, even though it serves Alice-adjacent functionality.
 - `internal/fileutil`: path expansion, atomic writes, and directory moves.
 - `internal/tmux`: the testable tmux command adapter used for Workspaces and
   the stack.
-- `internal/stack`: stack YAML, service adapters, package preflight, service
-  lifecycle, restart, stop, and endpoint helpers.
+- `internal/stack`: stack YAML, service adapters, service lifecycle, restart,
+  stop, and endpoint helpers.
 - `internal/templates`: embedded files used by `overlord new`.
 
 The registry and tmux command runner are existing seams: registry mutation must
@@ -122,24 +122,23 @@ tmux session on the host.
 `~/.config/overlord/stack.yaml` is separate from the registry. Missing stack
 configuration yields an in-memory version-1 default; commands that save it use
 an atomic write and `.bak` replacement. Enabled default adapters start in this
-order: `opencode`, `speech-outbox`, `opencode-desktop`, `frontend`,
+order: `opencode`, `speech-outbox`, `frontend`,
 `tailscale`, `phoenix`, and `ollama`. They run in named windows of the
-`StartServer` tmux session.
+`StartServer` tmux session. T3 Code currently has no Overlord startup adapter;
+a future integration must be designed after the ordinary packaged application
+works.
 
 `overlord start` creates the stack before opening configured Project Workspaces;
 `overlord up` / `overlord start up` only ensures the stack. Starting an existing
 `StartServer` is idempotent and reports enabled services as skipped rather than
 recreating them. `overlord start restart <service...>` requires that session and
 recreates only named, enabled service windows; unknown or disabled names fail.
-`overlord start stop` kills `StartServer` and attempts `tailscale serve reset`,
-reporting an absent or failed Tailscale reset as a warning/error outcome.
+`overlord start stop` kills `StartServer`. It does not reset Tailscale Serve:
+existing routes persist because they can belong to unrelated workflows.
 
-Health checks are short local HTTP checks where applicable, a process query for
-OpenCode Desktop, and `tailscale serve status` for Tailscale. `start status` is
-observational but can contact configured local endpoints and invoke Tailscale.
-When both OpenCode CLI and Desktop packages are installed with different
-upstream versions, preflight skips only OpenCode Desktop and warns; the
-remaining stack is still eligible to start. Service availability, package
+Health checks are short local HTTP checks where applicable and `tailscale serve
+status` for Tailscale. `start status` is observational but can contact configured
+local endpoints and invoke Tailscale. Service availability, package
 compatibility, ports, commands, and configured working/data directories remain
 host-dependent.
 
@@ -147,8 +146,8 @@ Phoenix is an optional local service adapter, not the Phoenix Project or its
 data owner. Speech outbox runs `alice speech-outbox serve` with its directory
 configured by `speech-outbox.settings.directory` (default
 `~/.config/alice`); Overlord neither reads nor interprets that directory's
-coordination data. OpenCode Desktop is likewise a locally launched application;
-OpenCode server ownership and application state remain external.
+coordination data. OpenCode server ownership and application state remain
+external.
 
 The stack and tmux mechanisms are early practical implementations rather than
 accepted future architecture. The owner relies on `overlord start` for initial

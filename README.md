@@ -88,13 +88,13 @@ Outside tmux, use `overlord open <name>` to open a Project Workspace.
 
 ## Startup stack
 
-`overlord start` manages enabled services in the `StartServer` tmux session,
+`overlord start` manages enabled services through the `StartServer` tmux session,
 then restores the saved bare-terminal workspace checkpoint. `overlord up`
 starts only the independent `StartServer` stack. Supported service adapters currently include
-OpenCode, OpenCode Desktop, speech outbox, a frontend, Tailscale Serve,
+OpenCode, speech outbox, a frontend, Tailscale Serve,
 Phoenix, and Ollama. Configuration lives in
 `~/.config/overlord/stack.yaml`; missing configuration receives safe defaults.
-The default configuration leaves Phoenix, speech outbox, and OpenCode Desktop disabled.
+The default configuration leaves Phoenix and speech outbox disabled.
 
 ```sh
 overlord start
@@ -109,10 +109,9 @@ overlord start url --remote
 overlord code
 ```
 
-Startup preflight may skip an incompatible OpenCode Desktop package while
-leaving the rest of the stack available. Targeted restart recreates only named,
-enabled service windows. `overlord code` ensures the stack is available and
-attaches the current directory to the configured OpenCode server.
+Targeted restart recreates named, enabled service windows. `overlord code`
+ensures the stack is available and attaches the current directory to the
+configured OpenCode server.
 
 `overlord start save` must run from tmux. It records session, window, pane,
 directory, selection, and layout topology (never commands, processes, history,
@@ -121,8 +120,11 @@ scrollback, or environment) in the versioned, atomically written
 previous checkpoints are retained. `overlord start revert <index>` promotes an
 archive without changing live tmux sessions.
 
-T3 Code integration was removed. Historical T3 plans and instructions are not
-current startup-stack documentation.
+T3 Code currently has no Overlord startup integration. A future integration
+must be designed after the ordinary packaged application works. `overlord start
+stop` stops only the stack's tmux session and intentionally leaves all Tailscale
+Serve routes in place because those routes can be shared with unrelated
+workflows.
 
 ## Development layout
 

@@ -94,12 +94,6 @@ func DefaultConfig() *StackConfig {
 				Enabled:  false,
 				Settings: map[string]string{},
 			},
-			"opencode-desktop": {
-				Enabled: false,
-				Settings: map[string]string{
-					openCodeDesktopBinaryKey: defaultOpenCodeDesktopBinary,
-				},
-			},
 			"frontend": {
 				Enabled: true,
 				Settings: map[string]string{

@@ -23,8 +23,8 @@ stack used by `overlord start` and `overlord code`.
 - `internal/registry`: versioned registry model, validation, resolution, and
   atomic persistence.
 - `internal/tmux`: tmux adapter used by commands and stack management.
-- `internal/stack`: startup configuration, service adapters, preflight,
-  lifecycle, restart, status, and stop behavior.
+- `internal/stack`: startup configuration, service adapters, lifecycle,
+  restart, status, and stop behavior.
 - `internal/templates`: embedded files for newly initialized Projects.
 
 Keep registry mutation behind the registry load/save path, preserve atomic

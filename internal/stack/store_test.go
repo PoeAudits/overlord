@@ -19,18 +19,18 @@ func TestLoad_DefaultConfigWhenFileNotExist(t *testing.T) {
 	if config.Version != 1 {
 		t.Errorf("expected Version 1, got %d", config.Version)
 	}
-	if len(config.Services) != 7 {
-		t.Errorf("expected 7 default services, got %d", len(config.Services))
+	if len(config.Services) != 6 {
+		t.Errorf("expected 6 default services, got %d", len(config.Services))
 	}
 
-	expectedServices := []string{"opencode", "speech-outbox", "opencode-desktop", "frontend", "tailscale", "phoenix", "ollama"}
+	expectedServices := []string{"opencode", "speech-outbox", "frontend", "tailscale", "phoenix", "ollama"}
 	for _, name := range expectedServices {
 		svc, ok := config.Services[name]
 		if !ok {
 			t.Errorf("expected default service %q to exist", name)
 			continue
 		}
-		shouldBeEnabled := name != "speech-outbox" && name != "opencode-desktop" && name != "phoenix"
+		shouldBeEnabled := name != "speech-outbox" && name != "phoenix"
 		if svc.Enabled != shouldBeEnabled {
 			t.Errorf("service %q enabled = %v, want %v", name, svc.Enabled, shouldBeEnabled)
 		}

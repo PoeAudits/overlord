@@ -41,10 +41,6 @@ func runStartStop(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "%s %s session not running\n", s.Warn.Render("Warning:"), s.Bold.Render(stack.SessionName))
 	}
 
-	if result.TailscaleReset {
-		fmt.Fprintf(os.Stderr, "%s tailscale serve config reset\n", s.Success.Render("Stopped:"))
-	}
-
 	for _, w := range result.Warnings {
 		fmt.Fprintf(os.Stderr, "%s %s\n", s.Warn.Render("Warning:"), w)
 	}

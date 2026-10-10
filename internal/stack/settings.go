@@ -6,9 +6,8 @@ import (
 )
 
 const (
-	openCodeHostKey          = "host"
-	openCodePortKey          = "port"
-	openCodeDesktopBinaryKey = "binary"
+	openCodeHostKey = "host"
+	openCodePortKey = "port"
 
 	frontEndPortKey    = "port"
 	frontEndWorkDirKey = "workdir"
@@ -23,9 +22,8 @@ const (
 	phoenixHealthURLKey      = "health_url"
 	speechOutboxDirectoryKey = "directory"
 
-	defaultOpenCodeHost          = "127.0.0.1"
-	defaultOpenCodePort          = 4096
-	defaultOpenCodeDesktopBinary = "opencode-desktop"
+	defaultOpenCodeHost = "127.0.0.1"
+	defaultOpenCodePort = 4096
 
 	defaultFrontEndPort = 3001
 	defaultFrontEndDir  = "~/Overlord/sandbox/phone-code/web"
@@ -50,11 +48,6 @@ func speechOutboxDirectory(cfg *StackConfig) string {
 func openCodePort(cfg *StackConfig) int {
 	settings := serviceSettings(cfg, "opencode")
 	return intSetting(settings, openCodePortKey, defaultOpenCodePort)
-}
-
-func openCodeDesktopBinary(cfg *StackConfig) string {
-	settings := serviceSettings(cfg, "opencode-desktop")
-	return stringSetting(settings, openCodeDesktopBinaryKey, defaultOpenCodeDesktopBinary)
 }
 
 func frontEndPort(cfg *StackConfig) int {
