@@ -113,16 +113,11 @@ func runInitCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine description
-	description := initOpts.description
-	if description == "" {
-		description = fmt.Sprintf("%s project", name)
-	}
+	description := projectDescription(name, initOpts.description)
 
 	// Styles
 	s := NewStyles()
 	labelStyle := s.Label
-	successStyle := s.Success
-	warnStyle := s.Warn
 	pathStyle := s.Path
 
 	fmt.Printf("%s %s\n", labelStyle.Render("Initializing:"), pathStyle.Render(absPath))
@@ -146,6 +141,10 @@ func runInitCmd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to render templates: %w", err)
 	}
 
+	return writeInitTemplates(absPath, allTemplates, s)
+}
+
+func writeInitTemplates(absPath string, allTemplates map[templates.TemplateType]string, s styles) error {
 	// Write each template, skipping existing files
 	written := 0
 	skipped := 0
@@ -156,7 +155,7 @@ func runInitCmd(cmd *cobra.Command, args []string) error {
 
 		// Check if file already exists
 		if _, err := os.Stat(outputPath); err == nil {
-			fmt.Printf("  %s %s (already exists)\n", warnStyle.Render("Skipped"), relPath)
+			fmt.Printf("  %s %s (already exists)\n", s.Warn.Render("Skipped"), relPath)
 			skipped++
 			continue
 		}
@@ -171,13 +170,13 @@ func runInitCmd(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to write %s: %w", relPath, err)
 		}
 
-		fmt.Printf("  %s %s\n", successStyle.Render("Written"), relPath)
+		fmt.Printf("  %s %s\n", s.Success.Render("Written"), relPath)
 		written++
 	}
 
 	fmt.Println()
 	fmt.Printf("%s (%d written, %d skipped)\n",
-		successStyle.Render("Initialization complete!"), written, skipped)
+		s.Success.Render("Initialization complete!"), written, skipped)
 
 	return nil
 }

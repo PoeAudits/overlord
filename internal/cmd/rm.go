@@ -10,6 +10,7 @@ import (
 
 	"github.com/PoeAudits/overlord/internal/fileutil"
 	"github.com/PoeAudits/overlord/internal/lifecycle"
+	"github.com/PoeAudits/overlord/internal/registry"
 )
 
 type rmFlags struct {
@@ -58,34 +59,10 @@ func runRm(cmd *cobra.Command, args []string) error {
 
 	// Resolve all projects first before making any changes
 	s := NewStyles()
-	type resolvedProject struct {
-		name string
-		path string
-	}
-	var resolved []resolvedProject
-	var resolveErrors []string
-
-	for _, name := range args {
-		result, err := reg.ResolveOne(name)
-		if err != nil {
-			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s' not found", name))
-			continue
-		}
-		projectPath, err := fileutil.ExpandProjectPath(result.Project.Path, reg.Settings.BaseDir)
-		if err != nil {
-			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': failed to expand path: %v", name, err))
-			continue
-		}
-		resolved = append(resolved, resolvedProject{name: result.Name, path: projectPath})
-	}
+	resolved, resolveErrors := resolveRemovalProjects(reg, args)
 
 	// Print resolution errors and continue with valid projects
-	if len(resolveErrors) > 0 {
-		for _, e := range resolveErrors {
-			fmt.Printf("%s %s\n", s.StrongWarn.Render("Skipping"), e)
-		}
-		fmt.Println()
-	}
+	printSkippedProjects(resolveErrors, s)
 
 	if len(resolved) == 0 {
 		return cmdError("rm", "no valid projects to remove", "Run 'overlord list' to see available projects")
@@ -93,34 +70,10 @@ func runRm(cmd *cobra.Command, args []string) error {
 
 	// Handle force mode (delete files)
 	if rmOpts.force {
-		filtered := make([]resolvedProject, 0, len(resolved))
-		for _, p := range resolved {
-			_, err := os.Stat(p.path)
-			if errors.Is(err, fs.ErrNotExist) {
-				fmt.Printf("Warning: Project directory does not exist: %s\n", p.path)
-				fmt.Println("Removing from registry only...")
-				filtered = append(filtered, p)
-				continue
-			}
-
-			if err != nil {
-				return fmt.Errorf("failed to check project directory '%s': %w", p.name, err)
-			}
-
-			confirmed, err := rmConfirmDelete(p.name, p.path)
-			if err != nil {
-				return fmt.Errorf("failed to read confirmation: %w", err)
-			}
-			if !confirmed {
-				fmt.Printf("Skipping '%s'\n", p.name)
-				continue
-			}
-			if err := rmRemoveAll(p.path); err != nil {
-				return fmt.Errorf("failed to delete project directory '%s': %w", p.name, err)
-			}
-			filtered = append(filtered, p)
+		resolved, err = deleteRemovalDirectories(resolved)
+		if err != nil {
+			return err
 		}
-		resolved = filtered
 		if len(resolved) == 0 {
 			return nil
 		}
@@ -153,26 +106,71 @@ func runRm(cmd *cobra.Command, args []string) error {
 			ProjectPath: p.path,
 			Settings:    nil,
 		})
-		for _, warning := range postRemoveResult.Warnings {
-			fmt.Fprintf(os.Stderr, "warning: %s\n", warning)
-		}
+		printLifecycleWarnings(postRemoveResult.Warnings)
 	}
 
-	// Define styles for output
-	labelStyle := s.Label
-	successStyle := s.Success
-	pathStyle := s.Path
-
-	// Print success messages
+	message, label := "Removed from registry", "Directory:"
+	if rmOpts.force {
+		message, label = "Deleted project", "Path:"
+	}
 	for _, p := range resolved {
-		if rmOpts.force {
-			fmt.Printf("%s '%s'\n", successStyle.Render("Deleted project"), p.name)
-			fmt.Printf("%s %s\n", labelStyle.Render("Path:"), pathStyle.Render(p.path))
-		} else {
-			fmt.Printf("%s '%s'\n", successStyle.Render("Removed from registry"), p.name)
-			fmt.Printf("%s %s\n", labelStyle.Render("Directory:"), pathStyle.Render(p.path))
-		}
+		fmt.Printf("%s '%s'\n", s.Success.Render(message), p.name)
+		fmt.Printf("%s %s\n", s.Label.Render(label), s.Path.Render(p.path))
 	}
 
 	return nil
+}
+
+type removalProject struct{ name, path string }
+
+func resolveRemovalProjects(reg *registry.Registry, args []string) ([]removalProject, []string) {
+	var resolved []removalProject
+	var resolveErrors []string
+
+	for _, name := range args {
+		result, err := reg.ResolveOne(name)
+		if err != nil {
+			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s' not found", name))
+			continue
+		}
+		projectPath, err := fileutil.ExpandProjectPath(result.Project.Path, reg.Settings.BaseDir)
+		if err != nil {
+			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': failed to expand path: %v", name, err))
+			continue
+		}
+		resolved = append(resolved, removalProject{name: result.Name, path: projectPath})
+	}
+
+	return resolved, resolveErrors
+}
+
+func deleteRemovalDirectories(resolved []removalProject) ([]removalProject, error) {
+	filtered := make([]removalProject, 0, len(resolved))
+	for _, p := range resolved {
+		_, err := os.Stat(p.path)
+		if errors.Is(err, fs.ErrNotExist) {
+			fmt.Printf("Warning: Project directory does not exist: %s\n", p.path)
+			fmt.Println("Removing from registry only...")
+			filtered = append(filtered, p)
+			continue
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to check project directory '%s': %w", p.name, err)
+		}
+
+		confirmed, err := rmConfirmDelete(p.name, p.path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read confirmation: %w", err)
+		}
+		if !confirmed {
+			fmt.Printf("Skipping '%s'\n", p.name)
+			continue
+		}
+		if err := rmRemoveAll(p.path); err != nil {
+			return nil, fmt.Errorf("failed to delete project directory '%s': %w", p.name, err)
+		}
+		filtered = append(filtered, p)
+	}
+	return filtered, nil
 }

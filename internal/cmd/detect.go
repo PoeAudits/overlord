@@ -62,62 +62,13 @@ func runDetect(cmd *cobra.Command, args []string) error {
 	// Build set of known paths (relative to base dir)
 	knownPaths := buildKnownPaths(reg, expandedBase)
 
-	// Build scan targets: category paths + archive
-	type scanTarget struct {
-		dir      string // relative dir to scan under base
-		category string // inferred category label
+	targets, err := detectionTargets(detectCategoryOpt)
+	if err != nil {
+		return err
 	}
-
-	var targets []scanTarget
-	for _, cat := range registry.ValidCategories() {
-		catPath := strings.TrimSuffix(cat.Path(), "/")
-		if catPath == "" {
-			continue
-		}
-		targets = append(targets, scanTarget{dir: catPath, category: string(cat)})
-	}
-	targets = append(targets, scanTarget{dir: "archive", category: "archive"})
-
-	// Filter by category if specified
-	if detectCategoryOpt != "" {
-		var filtered []scanTarget
-		for _, t := range targets {
-			if t.category == detectCategoryOpt {
-				filtered = append(filtered, t)
-			}
-		}
-		if len(filtered) == 0 {
-			return cmdError("detect", fmt.Sprintf("unknown category: %s", detectCategoryOpt),
-				fmt.Sprintf("Valid categories: %s, archive", strings.Join(validCategoryNames(), ", ")))
-		}
-		targets = filtered
-	}
-
-	// Scan each target directory for unregistered projects
-	var unregistered []unregisteredProject
-	for _, target := range targets {
-		absDir := filepath.Join(expandedBase, target.dir)
-		entries, err := os.ReadDir(absDir)
-		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				continue
-			}
-			return fmt.Errorf("failed to read directory %s: %w", absDir, err)
-		}
-
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				continue
-			}
-			relPath := filepath.Join(target.dir, entry.Name())
-			if _, known := knownPaths[relPath]; !known {
-				unregistered = append(unregistered, unregisteredProject{
-					Name:     entry.Name(),
-					Path:     relPath,
-					Category: target.category,
-				})
-			}
-		}
+	unregistered, err := scanUnregisteredProjects(expandedBase, knownPaths, targets)
+	if err != nil {
+		return err
 	}
 
 	if detectJSON {
@@ -202,4 +153,70 @@ func validCategoryNames() []string {
 		names[i] = string(c)
 	}
 	return names
+}
+
+type scanTarget struct {
+	dir      string // relative dir to scan under base
+	category string // inferred category label
+}
+
+func detectionTargets(category string) ([]scanTarget, error) {
+	// Build scan targets: category paths + archive
+	var targets []scanTarget
+	for _, cat := range registry.ValidCategories() {
+		catPath := strings.TrimSuffix(cat.Path(), "/")
+		if catPath == "" {
+			continue
+		}
+		targets = append(targets, scanTarget{dir: catPath, category: string(cat)})
+	}
+	targets = append(targets, scanTarget{dir: "archive", category: "archive"})
+
+	// Filter by category if specified
+	if category != "" {
+		var filtered []scanTarget
+		for _, t := range targets {
+			if t.category == category {
+				filtered = append(filtered, t)
+			}
+		}
+		if len(filtered) == 0 {
+			return nil, cmdError("detect", fmt.Sprintf("unknown category: %s", category),
+				fmt.Sprintf("Valid categories: %s, archive", strings.Join(validCategoryNames(), ", ")))
+		}
+		targets = filtered
+	}
+
+	return targets, nil
+}
+
+func scanUnregisteredProjects(expandedBase string, knownPaths map[string]struct{}, targets []scanTarget) ([]unregisteredProject, error) {
+	// Scan each target directory for unregistered projects
+	var unregistered []unregisteredProject
+	for _, target := range targets {
+		absDir := filepath.Join(expandedBase, target.dir)
+		entries, err := os.ReadDir(absDir)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+			return nil, fmt.Errorf("failed to read directory %s: %w", absDir, err)
+		}
+
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			relPath := filepath.Join(target.dir, entry.Name())
+			if _, known := knownPaths[relPath]; !known {
+				unregistered = append(unregistered, unregisteredProject{
+					Name:     entry.Name(),
+					Path:     relPath,
+					Category: target.category,
+				})
+			}
+		}
+	}
+
+	return unregistered, nil
 }

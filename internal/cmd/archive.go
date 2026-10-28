@@ -62,62 +62,12 @@ func runArchive(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Resolve all projects upfront
-	var resolved []resolvedProject
-	var resolveErrors []string
-
-	for _, name := range args {
-		result, err := reg.ResolveOne(name)
-		if err != nil {
-			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': not found", name))
-			continue
-		}
-
-		project := result.Project
-
-		if project.Status.State == registry.StateArchived {
-			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': already archived (location: %s)", result.Name, project.Path))
-			continue
-		}
-
-		sourcePath, err := fileutil.ExpandProjectPath(project.Path, reg.Settings.BaseDir)
-		if err != nil {
-			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': failed to expand source path: %v", result.Name, err))
-			continue
-		}
-
-		archivePath := fmt.Sprintf("archive/%s", result.Name)
-		destPath, err := fileutil.ExpandProjectPath(archivePath, reg.Settings.BaseDir)
-		if err != nil {
-			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': failed to expand destination path: %v", result.Name, err))
-			continue
-		}
-
-		if _, err := os.Stat(sourcePath); errors.Is(err, fs.ErrNotExist) {
-			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': directory does not exist: %s", result.Name, sourcePath))
-			continue
-		} else if err != nil {
-			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': failed to check directory: %v", result.Name, err))
-			continue
-		}
-
-		resolved = append(resolved, resolvedProject{
-			name:       result.Name,
-			project:    project,
-			sourcePath: sourcePath,
-			destPath:   destPath,
-		})
-	}
+	resolved, resolveErrors := resolveArchiveProjects(reg, args)
 
 	s := NewStyles()
 
 	// Print resolution errors
-	if len(resolveErrors) > 0 {
-		for _, e := range resolveErrors {
-			fmt.Printf("%s %s\n", s.StrongWarn.Render("Skipping"), e)
-		}
-		fmt.Println()
-	}
+	printSkippedProjects(resolveErrors, s)
 
 	if len(resolved) == 0 {
 		return fmt.Errorf("no valid projects to archive")
@@ -143,9 +93,9 @@ func runArchive(cmd *cobra.Command, args []string) error {
 		err := archiveOneProject(reg, rp)
 		if err != nil {
 			archiveErrors = append(archiveErrors, fmt.Sprintf("'%s': %v", rp.name, err))
-		} else {
-			archiveSuccessCount++
+			continue
 		}
+		archiveSuccessCount++
 	}
 
 	// Print archive errors
@@ -166,11 +116,6 @@ func runArchive(cmd *cobra.Command, args []string) error {
 		fmt.Printf("%s Registry save failed after %d successful archive(s); filesystem and registry may be out of sync: %v\n",
 			s.StrongWarn.Render("Warning:"), archiveSuccessCount, err)
 		return err
-	}
-
-	if len(archiveErrors) > 0 {
-		// Partial success — some archives failed but registry saved for the ones that succeeded
-		return nil
 	}
 
 	return nil
@@ -229,4 +174,55 @@ func archiveOneProject(reg *registry.Registry, rp resolvedProject) error {
 	}
 
 	return nil
+}
+
+func resolveArchiveProjects(reg *registry.Registry, args []string) ([]resolvedProject, []string) {
+	// Resolve all projects upfront
+	var resolved []resolvedProject
+	var resolveErrors []string
+
+	for _, name := range args {
+		result, err := reg.ResolveOne(name)
+		if err != nil {
+			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': not found", name))
+			continue
+		}
+
+		project := result.Project
+
+		if project.Status.State == registry.StateArchived {
+			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': already archived (location: %s)", result.Name, project.Path))
+			continue
+		}
+
+		sourcePath, err := fileutil.ExpandProjectPath(project.Path, reg.Settings.BaseDir)
+		if err != nil {
+			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': failed to expand source path: %v", result.Name, err))
+			continue
+		}
+
+		archivePath := fmt.Sprintf("archive/%s", result.Name)
+		destPath, err := fileutil.ExpandProjectPath(archivePath, reg.Settings.BaseDir)
+		if err != nil {
+			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': failed to expand destination path: %v", result.Name, err))
+			continue
+		}
+
+		if _, err := os.Stat(sourcePath); errors.Is(err, fs.ErrNotExist) {
+			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': directory does not exist: %s", result.Name, sourcePath))
+			continue
+		} else if err != nil {
+			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': failed to check directory: %v", result.Name, err))
+			continue
+		}
+
+		resolved = append(resolved, resolvedProject{
+			name:       result.Name,
+			project:    project,
+			sourcePath: sourcePath,
+			destPath:   destPath,
+		})
+	}
+
+	return resolved, resolveErrors
 }

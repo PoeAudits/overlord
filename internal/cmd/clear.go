@@ -56,42 +56,10 @@ func runClear(cmd *cobra.Command, args []string) error {
 
 	// Resolve all projects upfront
 	s := NewStyles()
-	var targets []clearTarget
-	var resolveErrors []string
-
-	for _, name := range args {
-		result, err := reg.ResolveOne(name)
-		if err != nil {
-			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': not found", name))
-			continue
-		}
-
-		projectPath, err := fileutil.ExpandProjectPath(result.Project.Path, reg.Settings.BaseDir)
-		if err != nil {
-			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': failed to expand path: %v", result.Name, err))
-			continue
-		}
-
-		target := clearTarget{
-			name:        result.Name,
-			projectPath: projectPath,
-		}
-
-		// Check what exists on disk
-		if _, err := os.Stat(projectPath); err == nil {
-			target.projectExists = true
-		}
-
-		targets = append(targets, target)
-	}
+	targets, resolveErrors := resolveClearTargets(reg, args)
 
 	// Print resolution errors and continue with valid targets
-	if len(resolveErrors) > 0 {
-		for _, e := range resolveErrors {
-			fmt.Printf("%s %s\n", s.StrongWarn.Render("Skipping"), e)
-		}
-		fmt.Println()
-	}
+	printSkippedProjects(resolveErrors, s)
 
 	if len(targets) == 0 {
 		return fmt.Errorf("no valid projects to clear")
@@ -163,4 +131,37 @@ func clearOneProject(reg *registry.Registry, t clearTarget) error {
 	fmt.Println()
 
 	return nil
+}
+
+func resolveClearTargets(reg *registry.Registry, args []string) ([]clearTarget, []string) {
+	var targets []clearTarget
+	var resolveErrors []string
+
+	for _, name := range args {
+		result, err := reg.ResolveOne(name)
+		if err != nil {
+			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': not found", name))
+			continue
+		}
+
+		projectPath, err := fileutil.ExpandProjectPath(result.Project.Path, reg.Settings.BaseDir)
+		if err != nil {
+			resolveErrors = append(resolveErrors, fmt.Sprintf("'%s': failed to expand path: %v", result.Name, err))
+			continue
+		}
+
+		target := clearTarget{
+			name:        result.Name,
+			projectPath: projectPath,
+		}
+
+		// Check what exists on disk
+		if _, err := os.Stat(projectPath); err == nil {
+			target.projectExists = true
+		}
+
+		targets = append(targets, target)
+	}
+
+	return targets, resolveErrors
 }

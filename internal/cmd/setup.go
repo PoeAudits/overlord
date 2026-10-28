@@ -100,19 +100,8 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("  Registry: %s\n", registry.DefaultRegistryPath)
 
-	shimResult, err := ensureOCShimInstalled()
-	if err != nil {
+	if err := setupOCShim(); err != nil {
 		return err
-	}
-	switch shimResult.Action {
-	case ocShimInstalled:
-		fmt.Printf("  oc shim:  installed at %s\n", fileutil.FormatPathWithTilde(shimResult.Path))
-	case ocShimUpdated:
-		fmt.Printf("  oc shim:  updated at %s\n", fileutil.FormatPathWithTilde(shimResult.Path))
-	case ocShimSkipped:
-		fmt.Printf("  oc shim:  skipped (%s is not Overlord-managed)\n", fileutil.FormatPathWithTilde(shimResult.Path))
-	default:
-		fmt.Printf("  oc shim:  already current at %s\n", fileutil.FormatPathWithTilde(shimResult.Path))
 	}
 
 	fmt.Println("\nSetup complete!")
@@ -302,20 +291,13 @@ func setupGitIgnore(configDir string) error {
 	}
 	defer f.Close()
 
-	// Add separator if file has content
+	// Assemble the suffix once so each write follows the same error path.
+	suffix := "\n# Machine-specific (added by setup)\n" + strings.Join(missing, "\n") + "\n"
 	if existingContent != "" && !strings.HasSuffix(existingContent, "\n") {
-		if _, err := f.WriteString("\n"); err != nil {
-			return err
-		}
+		suffix = "\n" + suffix
 	}
-
-	if _, err := f.WriteString("\n# Machine-specific (added by setup)\n"); err != nil {
+	if _, err := f.WriteString(suffix); err != nil {
 		return err
-	}
-	for _, entry := range missing {
-		if _, err := f.WriteString(entry + "\n"); err != nil {
-			return err
-		}
 	}
 
 	fmt.Printf("  Updated: %s\n", gitignorePath)
@@ -334,5 +316,24 @@ func createDir(path, name string) error {
 	} else {
 		fmt.Printf("  Exists:  %s\n", path)
 	}
+	return nil
+}
+
+func setupOCShim() error {
+	shimResult, err := ensureOCShimInstalled()
+	if err != nil {
+		return err
+	}
+	switch shimResult.Action {
+	case ocShimInstalled:
+		fmt.Printf("  oc shim:  installed at %s\n", fileutil.FormatPathWithTilde(shimResult.Path))
+	case ocShimUpdated:
+		fmt.Printf("  oc shim:  updated at %s\n", fileutil.FormatPathWithTilde(shimResult.Path))
+	case ocShimSkipped:
+		fmt.Printf("  oc shim:  skipped (%s is not Overlord-managed)\n", fileutil.FormatPathWithTilde(shimResult.Path))
+	default:
+		fmt.Printf("  oc shim:  already current at %s\n", fileutil.FormatPathWithTilde(shimResult.Path))
+	}
+
 	return nil
 }

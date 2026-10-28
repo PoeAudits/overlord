@@ -100,25 +100,15 @@ func (s *Session) Exists() (bool, error) {
 
 // Create starts a detached tmux session with an initial "base" window.
 func (s *Session) Create() error {
-	exists, err := s.Exists()
-	if err != nil {
-		return err
-	}
-	if exists {
-		return fmt.Errorf("tmux session %q: %w", s.Name, ErrSessionExists)
-	}
-	output, err := s.runner()("tmux", "new-session", "-d", "-s", s.Name, "-n", "base", "-c", s.Dir)
-	if err != nil {
-		if trimmed := strings.TrimSpace(string(output)); trimmed != "" {
-			return errors.New(trimmed)
-		}
-		return err
-	}
-	return nil
+	return s.create("base")
 }
 
 // CreateWithCommand starts a detached tmux session with a named initial window running command.
 func (s *Session) CreateWithCommand(windowName, command string) error {
+	return s.create(windowName, command)
+}
+
+func (s *Session) create(windowName string, command ...string) error {
 	exists, err := s.Exists()
 	if err != nil {
 		return err
@@ -126,14 +116,9 @@ func (s *Session) CreateWithCommand(windowName, command string) error {
 	if exists {
 		return fmt.Errorf("tmux session %q: %w", s.Name, ErrSessionExists)
 	}
-	output, err := s.runner()("tmux", "new-session", "-d", "-s", s.Name, "-n", windowName, "-c", s.Dir, command)
-	if err != nil {
-		if trimmed := strings.TrimSpace(string(output)); trimmed != "" {
-			return errors.New(trimmed)
-		}
-		return err
-	}
-	return nil
+	args := []string{"new-session", "-d", "-s", s.Name, "-n", windowName, "-c", s.Dir}
+	output, err := s.runner()("tmux", append(args, command...)...)
+	return commandError(output, err)
 }
 
 // NewWindow adds a new named window running command to an existing session.
@@ -146,13 +131,7 @@ func (s *Session) NewWindow(name, command string) error {
 		return fmt.Errorf("tmux session %q: %w", s.Name, ErrSessionNotFound)
 	}
 	output, err := s.runner()("tmux", "new-window", "-t", s.Name, "-n", name, "-c", s.Dir, command)
-	if err != nil {
-		if trimmed := strings.TrimSpace(string(output)); trimmed != "" {
-			return errors.New(trimmed)
-		}
-		return err
-	}
-	return nil
+	return commandError(output, err)
 }
 
 // SourceLocal executes the optional .tmux.local script with session context.
@@ -186,26 +165,14 @@ func (s *Session) SplitWindow(windowName, command string) error {
 	target := s.Name + ":" + windowName
 	args := []string{"split-window", "-v", "-t", target, "-c", s.Dir, command}
 	output, err := s.runner()("tmux", args...)
-	if err != nil {
-		if trimmed := strings.TrimSpace(string(output)); trimmed != "" {
-			return errors.New(trimmed)
-		}
-		return err
-	}
-	return nil
+	return commandError(output, err)
 }
 
 // KillWindow terminates a named tmux window in the session.
 func (s *Session) KillWindow(windowName string) error {
 	target := s.Name + ":" + windowName
 	output, err := s.runner()("tmux", "kill-window", "-t", target)
-	if err != nil {
-		if trimmed := strings.TrimSpace(string(output)); trimmed != "" {
-			return errors.New(trimmed)
-		}
-		return err
-	}
-	return nil
+	return commandError(output, err)
 }
 
 // IsWindowNotFound reports whether err signals that tmux could not find the
@@ -231,13 +198,7 @@ func (s *Session) Kill() error {
 		return nil
 	}
 	output, err := s.runner()("tmux", "kill-session", "-t", s.Name)
-	if err != nil {
-		if trimmed := strings.TrimSpace(string(output)); trimmed != "" {
-			return errors.New(trimmed)
-		}
-		return err
-	}
-	return nil
+	return commandError(output, err)
 }
 
 // AttachOrSwitch either attaches to the session or switches the current client.
@@ -290,4 +251,14 @@ func exitCode(err error) (int, bool) {
 		return coder.ExitCode(), true
 	}
 	return 0, false
+}
+
+func commandError(output []byte, err error) error {
+	if err == nil {
+		return nil
+	}
+	if message := strings.TrimSpace(string(output)); message != "" {
+		return errors.New(message)
+	}
+	return err
 }
