@@ -73,52 +73,9 @@ func StartStack(cfg *StackConfig, opts ...tmux.Option) (*StartResult, error) {
 		return &StartResult{}, nil
 	}
 
-	var warnings []string
-	sessionCreated := false
-	cleanupOnError := func(cause error) error {
-		if !sessionCreated {
-			return cause
-		}
-		if killErr := session.Kill(); killErr != nil {
-			return fmt.Errorf("%w (rollback failed: %v)", cause, killErr)
-		}
-		return cause
-	}
-
-	for i, svc := range services {
-		dir := svc.WorkDir()
-		if dir == "" {
-			dir, _ = os.UserHomeDir()
-		}
-
-		cmd := buildCommand(svc)
-
-		if i == 0 {
-			// First service: create the session with a named window.
-			session.Dir = dir
-			if err := session.CreateWithCommand(svc.WindowName(), cmd); err != nil {
-				return nil, fmt.Errorf("creating session with %s: %w", svc.Name(), err)
-			}
-			sessionCreated = true
-		} else {
-			// Subsequent services: add a new window.
-			origDir := session.Dir
-			session.Dir = dir
-			if err := session.NewWindow(svc.WindowName(), cmd); err != nil {
-				return nil, cleanupOnError(fmt.Errorf("creating window for %s: %w", svc.Name(), err))
-			}
-			session.Dir = origDir
-		}
-
-		// If the service defines a pane command, split the window vertically.
-		if paneCmd := svc.PaneCommand(); paneCmd != "" {
-			origDir := session.Dir
-			session.Dir = dir
-			if err := session.SplitWindow(svc.WindowName(), paneCmd); err != nil {
-				warnings = append(warnings, fmt.Sprintf("split pane for %s: %v", svc.Name(), err))
-			}
-			session.Dir = origDir
-		}
+	warnings, err := launchServices(session, services)
+	if err != nil {
+		return nil, err
 	}
 
 	results := make([]ServiceResult, len(services))
@@ -156,4 +113,50 @@ func buildCommand(svc Service) string {
 		return cmd
 	}
 	return "env " + strings.Join(envVars, " ") + " " + cmd
+}
+
+// launchServices rolls back the session only after its initial window was created.
+func launchServices(session *tmux.Session, services []Service) ([]string, error) {
+	var warnings []string
+	for i, svc := range services {
+		warning, err := launchServiceWindow(session, svc, i == 0)
+		if err != nil {
+			if i == 0 {
+				return nil, err
+			}
+			if killErr := session.Kill(); killErr != nil {
+				return nil, fmt.Errorf("%w (rollback failed: %v)", err, killErr)
+			}
+			return nil, err
+		}
+		if warning != "" {
+			warnings = append(warnings, warning)
+		}
+	}
+	return warnings, nil
+}
+
+// launchServiceWindow shares directory selection and optional panes between start and restart.
+func launchServiceWindow(session *tmux.Session, svc Service, first bool) (string, error) {
+	originalDir := session.Dir
+	defer func() { session.Dir = originalDir }()
+	session.Dir = svc.WorkDir()
+	if session.Dir == "" {
+		session.Dir, _ = os.UserHomeDir()
+	}
+	create := session.NewWindow
+	operation := "creating window for"
+	if first {
+		create = session.CreateWithCommand
+		operation = "creating session with"
+	}
+	if err := create(svc.WindowName(), buildCommand(svc)); err != nil {
+		return "", fmt.Errorf("%s %s: %w", operation, svc.Name(), err)
+	}
+	if paneCmd := svc.PaneCommand(); paneCmd != "" {
+		if err := session.SplitWindow(svc.WindowName(), paneCmd); err != nil {
+			return fmt.Sprintf("split pane for %s: %v", svc.Name(), err), nil
+		}
+	}
+	return "", nil
 }

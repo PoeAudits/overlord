@@ -133,18 +133,11 @@ func runBackup(cmd *cobra.Command, args []string) error {
 
 	zipWriter := zip.NewWriter(file)
 
-	for _, project := range projects {
-		for _, relPath := range projectFiles[project.name] {
-			sourcePath := filepath.Join(project.path, relPath)
-			zipName := filepath.ToSlash(filepath.Join(rootName, safeZipSegment(project.name), relPath))
-			_, err := addPathToZip(zipWriter, sourcePath, zipName)
-			if err != nil {
-				zipWriter.Close()
-				file.Close()
-				_ = os.Remove(zipPath)
-				return fmt.Errorf("failed to add %s: %w", sourcePath, err)
-			}
-		}
+	if err := writeBackupProjects(zipWriter, rootName, projects, projectFiles); err != nil {
+		zipWriter.Close()
+		file.Close()
+		_ = os.Remove(zipPath)
+		return err
 	}
 
 	if err := zipWriter.Close(); err != nil {
@@ -161,6 +154,19 @@ func runBackup(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Projects: %d\n", len(projects))
 	fmt.Printf("Files: %d\n", totalFiles)
 
+	return nil
+}
+
+func writeBackupProjects(writer *zip.Writer, rootName string, projects []backupProject, files map[string][]string) error {
+	for _, project := range projects {
+		for _, relPath := range files[project.name] {
+			sourcePath := filepath.Join(project.path, relPath)
+			zipName := filepath.ToSlash(filepath.Join(rootName, safeZipSegment(project.name), relPath))
+			if _, err := addPathToZip(writer, sourcePath, zipName); err != nil {
+				return fmt.Errorf("failed to add %s: %w", sourcePath, err)
+			}
+		}
+	}
 	return nil
 }
 
@@ -344,6 +350,13 @@ func updateBackupTags(args []string, add bool) error {
 		return err
 	}
 
+	update := removeBackupTag
+	changedMessage, unchangedMessage := "Removed from backup", "Not in backup"
+	if add {
+		update = addBackupTag
+		changedMessage, unchangedMessage = "Added to backup", "Already in backup"
+	}
+
 	changed := false
 	seen := make(map[string]struct{}, len(args))
 	for _, arg := range args {
@@ -357,21 +370,12 @@ func updateBackupTags(args []string, add bool) error {
 		seen[result.Name] = struct{}{}
 
 		project := result.Project
-		if add {
-			if addBackupTag(&project) {
-				changed = true
-				fmt.Printf("Added to backup: %s\n", result.Name)
-			} else {
-				fmt.Printf("Already in backup: %s\n", result.Name)
-			}
-		} else {
-			if removeBackupTag(&project) {
-				changed = true
-				fmt.Printf("Removed from backup: %s\n", result.Name)
-			} else {
-				fmt.Printf("Not in backup: %s\n", result.Name)
-			}
+		message := unchangedMessage
+		if update(&project) {
+			changed = true
+			message = changedMessage
 		}
+		fmt.Printf("%s: %s\n", message, result.Name)
 		reg.Projects[result.Name] = project
 	}
 

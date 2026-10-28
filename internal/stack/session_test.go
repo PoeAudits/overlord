@@ -255,3 +255,43 @@ func TestBuildCommand_NoEnv(t *testing.T) {
 		t.Errorf("expected plain command, got: %s", got)
 	}
 }
+
+func TestLaunchServiceWindowPreservesDirectoryAndWarnsOnPaneFailure(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	for _, tc := range []struct {
+		name, dir, wantCommand, wantDir string
+		first                           bool
+	}{
+		{"initial custom directory", "/workspace", "new-session", "/workspace", true},
+		{"initial home directory", "", "new-session", home, true},
+		{"additional custom directory", "/workspace", "new-window", "/workspace", false},
+		{"additional home directory", "", "new-window", home, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var commands []string
+			runner := func(name string, args ...string) ([]byte, error) {
+				commands = append(commands, strings.Join(args, " "))
+				if args[0] == "has-session" && tc.first {
+					return nil, &exitError{code: 1}
+				}
+				if args[0] == "split-window" {
+					return []byte("pane unavailable"), errors.New("exit status 1")
+				}
+				return nil, nil
+			}
+			session := tmux.NewSession("test", "/original", tmux.WithRunner(runner))
+			service := &stubService{name: "test-service", windowName: "service", command: "serve", workDir: tc.dir, paneCommand: "monitor"}
+			warning, err := launchServiceWindow(session, service, tc.first)
+			if err != nil || warning != "split pane for test-service: pane unavailable" {
+				t.Fatalf("warning = %q, error = %v", warning, err)
+			}
+			if session.Dir != "/original" {
+				t.Fatalf("session directory changed to %q", session.Dir)
+			}
+			if !strings.HasPrefix(commands[1], tc.wantCommand+" ") || !strings.Contains(commands[1], "-c "+tc.wantDir+" serve") {
+				t.Fatalf("unexpected launch: %v", commands)
+			}
+		})
+	}
+}

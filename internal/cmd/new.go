@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -64,11 +63,6 @@ Examples:
 
 // formatNewUsage returns a helpful usage string for the new command
 func formatNewUsage() string {
-	validCats := make([]string, 0, len(registry.ValidCategories()))
-	for _, c := range registry.ValidCategories() {
-		validCats = append(validCats, string(c))
-	}
-
 	return fmt.Sprintf(`Usage: overlord new <name> --category=<category> [--lang-flag] [options]
 
 Categories (required):
@@ -90,7 +84,7 @@ Examples:
   overlord new my-api --category=services --go
   overlord new my-app --category=web --ts --description="Web app"
   overlord new my-project --category=cli --go --alias=mp
-  overlord new sandbox-test --category=sandbox`, strings.Join(validCats, ", "))
+  overlord new sandbox-test --category=sandbox`, strings.Join(validCategoryNames(), ", "))
 }
 
 func init() {
@@ -281,10 +275,7 @@ func runNewValidate(name string) (*newProjectContext, error) {
 		return nil, fmt.Errorf("directory already exists\nLocation: %s\nUse 'overlord add' to register an existing project", projectPath)
 	}
 
-	description := newOpts.description
-	if description == "" {
-		description = fmt.Sprintf("%s project", name)
-	}
+	description := projectDescription(name, newOpts.description)
 
 	return &newProjectContext{
 		name:         name,
@@ -390,17 +381,11 @@ func runNewRegister(ctx *newProjectContext) error {
 		Path:        relativePath,
 		Category:    ctx.category,
 		Lang:        ctx.lang,
-		Created:     time.Now().Format("2006-01-02"),
 		Description: ctx.description,
 		Aliases:     newOpts.aliases,
-		Tags:        []string{},
-		Status:      registry.Status{State: registry.StateActive},
 	}
 
-	if ctx.reg.Projects == nil {
-		ctx.reg.Projects = make(map[string]registry.Project)
-	}
-	ctx.reg.Projects[ctx.name] = project
+	registerProject(ctx.reg, ctx.name, project)
 
 	if err := newSaveRegistry(ctx.reg); err != nil {
 		return err
@@ -412,9 +397,7 @@ func runNewRegister(ctx *newProjectContext) error {
 		ProjectPath: ctx.projectPath,
 		Settings:    map[string]string{},
 	})
-	for _, warning := range postCreateResult.Warnings {
-		fmt.Fprintf(os.Stderr, "warning: %s\n", warning)
-	}
+	printLifecycleWarnings(postCreateResult.Warnings)
 
 	fmt.Println(" done")
 	return nil

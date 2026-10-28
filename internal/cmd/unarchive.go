@@ -164,7 +164,7 @@ func runUnarchive(cmd *cobra.Command, args []string) error {
 	}
 
 	warnings := firePostUnarchiveEvent(resolvedName, targetPath)
-	printUnarchiveSuccess(s, resolvedName, targetCategory, sourcePath, targetPath, warnings)
+	printUnarchiveSuccess(resolvedName, targetCategory, sourcePath, targetPath, warnings)
 
 	return nil
 }
@@ -278,13 +278,13 @@ func firePostUnarchiveEvent(resolvedName, targetPath string) []string {
 }
 
 func printUnarchiveSuccess(
-	s styles,
 	resolvedName string,
 	targetCategory registry.Category,
 	sourcePath string,
 	targetPath string,
 	warnings []string,
 ) {
+	s := NewStyles()
 	labelStyle := s.Label
 	successStyle := s.Success
 	pathStyle := s.Path

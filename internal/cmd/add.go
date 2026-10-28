@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -72,11 +71,6 @@ Examples:
 
 // formatAddUsage returns a helpful usage string for the add command
 func formatAddUsage() string {
-	validCats := make([]string, 0, len(registry.ValidCategories()))
-	for _, c := range registry.ValidCategories() {
-		validCats = append(validCats, string(c))
-	}
-
 	return fmt.Sprintf(`Usage: overlord add [path] [options]
        overlord add <name> <path>   (legacy two-argument form)
 
@@ -102,7 +96,7 @@ Examples:
   overlord add                          # Add current directory
   overlord add .                        # Same as above
   overlord add --name=custom --py       # Custom name, Python
-  overlord add ../my-lib --sol          # Relative path, Solidity`, strings.Join(validCats, ", "))
+  overlord add ../my-lib --sol          # Relative path, Solidity`, strings.Join(validCategoryNames(), ", "))
 }
 
 // validateAddFlags validates flags and provides helpful error messages
@@ -258,13 +252,9 @@ func buildAddContext(_ *cobra.Command, args []string) (*addProjectContext, error
 		return nil, err
 	}
 
-	expandedPath, err := registry.ExpandPath(projectPath)
+	expandedPath, err := resolveAddPath(projectPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to expand project path: %w", err)
-	}
-
-	if _, err := os.Stat(expandedPath); errors.Is(err, fs.ErrNotExist) {
-		return nil, cmdError("add", fmt.Sprintf("project directory does not exist: %s", expandedPath), "Use 'overlord new' to create a new project")
+		return nil, err
 	}
 
 	reg, err := loadRegistry()
@@ -285,43 +275,16 @@ func buildAddContext(_ *cobra.Command, args []string) (*addProjectContext, error
 		return nil, cmdError("add", fmt.Sprintf("this directory is already registered as project '%s'", existingName), fmt.Sprintf("Use 'overlord info %s' to see details", existingName))
 	}
 
-	var (
-		lang               registry.Language
-		languageAutoDetect bool
-	)
-	if flagLang, hasFlag := languageFromFlags(addOpts.langPy, addOpts.langTs, addOpts.langGo, addOpts.langSol, addOpts.langBase); hasFlag {
-		lang = flagLang
-	} else {
-		detected, langErr := detectLanguage(expandedPath)
-		if langErr != nil {
-			return nil, langErr
-		}
-		lang = detected
-		languageAutoDetect = true
+	lang, languageAutoDetect, err := resolveAddLanguage(expandedPath)
+	if err != nil {
+		return nil, err
+	}
+	category, categoryAutoDetect, err := resolveAddCategory(expandedPath, baseDir)
+	if err != nil {
+		return nil, err
 	}
 
-	var (
-		category           registry.Category
-		categoryAutoDetect bool
-	)
-	if addOpts.category != "" {
-		category, err = validateCategory(addOpts.category)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		detectedCat, catErr := detectCategory(expandedPath, baseDir)
-		if catErr != nil {
-			return nil, catErr
-		}
-		category = detectedCat
-		categoryAutoDetect = true
-	}
-
-	description := addOpts.description
-	if description == "" {
-		description = fmt.Sprintf("%s project", name)
-	}
+	description := projectDescription(name, addOpts.description)
 
 	registryPath := expandedPath
 	registryPathIsAbs := true
@@ -356,17 +319,11 @@ func runAddRegister(ctx *addProjectContext, s styles) error {
 		Path:        ctx.registryPath,
 		Category:    ctx.category,
 		Lang:        ctx.lang,
-		Created:     time.Now().Format("2006-01-02"),
 		Description: ctx.description,
 		Aliases:     ctx.aliases,
-		Tags:        []string{},
-		Status:      registry.Status{State: registry.StateActive},
 	}
 
-	if ctx.reg.Projects == nil {
-		ctx.reg.Projects = make(map[string]registry.Project)
-	}
-	ctx.reg.Projects[ctx.name] = project
+	registerProject(ctx.reg, ctx.name, project)
 
 	if err := saveRegistry(ctx.reg); err != nil {
 		return err
@@ -377,9 +334,7 @@ func runAddRegister(ctx *addProjectContext, s styles) error {
 		ProjectName: ctx.name,
 		ProjectPath: ctx.expandedPath,
 	})
-	for _, warning := range postCreateResult.Warnings {
-		fmt.Fprintf(os.Stderr, "warning: %s\n", warning)
-	}
+	printLifecycleWarnings(postCreateResult.Warnings)
 
 	fmt.Println(" done")
 	return nil
@@ -431,4 +386,34 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 
 	return nil
+}
+
+func resolveAddLanguage(path string) (registry.Language, bool, error) {
+	if lang, explicit := languageFromFlags(addOpts.langPy, addOpts.langTs, addOpts.langGo, addOpts.langSol, addOpts.langBase); explicit {
+		return lang, false, nil
+	}
+	lang, err := detectLanguage(path)
+	return lang, true, err
+}
+
+func resolveAddCategory(path, baseDir string) (registry.Category, bool, error) {
+	if addOpts.category != "" {
+		category, err := validateCategory(addOpts.category)
+		return category, false, err
+	}
+	category, err := detectCategory(path, baseDir)
+	return category, true, err
+}
+
+func resolveAddPath(projectPath string) (string, error) {
+	expandedPath, err := registry.ExpandPath(projectPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to expand project path: %w", err)
+	}
+
+	if _, err := os.Stat(expandedPath); errors.Is(err, fs.ErrNotExist) {
+		return "", cmdError("add", fmt.Sprintf("project directory does not exist: %s", expandedPath), "Use 'overlord new' to create a new project")
+	}
+
+	return expandedPath, nil
 }

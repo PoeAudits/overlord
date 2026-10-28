@@ -60,27 +60,34 @@ func captureSession(runner CommandRunner, name string, order int) (checkpoint.Se
 		if fields[2] == "1" {
 			session.ActiveWindow = index
 		}
-		panes, err := runner("tmux", "list-panes", "-t", name+":"+fields[0], "-F", "#{pane_index}\t#{pane_active}\t#{pane_current_path}")
-		if err != nil {
-			return session, fmt.Errorf("list panes for %q: %w", name, err)
-		}
-		for _, paneLine := range lines(panes) {
-			paneFields := strings.Split(paneLine, "\t")
-			if len(paneFields) != 3 {
-				return session, fmt.Errorf("unexpected pane data for %q", name)
-			}
-			paneIndex, err := strconv.Atoi(paneFields[0])
-			if err != nil {
-				return session, err
-			}
-			window.Panes = append(window.Panes, checkpoint.Pane{Index: paneIndex, Path: paneFields[2]})
-			if paneFields[1] == "1" {
-				window.ActivePane = paneIndex
-			}
+		if err := captureWindowPanes(runner, name, fields[0], &window); err != nil {
+			return session, err
 		}
 		session.Windows = append(session.Windows, window)
 	}
 	return session, nil
+}
+
+func captureWindowPanes(runner CommandRunner, name, index string, window *checkpoint.Window) error {
+	panes, err := runner("tmux", "list-panes", "-t", name+":"+index, "-F", "#{pane_index}\t#{pane_active}\t#{pane_current_path}")
+	if err != nil {
+		return fmt.Errorf("list panes for %q: %w", name, err)
+	}
+	for _, paneLine := range lines(panes) {
+		paneFields := strings.Split(paneLine, "\t")
+		if len(paneFields) != 3 {
+			return fmt.Errorf("unexpected pane data for %q", name)
+		}
+		paneIndex, err := strconv.Atoi(paneFields[0])
+		if err != nil {
+			return err
+		}
+		window.Panes = append(window.Panes, checkpoint.Pane{Index: paneIndex, Path: paneFields[2]})
+		if paneFields[1] == "1" {
+			window.ActivePane = paneIndex
+		}
+	}
+	return nil
 }
 
 // RestoreCheckpoint creates only missing sessions. Individual failures are reported and do not stop later work.
@@ -127,18 +134,14 @@ func restoreSession(session checkpoint.Session, runner CommandRunner, warn func(
 		return err
 	}
 	moveWindowToIndex(session.Name, first, runner, warn)
-	if err := restoreWindow(session.Name, first, false, runner, warn); err != nil {
-		warn("failed to restore window %q: %v", first.Name, err)
-	}
+	restoreWindow(session.Name, first, runner, warn)
 	for _, window := range session.Windows[1:] {
 		if _, err := runner("tmux", "new-window", "-d", "-t", session.Name, "-n", window.Name, "-c", usableDir(window.Panes, warn)); err != nil {
 			warn("failed to create window %q: %v", window.Name, err)
 			continue
 		}
 		moveWindowToIndex(session.Name, window, runner, warn)
-		if err := restoreWindow(session.Name, window, true, runner, warn); err != nil {
-			warn("failed to restore window %q: %v", window.Name, err)
-		}
+		restoreWindow(session.Name, window, runner, warn)
 	}
 	_, _ = runner("tmux", "select-window", "-t", fmt.Sprintf("%s:%d", session.Name, session.ActiveWindow))
 	return nil
@@ -159,16 +162,13 @@ func moveWindowToIndex(session string, window checkpoint.Window, runner CommandR
 	}
 }
 
-func restoreWindow(session string, window checkpoint.Window, hasInitialPane bool, runner CommandRunner, warn func(string, ...any)) error {
+func restoreWindow(session string, window checkpoint.Window, runner CommandRunner, warn func(string, ...any)) {
 	if len(window.Panes) == 0 {
-		return nil
+		return
 	}
 	target := session + ":" + window.Name
-	start := 1
-	if hasInitialPane {
-		start = 1
-	}
-	for _, pane := range window.Panes[start:] {
+	// Both new-session and new-window already created the first pane.
+	for _, pane := range window.Panes[1:] {
 		if _, err := runner("tmux", "split-window", "-d", "-t", target, "-c", usableDir([]checkpoint.Pane{pane}, warn)); err != nil {
 			warn("failed to create pane in %q: %v", window.Name, err)
 		}
@@ -179,7 +179,6 @@ func restoreWindow(session string, window checkpoint.Window, hasInitialPane bool
 		}
 	}
 	_, _ = runner("tmux", "select-pane", "-t", fmt.Sprintf("%s.%d", target, window.ActivePane))
-	return nil
 }
 
 func usableDir(panes []checkpoint.Pane, warn func(string, ...any)) string {

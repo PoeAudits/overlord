@@ -2,7 +2,6 @@ package stack
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/PoeAudits/overlord/internal/tmux"
@@ -30,11 +29,6 @@ func RestartServices(cfg *StackConfig, names []string, opts ...tmux.Option) (*St
 	results := make([]ServiceResult, 0, len(selected))
 	var warnings []string
 	for _, svc := range selected {
-		dir := svc.WorkDir()
-		if dir == "" {
-			dir, _ = os.UserHomeDir()
-		}
-
 		if err := session.KillWindow(svc.WindowName()); err != nil {
 			// A missing service window in an otherwise-running session is the
 			// common "newly configured service" case: just create it instead
@@ -44,19 +38,13 @@ func RestartServices(cfg *StackConfig, names []string, opts ...tmux.Option) (*St
 			}
 		}
 
-		origDir := session.Dir
-		session.Dir = dir
-		if err := session.NewWindow(svc.WindowName(), buildCommand(svc)); err != nil {
-			session.Dir = origDir
-			return nil, fmt.Errorf("creating window for %s: %w", svc.Name(), err)
+		warning, err := launchServiceWindow(session, svc, false)
+		if err != nil {
+			return nil, err
 		}
-
-		if paneCmd := svc.PaneCommand(); paneCmd != "" {
-			if err := session.SplitWindow(svc.WindowName(), paneCmd); err != nil {
-				warnings = append(warnings, fmt.Sprintf("split pane for %s: %v", svc.Name(), err))
-			}
+		if warning != "" {
+			warnings = append(warnings, warning)
 		}
-		session.Dir = origDir
 
 		results = append(results, ServiceResult{
 			Name:        svc.Name(),

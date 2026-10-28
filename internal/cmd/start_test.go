@@ -110,7 +110,7 @@ func TestDoStartWithoutCheckpointAttachesStartServer(t *testing.T) {
 	startLaunchDesktopApp = func(id string) error {
 		launched = append(launched, id)
 		// A missing app must not prevent the other apps or tmux from opening.
-		if id == "t3code-nightly.desktop" {
+		if id == "t3code.desktop" {
 			return errors.New("desktop entry not installed")
 		}
 		return nil
@@ -140,7 +140,7 @@ func TestDoStartWithoutCheckpointAttachesStartServer(t *testing.T) {
 	if attached != stack.SessionName {
 		t.Fatalf("attached %q, want %q", attached, stack.SessionName)
 	}
-	want := []string{"t3code-nightly.desktop", "chatgpt.desktop", "ai.opencode.desktop.desktop"}
+	want := []string{"t3code.desktop", "chatgpt.desktop", "ai.opencode.desktop.desktop"}
 	if !reflect.DeepEqual(launched, want) {
 		t.Fatalf("launched %v, want %v", launched, want)
 	}

@@ -268,3 +268,37 @@ func cmdError(command, problem, suggestion string) error {
 	}
 	return fmt.Errorf("[error] %s: %s. %s", command, problem, suggestion)
 }
+
+func printSkippedProjects(messages []string, s styles) {
+	if len(messages) == 0 {
+		return
+	}
+	for _, message := range messages {
+		fmt.Printf("%s %s\n", s.StrongWarn.Render("Skipping"), message)
+	}
+	fmt.Println()
+}
+
+func printLifecycleWarnings(warnings []string) {
+	for _, warning := range warnings {
+		fmt.Fprintf(os.Stderr, "warning: %s\n", warning)
+	}
+}
+
+// registerProject applies the defaults shared by new and add; callers own persistence and hooks.
+func registerProject(reg *registry.Registry, name string, project registry.Project) {
+	project.Created = time.Now().Format("2006-01-02")
+	project.Tags = []string{}
+	project.Status = registry.Status{State: registry.StateActive}
+	if reg.Projects == nil {
+		reg.Projects = make(map[string]registry.Project)
+	}
+	reg.Projects[name] = project
+}
+
+func projectDescription(name, description string) string {
+	if description != "" {
+		return description
+	}
+	return fmt.Sprintf("%s project", name)
+}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -87,9 +88,7 @@ func doStart(silent bool) error {
 	}
 
 	// Print status table to stderr (design decision D4: all output before tmux attach).
-	if !silent {
-		printStackStatus(result, s)
-	}
+	printStackStatus(result, s)
 
 	// Print any warnings from StartStack.
 	for _, w := range result.Warnings {
@@ -99,7 +98,7 @@ func doStart(silent bool) error {
 	// Use installed desktop entries so application-specific flags stay with the
 	// desktop launcher. These apps are not owned by the tmux service stack.
 	for _, app := range []struct{ name, id string }{
-		{"T3 Code", "t3code-nightly.desktop"},
+		{"T3 Code", "t3code.desktop"},
 		{"ChatGPT", "chatgpt.desktop"},
 		{"OpenCode Desktop", "ai.opencode.desktop.desktop"},
 	} {
@@ -115,18 +114,12 @@ func doStart(silent bool) error {
 	available := startRestoreCheckpoint(store.Current, nil, func(format string, args ...any) {
 		fmt.Fprintf(os.Stderr, "%s %s\n", s.Warn.Render("Warning:"), fmt.Sprintf(format, args...))
 	})
-	target := ""
-	for _, name := range available {
-		if name == store.Current.AttachSession {
-			target = name
-			break
-		}
+	if slices.Contains(available, store.Current.AttachSession) {
+		return startAttach(store.Current.AttachSession)
 	}
-	if target == "" && len(available) > 0 {
+	target := stack.SessionName
+	if len(available) > 0 {
 		target = available[0]
-	}
-	if target == "" {
-		target = stack.SessionName
 	}
 	return startAttach(target)
 }
