@@ -47,6 +47,9 @@ things or changing decided behaviour.
   config writer, hook installer).
 - `internal/machine`: Sync and Start.
 - `internal/t3`: edits T3 Code's settings.
+- `skills/`: the `new-project` and `project-setup` skills, laid out like
+  `~/.agents/skills`; the test checks their frontmatter and that every
+  `overlord <command>` they name exists.
 
 Packages not yet present are created by the ticket that needs them.
 
