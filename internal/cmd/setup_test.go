@@ -103,12 +103,15 @@ func TestSetupCheckProjectRoot(t *testing.T) {
 	empty := t.TempDir()
 
 	tests := []struct {
-		name    string
-		envRoot string
-		workdir string
-		args    []string
+		name        string
+		envRoot     string
+		envWorktree string
+		workdir     string
+		args        []string
 	}{
-		{name: "T3CODE_PROJECT_ROOT wins over the path argument", envRoot: complete, workdir: empty, args: []string{empty}},
+		{name: "path argument wins over T3 worktree variables", envRoot: empty, envWorktree: empty, workdir: empty, args: []string{complete}},
+		{name: "T3CODE_WORKTREE_PATH wins over the working directory", envRoot: empty, envWorktree: complete, workdir: empty},
+		{name: "T3CODE_PROJECT_ROOT never picks the target", envRoot: empty, workdir: complete},
 		{name: "path argument wins over the working directory", workdir: empty, args: []string{complete}},
 		{name: "relative path argument resolves against the working directory", workdir: filepath.Dir(complete), args: []string{filepath.Base(complete)}},
 		{name: "working directory is the fallback", workdir: complete},
@@ -117,8 +120,11 @@ func TestSetupCheckProjectRoot(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sys := newSystem(t, tt.workdir)
 			sys.Getenv = func(key string) string {
-				if key == "T3CODE_PROJECT_ROOT" {
+				switch key {
+				case "T3CODE_PROJECT_ROOT":
 					return tt.envRoot
+				case "T3CODE_WORKTREE_PATH":
+					return tt.envWorktree
 				}
 				return ""
 			}

@@ -62,17 +62,19 @@ func printPlan(sys system.System, plan project.Plan, asJSON bool, heading string
 	return nil
 }
 
-// projectRoot picks the Project root: T3 Code's T3CODE_PROJECT_ROOT when set,
-// else the path argument, else the working directory.
+// projectRoot picks the checkout Setup works on: the path argument, else T3
+// Code's T3CODE_WORKTREE_PATH, else the working directory. T3CODE_PROJECT_ROOT
+// is never the target: T3 sets it to the main checkout, so writing there would
+// leave the new worktree unchanged.
 func projectRoot(sys system.System, args []string) string {
-	if root := sys.Getenv("T3CODE_PROJECT_ROOT"); root != "" {
-		return root
-	}
-	if len(args) == 0 {
-		return sys.Workdir
-	}
-	if filepath.IsAbs(args[0]) {
+	if len(args) > 0 && filepath.IsAbs(args[0]) {
 		return filepath.Clean(args[0])
 	}
-	return filepath.Join(sys.Workdir, args[0])
+	if len(args) > 0 {
+		return filepath.Join(sys.Workdir, args[0])
+	}
+	if worktree := sys.Getenv("T3CODE_WORKTREE_PATH"); worktree != "" {
+		return worktree
+	}
+	return sys.Workdir
 }
