@@ -1,0 +1,82 @@
+package cmd
+
+import (
+	"errors"
+	"fmt"
+	"path/filepath"
+	"strings"
+
+	"github.com/spf13/cobra"
+
+	"github.com/PoeAudits/overlord/internal/machine"
+	"github.com/PoeAudits/overlord/internal/system"
+)
+
+func newSyncCommand(sys system.System) *cobra.Command {
+	var check, quiet bool
+	command := &cobra.Command{
+		Use:   "sync",
+		Short: "Apply skills and global instructions from the agents directory to every Harness",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			// The agents directory becomes configurable with Overlord's config
+			// file; until then it is always ~/.agents.
+			report, err := machine.Sync(sys, filepath.Join(sys.Home, ".agents"), check)
+			if err != nil {
+				return err
+			}
+			if !quiet {
+				fmt.Fprintln(sys.Stdout, syncHeader(check))
+			}
+			for _, result := range report.Results {
+				if quiet && result.Action != machine.Conflict && result.Action != machine.Shadowed {
+					continue
+				}
+				fmt.Fprintln(sys.Stdout, resultLine(sys.Home, result, check))
+			}
+			if check && report.Conflicted() {
+				return errors.New("sync --check found conflicts")
+			}
+			return nil
+		},
+	}
+	command.Flags().BoolVar(&check, "check", false, "report what Sync would change without changing anything")
+	command.Flags().BoolVar(&quiet, "quiet", false, "print only conflicts and shadowed skills")
+	return command
+}
+
+func syncHeader(check bool) string {
+	if check {
+		return "Sync check (nothing changed)"
+	}
+	return "Sync"
+}
+
+// resultLine formats one result: the action (past tense once applied), the
+// path and any detail.
+func resultLine(home string, result machine.Result, check bool) string {
+	label := string(result.Action)
+	if !check && pastTense[result.Action] != "" {
+		label = pastTense[result.Action]
+	}
+	line := fmt.Sprintf("  %-8s  %s", label, displayPath(home, result.Path))
+	if result.Detail == "" {
+		return line
+	}
+	return line + ": " + result.Detail
+}
+
+var pastTense = map[machine.Action]string{
+	machine.Create:  "created",
+	machine.Remove:  "removed",
+	machine.Replace: "replaced",
+}
+
+// displayPath shortens paths under home to ~/... for readable reports.
+func displayPath(home, path string) string {
+	rel, err := filepath.Rel(home, path)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return path
+	}
+	return "~/" + rel
+}
