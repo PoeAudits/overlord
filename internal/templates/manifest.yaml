@@ -5,9 +5,45 @@
 #            skipped when any path matches the `skipIfAny` glob.
 #   dir      the directory exists, holding a .gitkeep only while empty.
 #   symlink  a relative link to `target`.
+#   block    the Managed Block `block` in the file at `path`, its body rendered
+#            from `template`. Setup creates the file holding the block when it
+#            is absent, inserts the block after the file's earlier blocks (or
+#            at the top) when it is missing, and replaces it when it differs
+#            from the rendered Template. `language` limits the block to
+#            Projects where that language is detected; `createWith` names a
+#            Template written after the block only when the file is created.
 #
 # Create items come before the dirs they live in, so docs/adr gets the starter
 # ADR rather than a .gitkeep.
+- path: AGENTS.md
+  strategy: block
+  block: agents
+  template: agents.md.tmpl
+- path: docs/coding-standards.md
+  strategy: block
+  block: general
+  template: standards-general.md.tmpl
+  createWith: standards-project.md.tmpl
+- path: docs/coding-standards.md
+  strategy: block
+  block: lang-go
+  language: Go
+  template: standards-go.md.tmpl
+- path: docs/coding-standards.md
+  strategy: block
+  block: lang-typescript
+  language: TypeScript
+  template: standards-typescript.md.tmpl
+- path: docs/coding-standards.md
+  strategy: block
+  block: lang-python
+  language: Python
+  template: standards-python.md.tmpl
+- path: docs/coding-standards.md
+  strategy: block
+  block: lang-rust
+  language: Rust
+  template: standards-rust.md.tmpl
 - path: GLOSSARY.md
   strategy: create
   template: GLOSSARY.md.tmpl

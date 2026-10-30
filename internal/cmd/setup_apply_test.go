@@ -28,6 +28,8 @@ func TestSetupOnEmptyProjectCreatesEveryItemFromTheGoldenFiles(t *testing.T) {
 		t.Fatalf("project files differ from testdata/empty-project:\ngot  %v\nwant %v", keys(got), keys(want))
 	}
 	want := "Setup applied to " + project + "\n" +
+		"  created    AGENTS.md#agents\n" +
+		"  created    docs/coding-standards.md#general\n" +
 		"  created    GLOSSARY.md\n" +
 		"  created    docs/adr/0001-lint-and-tests-must-pass-before-merge.md\n" +
 		"  created    docs/agents/issue-tracker.md\n" +
@@ -115,6 +117,8 @@ func TestSetupSecondRunChangesNothingAndReportsEveryItemOK(t *testing.T) {
 		t.Fatalf("second run changed the project:\nbefore %v\nafter  %v", keys(before), keys(after))
 	}
 	want := "Setup applied to " + project + "\n" +
+		"  ok         AGENTS.md#agents\n" +
+		"  ok         docs/coding-standards.md#general\n" +
 		"  ok         GLOSSARY.md\n" +
 		"  ok         docs/adr/0001-lint-and-tests-must-pass-before-merge.md\n" +
 		"  ok         docs/agents/issue-tracker.md\n" +
