@@ -280,11 +280,3 @@ func assertLink(t *testing.T, path, target string) {
 		t.Fatalf("%s -> %s, want -> %s", path, got, target)
 	}
 }
-
-func mustWrite(t *testing.T, path, content string) {
-	t.Helper()
-	mustMkdir(t, filepath.Dir(path))
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}

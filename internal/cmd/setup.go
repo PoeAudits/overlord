@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -16,26 +15,22 @@ func newSetupCommand(sys system.System) *cobra.Command {
 	var check, asJSON bool
 	command := &cobra.Command{
 		Use:   "setup [path]",
-		Short: "Check a Project for the files Overlord guarantees",
+		Short: "Create or refresh the files Overlord guarantees in a Project",
 		Args:  cobra.MaximumNArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			if !check {
-				return errors.New("setup without --check is not implemented yet")
+		RunE: func(command *cobra.Command, args []string) error {
+			root := projectRoot(sys, args)
+			if check {
+				plan, err := project.Check(root)
+				if err != nil {
+					return err
+				}
+				return printPlan(sys, plan, asJSON, "Setup plan for", checkWords)
 			}
-			plan, err := project.Check(projectRoot(sys, args))
+			plan, err := project.Apply(command.Context(), sys.Runner, root)
 			if err != nil {
 				return err
 			}
-			if asJSON {
-				encoder := json.NewEncoder(sys.Stdout)
-				encoder.SetIndent("", "  ")
-				return encoder.Encode(plan)
-			}
-			fmt.Fprintf(sys.Stdout, "Setup plan for %s\n", plan.Root)
-			for _, item := range plan.Items {
-				fmt.Fprintf(sys.Stdout, "  %-7s  %s\n", item.Status, item.Path)
-			}
-			return nil
+			return printPlan(sys, plan, asJSON, "Setup applied to", applyWords)
 		},
 	}
 	command.Flags().BoolVar(&check, "check", false, "print the plan without changing anything")
@@ -43,17 +38,43 @@ func newSetupCommand(sys system.System) *cobra.Command {
 	return command
 }
 
-// projectRoot picks the Project root: T3 Code's T3CODE_PROJECT_ROOT when set,
-// else the path argument, else the working directory.
+// checkWords and applyWords say what each status means before and after Setup
+// acts on it.
+var (
+	checkWords = map[project.Status]string{project.Missing: "missing", project.Stale: "stale", project.OK: "ok", project.Conflict: "conflict"}
+	applyWords = map[project.Status]string{project.Missing: "created", project.Stale: "refreshed", project.OK: "ok", project.Conflict: "conflict"}
+)
+
+func printPlan(sys system.System, plan project.Plan, asJSON bool, heading string, words map[project.Status]string) error {
+	if asJSON {
+		encoder := json.NewEncoder(sys.Stdout)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(plan)
+	}
+	fmt.Fprintf(sys.Stdout, "%s %s\n", heading, plan.Root)
+	for _, item := range plan.Items {
+		line := fmt.Sprintf("  %-9s  %s", words[item.Status], item.Path)
+		if item.Detail != "" {
+			line += " (" + item.Detail + ")"
+		}
+		fmt.Fprintln(sys.Stdout, line)
+	}
+	return nil
+}
+
+// projectRoot picks the checkout Setup works on: the path argument, else T3
+// Code's T3CODE_WORKTREE_PATH, else the working directory. T3CODE_PROJECT_ROOT
+// is never the target: T3 sets it to the main checkout, so writing there would
+// leave the new worktree unchanged.
 func projectRoot(sys system.System, args []string) string {
-	if root := sys.Getenv("T3CODE_PROJECT_ROOT"); root != "" {
-		return root
-	}
-	if len(args) == 0 {
-		return sys.Workdir
-	}
-	if filepath.IsAbs(args[0]) {
+	if len(args) > 0 && filepath.IsAbs(args[0]) {
 		return filepath.Clean(args[0])
 	}
-	return filepath.Join(sys.Workdir, args[0])
+	if len(args) > 0 {
+		return filepath.Join(sys.Workdir, args[0])
+	}
+	if worktree := sys.Getenv("T3CODE_WORKTREE_PATH"); worktree != "" {
+		return worktree
+	}
+	return sys.Workdir
 }

@@ -1,8 +1,29 @@
-# Items Setup guarantees in every Project, checked in this order.
-# strategy: create (whole file, only if absent), dir (directory exists),
-# symlink (relative link to target).
+# Items Setup guarantees in every Project, checked and applied in this order.
+#
+# strategy:
+#   create   write the whole file from `template` (in files/) only if absent;
+#            skipped when any path matches the `skipIfAny` glob.
+#   dir      the directory exists, holding a .gitkeep only while empty.
+#   symlink  a relative link to `target`.
+#
+# Create items come before the dirs they live in, so docs/adr gets the starter
+# ADR rather than a .gitkeep.
 - path: GLOSSARY.md
   strategy: create
+  template: GLOSSARY.md.tmpl
+- path: docs/adr/0001-lint-and-tests-must-pass-before-merge.md
+  strategy: create
+  template: adr-0001-lint-and-tests.md.tmpl
+  skipIfAny: docs/adr/*.md
+- path: docs/agents/issue-tracker.md
+  strategy: create
+  template: issue-tracker.md.tmpl
+- path: docs/agents/triage-labels.md
+  strategy: create
+  template: triage-labels.md.tmpl
+- path: docs/agents/domain.md
+  strategy: create
+  template: domain.md.tmpl
 - path: docs/adr
   strategy: dir
 - path: .agents/skills

@@ -21,10 +21,14 @@ func TestSetupCheckOnEmptyProjectListsEveryItemMissingAndWritesNothing(t *testin
 		t.Fatalf("exit code = %d, want 0", code)
 	}
 	want := "Setup plan for " + project + "\n" +
-		"  missing  GLOSSARY.md\n" +
-		"  missing  docs/adr\n" +
-		"  missing  .agents/skills\n" +
-		"  missing  .claude/skills\n"
+		"  missing    GLOSSARY.md\n" +
+		"  missing    docs/adr/0001-lint-and-tests-must-pass-before-merge.md\n" +
+		"  missing    docs/agents/issue-tracker.md\n" +
+		"  missing    docs/agents/triage-labels.md\n" +
+		"  missing    docs/agents/domain.md\n" +
+		"  missing    docs/adr\n" +
+		"  missing    .agents/skills\n" +
+		"  missing    .claude/skills\n"
 	if stdout != want {
 		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
 	}
@@ -46,10 +50,14 @@ func TestSetupCheckOnCompleteProjectReportsEveryItemOK(t *testing.T) {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
 	want := "Setup plan for " + project + "\n" +
-		"  ok       GLOSSARY.md\n" +
-		"  ok       docs/adr\n" +
-		"  ok       .agents/skills\n" +
-		"  ok       .claude/skills\n"
+		"  ok         GLOSSARY.md\n" +
+		"  ok         docs/adr/0001-lint-and-tests-must-pass-before-merge.md\n" +
+		"  ok         docs/agents/issue-tracker.md\n" +
+		"  ok         docs/agents/triage-labels.md\n" +
+		"  ok         docs/agents/domain.md\n" +
+		"  ok         docs/adr\n" +
+		"  ok         .agents/skills\n" +
+		"  ok         .claude/skills\n"
 	if stdout != want {
 		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
 	}
@@ -58,6 +66,7 @@ func TestSetupCheckOnCompleteProjectReportsEveryItemOK(t *testing.T) {
 func TestSetupCheckJSONEmitsThePlan(t *testing.T) {
 	project := t.TempDir()
 	mustMkdir(t, filepath.Join(project, "docs", "adr"))
+	mustWrite(t, filepath.Join(project, "docs", "adr", ".gitkeep"), "")
 
 	stdout, code := run(t, newSystem(t, project), "setup", "--check", "--json")
 
@@ -73,6 +82,10 @@ func TestSetupCheckJSONEmitsThePlan(t *testing.T) {
 		"root": "`+project+`",
 		"items": [
 			{"path": "GLOSSARY.md", "strategy": "create", "status": "missing"},
+			{"path": "docs/adr/0001-lint-and-tests-must-pass-before-merge.md", "strategy": "create", "status": "missing"},
+			{"path": "docs/agents/issue-tracker.md", "strategy": "create", "status": "missing"},
+			{"path": "docs/agents/triage-labels.md", "strategy": "create", "status": "missing"},
+			{"path": "docs/agents/domain.md", "strategy": "create", "status": "missing"},
 			{"path": "docs/adr", "strategy": "dir", "status": "ok"},
 			{"path": ".agents/skills", "strategy": "dir", "status": "missing"},
 			{"path": ".claude/skills", "strategy": "symlink", "status": "missing"}
@@ -90,12 +103,15 @@ func TestSetupCheckProjectRoot(t *testing.T) {
 	empty := t.TempDir()
 
 	tests := []struct {
-		name    string
-		envRoot string
-		workdir string
-		args    []string
+		name        string
+		envRoot     string
+		envWorktree string
+		workdir     string
+		args        []string
 	}{
-		{name: "T3CODE_PROJECT_ROOT wins over the path argument", envRoot: complete, workdir: empty, args: []string{empty}},
+		{name: "path argument wins over T3 worktree variables", envRoot: empty, envWorktree: empty, workdir: empty, args: []string{complete}},
+		{name: "T3CODE_WORKTREE_PATH wins over the working directory", envRoot: empty, envWorktree: complete, workdir: empty},
+		{name: "T3CODE_PROJECT_ROOT never picks the target", envRoot: empty, workdir: complete},
 		{name: "path argument wins over the working directory", workdir: empty, args: []string{complete}},
 		{name: "relative path argument resolves against the working directory", workdir: filepath.Dir(complete), args: []string{filepath.Base(complete)}},
 		{name: "working directory is the fallback", workdir: complete},
@@ -104,8 +120,11 @@ func TestSetupCheckProjectRoot(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sys := newSystem(t, tt.workdir)
 			sys.Getenv = func(key string) string {
-				if key == "T3CODE_PROJECT_ROOT" {
+				switch key {
+				case "T3CODE_PROJECT_ROOT":
 					return tt.envRoot
+				case "T3CODE_WORKTREE_PATH":
+					return tt.envWorktree
 				}
 				return ""
 			}
@@ -122,17 +141,12 @@ func TestSetupCheckProjectRoot(t *testing.T) {
 	}
 }
 
-// completeProject returns a Project directory that already has every item.
+// completeProject returns a Project directory that already has every item:
+// a copy of the golden files for Setup on an empty Project.
 func completeProject(t *testing.T) string {
 	t.Helper()
 	project := t.TempDir()
-	mustMkdir(t, filepath.Join(project, "docs", "adr"))
-	mustMkdir(t, filepath.Join(project, ".agents", "skills"))
-	mustMkdir(t, filepath.Join(project, ".claude"))
-	if err := os.WriteFile(filepath.Join(project, "GLOSSARY.md"), []byte("# Project\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink("../.agents/skills", filepath.Join(project, ".claude", "skills")); err != nil {
+	if err := os.CopyFS(project, os.DirFS(filepath.Join("testdata", "empty-project"))); err != nil {
 		t.Fatal(err)
 	}
 	return project
@@ -170,6 +184,16 @@ func run(t *testing.T, sys system.System, args ...string) (string, int) {
 func mustMkdir(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func mustWrite(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
