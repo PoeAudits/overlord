@@ -23,11 +23,7 @@ func syncRoles(run syncRun) ([]Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	agentDirs := map[harness.Harness]string{
-		harness.Claude:   filepath.Join(run.sys.Home, ".claude", "agents"),
-		harness.Codex:    filepath.Join(run.sys.Home, ".codex", "agents"),
-		harness.OpenCode: filepath.Join(run.sys.Home, ".config", "opencode", "agents"),
-	}
+	agentDirs := globalAgentDirs(run.sys.Home)
 	var results []Result
 	for _, role := range roles {
 		for _, file := range harness.RenderRole(role, rolesSource) {
@@ -47,6 +43,15 @@ func syncRoles(run syncRun) ([]Result, error) {
 		return nil, err
 	}
 	return append(results, models...), nil
+}
+
+// globalAgentDirs is where each Harness reads global agent files.
+func globalAgentDirs(home string) map[harness.Harness]string {
+	return map[harness.Harness]string{
+		harness.Claude:   filepath.Join(home, ".claude", "agents"),
+		harness.Codex:    filepath.Join(home, ".codex", "agents"),
+		harness.OpenCode: filepath.Join(home, ".config", "opencode", "agents"),
+	}
 }
 
 // writeMainModels sets the main Model for Claude Code and Codex. OpenCode's is
