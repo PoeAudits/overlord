@@ -45,6 +45,11 @@ func repair(path string, item templates.Item, data templates.Data, earlier []str
 			return err
 		}
 		return os.WriteFile(path, content, 0o644)
+	case templates.Generated:
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(path, item.Content, 0o644)
 	case templates.Dir:
 		return repairDir(path)
 	case templates.Symlink:
