@@ -52,7 +52,11 @@ func RenderRole(role catalog.Role, source string) []AgentFile {
 	}
 	opencode := []string{"description: " + yamlScalar(description), "mode: subagent", "model: " + yamlScalar(role.Models.OpenCode)}
 	if role.ReadOnly {
-		opencode = append(opencode, "tools:", "  write: false", "  edit: false", "  bash: false")
+		// OpenCode v2 ignores the v1 `tools:` map; permission rules are what
+		// block file edits and shell commands.
+		opencode = append(opencode, "permissions:",
+			"  - action: edit", `    resource: "*"`, "    effect: deny",
+			"  - action: shell", `    resource: "*"`, "    effect: deny")
 	}
 	codex := []string{
 		"# " + header,

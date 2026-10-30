@@ -3,10 +3,13 @@
 description: 'Read-only research: return evidence without editing files.'
 mode: subagent
 model: openai/gpt-6-luna#low
-tools:
-  write: false
-  edit: false
-  bash: false
+permissions:
+  - action: edit
+    resource: "*"
+    effect: deny
+  - action: shell
+    resource: "*"
+    effect: deny
 ---
 
 Explore and research without changing files.
