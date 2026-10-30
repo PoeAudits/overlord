@@ -1,0 +1,15 @@
+main:
+  description: The main agent.
+  models: {claude: opus, codex: gpt-6, opencode: openai/gpt-6}
+explorer:
+  description: "Read-only research: return evidence without editing files."
+  readOnly: true
+  models: {claude: haiku, codex: gpt-6-luna, opencode: "openai/gpt-6-luna#low"}
+  codexReasoningEffort: low
+  prompt: roles/explorer.md
+restricted:
+  description: Highest-intelligence agent for exceptional tasks.
+  userInvokedOnly: true
+  models: {claude: claude-fable-5-1, codex: gpt-6-astra, opencode: "openai/gpt-6-astra#high"}
+  codexReasoningEffort: high
+  prompt: roles/restricted.md
