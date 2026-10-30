@@ -295,3 +295,9 @@ func TestSetupLeavesAFileWhereADirectoryBelongsUntouched(t *testing.T) {
 		t.Fatalf("stdout lacks %q:\n%s", want, stdout)
 	}
 }
+
+func (r *fakeRunner) Launch(dir, logPath, name string, args ...string) error {
+	command := strings.Join(append([]string{name}, args...), " ")
+	r.calls = append(r.calls, "launch "+logPath+": "+command)
+	return nil
+}

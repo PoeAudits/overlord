@@ -24,6 +24,7 @@ func Execute(sys system.System, args []string) int {
 	root.SetErr(sys.Stderr)
 	root.AddCommand(newSetupCommand(sys))
 	root.AddCommand(newSyncCommand(sys))
+	root.AddCommand(newStartCommand(sys))
 	if err := root.ExecuteContext(context.Background()); err != nil {
 		fmt.Fprintln(sys.Stderr, "overlord:", err)
 		return 1

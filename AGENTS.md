@@ -11,11 +11,13 @@ things or changing decided behaviour.
 
 - All external effects go through `system.System`: `Home` (every path under
   the user's home is derived from it), `Getenv`, `Workdir`, `Runner` (external
-  programs such as `gh`, `git`, `t3`) and `Stdout`/`Stderr`. Never call
+  programs such as `gh`, `git`, `t3`, run or launched detached), `Health`
+  (HTTP health checks), `Sleep` and `Stdout`/`Stderr`. Never call
   `os.UserHomeDir`, `os.Getenv`, `os.Getwd` or `os/exec` outside
   `internal/system`.
 - Tests drive commands through `cmd.Execute(sys, args)` with a temporary
-  `Home`, a temporary Project directory and a fake `Runner`. Assert on the
+  `Home`, a temporary Project directory, a fake `Runner` and, for `start`, a
+  fake `Health`. Assert on the
   resulting files, the output and the recorded commands, never on internal
   calls. Never touch the real home directory, real Harness config or real
   services in tests.
@@ -27,7 +29,11 @@ things or changing decided behaviour.
 
 - `cmd/overlord/main.go`: process entry point only; builds `system.OS()` and
   calls `cmd.Execute`.
-- `internal/system`: the injected seams (`System`, `Runner`, `ExecRunner`).
+- `internal/system`: the injected seams (`System`, `Runner`, `ExecRunner`,
+  `HealthChecker`, `HTTPHealth`).
+- `internal/config`: Overlord's own config, `~/.config/overlord/config.yaml`.
+  `Load(home)` returns it with paths absolute (defaults when the file is
+  absent, never writes); `WriteDefault(home)` writes the defaults once.
 - `internal/cmd`: thin Cobra wiring. Commands: `setup`, `sync`, `start`,
   `doctor`, `new-project`.
 - `internal/templates`: embedded Templates and the Setup manifest
