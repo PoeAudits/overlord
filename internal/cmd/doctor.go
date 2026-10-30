@@ -3,10 +3,10 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
+	"github.com/PoeAudits/overlord/internal/config"
 	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/system"
 )
@@ -36,9 +36,11 @@ A remote that cannot be reached (offline) is listed under "Not checked".
 Doctor exits 1 when it finds drift and 0 otherwise.`,
 		Args: cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
-			// The agents directory becomes configurable with Overlord's config
-			// file; until then it is always ~/.agents.
-			diagnosis, err := machine.Doctor(command.Context(), sys, filepath.Join(sys.Home, ".agents"))
+			cfg, err := config.Load(sys.Home)
+			if err != nil {
+				return err
+			}
+			diagnosis, err := machine.Doctor(command.Context(), sys, cfg.AgentsDir)
 			if err != nil {
 				return err
 			}

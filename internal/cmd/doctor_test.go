@@ -275,3 +275,22 @@ func TestDoctorSkipsUpstreamChecksWithANoteWhenOffline(t *testing.T) {
 		t.Errorf("recorded commands lack the remote lookup: %v", sys.runner.calls)
 	}
 }
+
+func TestDoctorUsesTheAgentsDirFromOverlordsConfig(t *testing.T) {
+	sys := newSystemWithRunner(t)
+	agents := filepath.Join(sys.Home, "src", "agents")
+	mustWrite(t, filepath.Join(agents, "skills", "tdd", "SKILL.md"), "# tdd\n")
+	mustWrite(t, filepath.Join(agents, "AGENTS.md"), "# Global rules\n")
+	addRoles(t, agents)
+	mustMkdir(t, filepath.Join(agents, ".git"))
+	mustWrite(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), "agentsDir: ~/src/agents\n")
+	if stdout, code := run(t, sys.System, "sync"); code != 0 {
+		t.Fatalf("sync exit code = %d\n%s", code, stdout)
+	}
+
+	stdout, code := run(t, sys.System, "doctor")
+
+	if code != 0 || stdout != "Doctor: no drift found\n" {
+		t.Fatalf("exit code = %d, stdout:\n%s", code, stdout)
+	}
+}
