@@ -46,3 +46,17 @@ git diff --check
 `make build` creates the ignored `overlord` binary. Benchmark reports under
 `.benchmark/`, local OpenCode runtime state under `.opencode/`, and cross-built
 `overlord-linux` binaries are generated outputs and must not be committed.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked as GitHub Issues on `PoeAudits/overlord` via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default triage vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
