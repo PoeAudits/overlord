@@ -13,6 +13,7 @@ Run every command in the checkout you are working in. In a T3 thread that is the
 
 1. **Check.** Run `overlord setup --check`. It changes nothing and exits 0. Done when you have the plan: one line per item, read with [the plan](#the-plan) below.
 2. **Show the plan.** Tell the user which items are `missing` or `stale`, and name every `conflict` and `warning` with its reason. When every line is `ok`, say the Project is already set up and stop here.
+   Items missing in a T3 worktree mean T3 did not run Setup when it created it: run `overlord doctor` (read-only) and pass on any `scripts override without overlord-setup, so Setup does not run there` finding for this Project.
 3. **Apply.** Run `overlord setup`. Done when it exits 0 and prints `Setup applied to <path>`. A non-zero exit is a real failure (a Template failed to render or a path could not be written): report the `overlord: ...` line from stderr and stop.
 4. **Report.** Summarise the `created` and `refreshed` lines. Repeat each `conflict` and what the user would have to move or delete for Setup to own that path; Setup never resolves a conflict itself. Repeat each `warning`; Setup still succeeded.
 5. **Offer to commit.** Run `git status --short` and show the changed files. Ask the user whether to commit them; on yes, `git add` exactly those files and commit with the message `Overlord setup`. Done when the user has answered and, on yes, `git status` is clean for those files.
