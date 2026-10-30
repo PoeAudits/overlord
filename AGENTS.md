@@ -32,8 +32,10 @@ things or changing decided behaviour.
   `doctor`, `new-project`.
 - `internal/templates`: embedded Templates and the Setup manifest
   (`Manifest()` returns the guaranteed items and their strategy).
-- `internal/project`: Setup for one Project. `Check(root)` returns a `Plan`
-  with a `missing`, `stale` or `ok` status per manifest item.
+- `internal/project`: Setup for one Project. `Check(ctx, runner, root,
+  projectRoot)` returns a `Plan` with a `missing`, `stale`, `ok` or `conflict`
+  status per manifest item; languages are detected in `projectRoot`, files are
+  written under `root`.
 - `internal/catalog`: reads `~/.agents` (skills, Roles, global instructions).
 - `internal/harness`: one adapter per Harness (paths, agent file format, model
   config writer, hook installer).

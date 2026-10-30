@@ -21,6 +21,7 @@ const (
 	Create  Strategy = "create"
 	Dir     Strategy = "dir"
 	Symlink Strategy = "symlink"
+	Block   Strategy = "block"
 )
 
 // Item is one guaranteed path in a Project, relative to the Project root.
@@ -34,6 +35,26 @@ type Item struct {
 	SkipIfAny string `yaml:"skipIfAny"`
 	// Target is the link destination for the symlink strategy.
 	Target string `yaml:"target"`
+	// Block names the Managed Block the block strategy owns in the file at
+	// Path; its body is rendered from Template.
+	Block string `yaml:"block"`
+	// Language limits a block to Projects where it is detected (see Languages).
+	Language string `yaml:"language"`
+	// CreateWith names a Template appended after the block, outside it, only
+	// when Setup creates the file.
+	CreateWith string `yaml:"createWith"`
+}
+
+// Languages are the languages Setup detects, in the order Templates see them,
+// each with the files in the Project root that mark it.
+var Languages = []struct {
+	Name    string
+	Markers []string
+}{
+	{Name: "Go", Markers: []string{"go.mod"}},
+	{Name: "TypeScript", Markers: []string{"package.json", "tsconfig.json"}},
+	{Name: "Python", Markers: []string{"pyproject.toml", "requirements.txt"}},
+	{Name: "Rust", Markers: []string{"Cargo.toml"}},
 }
 
 // Data is what every Template can refer to.
@@ -43,6 +64,8 @@ type Data struct {
 	Owner   string
 	Repo    string
 	Version int
+	// Languages holds the detected names from Languages, in that order.
+	Languages []string
 }
 
 //go:embed manifest.yaml

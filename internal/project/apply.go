@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/PoeAudits/overlord/internal/system"
 	"github.com/PoeAudits/overlord/internal/templates"
@@ -17,25 +16,26 @@ import (
 // or stale item. It returns the plan as it was before the repairs; conflict
 // items are left untouched. An error means a Template failed to render or a
 // path could not be written.
-func Apply(ctx context.Context, runner system.Runner, root string) (Plan, error) {
-	manifest, plan, err := check(root)
+func Apply(ctx context.Context, runner system.Runner, root, projectRoot string) (Plan, error) {
+	items, data, plan, err := check(ctx, runner, root, projectRoot)
 	if err != nil {
 		return Plan{}, err
 	}
-	data := templateData(ctx, runner, root)
-	for i, item := range manifest {
+	for i, item := range items {
 		if status := plan.Items[i].Status; status != Missing && status != Stale {
 			continue
 		}
-		if err := repair(filepath.Join(root, item.Path), item, data); err != nil {
+		if err := repair(filepath.Join(root, item.Path), item, data, earlierBlocks(items[:i], item.Path)); err != nil {
 			return plan, fmt.Errorf("set up %s: %w", item.Path, err)
 		}
 	}
 	return plan, nil
 }
 
-func repair(path string, item templates.Item, data templates.Data) error {
+func repair(path string, item templates.Item, data templates.Data, earlier []string) error {
 	switch item.Strategy {
+	case templates.Block:
+		return repairBlock(path, item, data, earlier)
 	case templates.Create:
 		content, err := templates.Render(item.Template, data)
 		if err != nil {
@@ -80,33 +80,14 @@ func repairDir(path string) error {
 	return nil
 }
 
-// templateData names the Project after its GitHub origin repo, falling back
-// to the directory name when there is no GitHub origin.
-func templateData(ctx context.Context, runner system.Runner, root string) templates.Data {
-	data := templates.Data{ProjectName: filepath.Base(root), Version: templates.Version}
-	output, err := runner.Run(ctx, root, "git", "remote", "get-url", "origin")
-	if err != nil {
-		return data
-	}
-	owner, repo, ok := parseGitHubRemote(strings.TrimSpace(string(output)))
-	if !ok {
-		return data
-	}
-	data.ProjectName, data.Owner, data.Repo = repo, owner, repo
-	return data
-}
-
-func parseGitHubRemote(url string) (owner, repo string, ok bool) {
-	for _, prefix := range []string{"git@github.com:", "ssh://git@github.com/", "https://github.com/", "http://github.com/"} {
-		rest, found := strings.CutPrefix(url, prefix)
-		if !found {
-			continue
+// earlierBlocks names the blocks the manifest lists before this one in the
+// same file, so a missing block lands after them rather than at the top.
+func earlierBlocks(items []templates.Item, path string) []string {
+	var names []string
+	for _, item := range items {
+		if item.Strategy == templates.Block && item.Path == path {
+			names = append(names, item.Block)
 		}
-		owner, repo, found = strings.Cut(strings.TrimSuffix(strings.TrimSuffix(rest, "/"), ".git"), "/")
-		if !found || owner == "" || repo == "" || strings.Contains(repo, "/") {
-			return "", "", false
-		}
-		return owner, repo, true
 	}
-	return "", "", false
+	return names
 }

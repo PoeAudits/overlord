@@ -1,0 +1,6 @@
+## Rust
+
+- `cargo fmt --check`, `cargo clippy -- -D warnings` and `cargo test` pass.
+- Return `Result` and propagate with `?`. Do not `unwrap` or `expect` outside tests and proven invariants.
+- Use enums to make illegal states unrepresentable, and match exhaustively.
+- Prefer borrowing to cloning unless ownership is needed.

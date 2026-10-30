@@ -21,6 +21,8 @@ func TestSetupCheckOnEmptyProjectListsEveryItemMissingAndWritesNothing(t *testin
 		t.Fatalf("exit code = %d, want 0", code)
 	}
 	want := "Setup plan for " + project + "\n" +
+		"  missing    AGENTS.md#agents\n" +
+		"  missing    docs/coding-standards.md#general\n" +
 		"  missing    GLOSSARY.md\n" +
 		"  missing    docs/adr/0001-lint-and-tests-must-pass-before-merge.md\n" +
 		"  missing    docs/agents/issue-tracker.md\n" +
@@ -50,6 +52,8 @@ func TestSetupCheckOnCompleteProjectReportsEveryItemOK(t *testing.T) {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
 	want := "Setup plan for " + project + "\n" +
+		"  ok         AGENTS.md#agents\n" +
+		"  ok         docs/coding-standards.md#general\n" +
 		"  ok         GLOSSARY.md\n" +
 		"  ok         docs/adr/0001-lint-and-tests-must-pass-before-merge.md\n" +
 		"  ok         docs/agents/issue-tracker.md\n" +
@@ -81,6 +85,8 @@ func TestSetupCheckJSONEmitsThePlan(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{
 		"root": "`+project+`",
 		"items": [
+			{"path": "AGENTS.md", "block": "agents", "strategy": "block", "status": "missing"},
+			{"path": "docs/coding-standards.md", "block": "general", "strategy": "block", "status": "missing"},
 			{"path": "GLOSSARY.md", "strategy": "create", "status": "missing"},
 			{"path": "docs/adr/0001-lint-and-tests-must-pass-before-merge.md", "strategy": "create", "status": "missing"},
 			{"path": "docs/agents/issue-tracker.md", "strategy": "create", "status": "missing"},
@@ -158,14 +164,16 @@ func jsonEqual(a, b any) bool {
 	return bytes.Equal(left, right)
 }
 
-// newSystem returns a System with a temporary HOME, no environment and the
-// given working directory.
+// newSystem returns a System with a temporary HOME, no environment, the given
+// working directory and a runner that reports the PoeAudits/sample GitHub
+// origin.
 func newSystem(t *testing.T, workdir string) system.System {
 	t.Helper()
 	return system.System{
 		Home:    t.TempDir(),
 		Getenv:  func(string) string { return "" },
 		Workdir: workdir,
+		Runner:  &fakeRunner{outputs: map[string]string{"git remote get-url origin": "git@github.com:PoeAudits/sample.git\n"}},
 	}
 }
 
