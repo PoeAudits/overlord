@@ -1,51 +1,60 @@
 # Overlord Project Guide
 
-Overlord is a Go CLI that owns the local Project registry, resolves Project paths,
-and opens Project Workspaces in tmux. It also manages the optional local startup
-stack used by `overlord start` and `overlord code`.
+Overlord is a small Go CLI with three jobs: Setup a Project (check it for the
+files Overlord guarantees and repair only what Overlord owns), Sync the machine
+(apply skills, Roles and global instructions from `~/.agents` to every Harness)
+and Start the machine (Sync, then bring up the services T3 Code needs). The
+spec is GitHub issue #2. Read `GLOSSARY.md` and `docs/adr/` before naming
+things or changing decided behaviour.
 
 ## Boundaries
 
-- `~/.config/overlord/registry.yaml` is the runtime source of truth. Never use the
-  live registry in tests; use a temporary `HOME` and fixture registry.
-- A Project is a logical registry entry. A Workspace is the checkout or worktree
-  opened for a Run. Do not use these terms interchangeably.
-- Overlord may create and manage tmux sessions for Project Workspaces and the
-  startup stack. Tests must use fake command executors, not real tmux sessions.
-- Overlord does not own Alice coordination, Efforts, Work Items, Runs,
-  Conversations, or the Coordination Journal. The optional `speech-outbox`
-  process is only a managed stack service.
+- All external effects go through `system.System`: `Home` (every path under
+  the user's home is derived from it), `Getenv`, `Workdir`, `Runner` (external
+  programs such as `gh`, `git`, `t3`) and `Stdout`/`Stderr`. Never call
+  `os.UserHomeDir`, `os.Getenv`, `os.Getwd` or `os/exec` outside
+  `internal/system`.
+- Tests drive commands through `cmd.Execute(sys, args)` with a temporary
+  `Home`, a temporary Project directory and a fake `Runner`. Assert on the
+  resulting files, the output and the recorded commands, never on internal
+  calls. Never touch the real home directory, real Harness config or real
+  services in tests.
+- Setup never edits text outside a Managed Block, and `--check` never writes.
+- What Setup guarantees is data in `internal/templates/manifest.yaml`; adding a
+  guaranteed file is a manifest and Template change, not new code.
 
 ## Architecture
 
-- `cmd/overlord/main.go`: process entry point only.
-- `internal/cmd`: Cobra commands and CLI orchestration.
-- `internal/registry`: versioned registry model, validation, resolution, and
-  atomic persistence.
-- `internal/tmux`: tmux adapter used by commands and stack management.
-- `internal/stack`: startup configuration, service adapters, lifecycle,
-  restart, status, and stop behavior.
-- `internal/templates`: embedded files for newly initialized Projects.
+- `cmd/overlord/main.go`: process entry point only; builds `system.OS()` and
+  calls `cmd.Execute`.
+- `internal/system`: the injected seams (`System`, `Runner`, `ExecRunner`).
+- `internal/cmd`: thin Cobra wiring. Commands: `setup`, `sync`, `start`,
+  `doctor`, `new-project`.
+- `internal/templates`: embedded Templates and the Setup manifest
+  (`Manifest()` returns the guaranteed items and their strategy).
+- `internal/project`: Setup for one Project. `Check(root)` returns a `Plan`
+  with a `missing`, `stale` or `ok` status per manifest item.
+- `internal/catalog`: reads `~/.agents` (skills, Roles, global instructions).
+- `internal/harness`: one adapter per Harness (paths, agent file format, model
+  config writer, hook installer).
+- `internal/machine`: Sync and Start.
+- `internal/t3`: edits T3 Code's settings.
 
-Keep registry mutation behind the registry load/save path, preserve atomic
-writes, and keep external process calls behind the existing executor seams so
-they remain fixture-testable.
+Packages not yet present are created by the ticket that needs them.
 
 ## Validation
 
-Run:
+Run before every commit:
 
 ```sh
-make test
-make vet
-make fmt
-make build
+go test ./...
+go vet ./...
+gofmt -l .        # must print nothing
+go build ./...
 git diff --check
 ```
 
-`make build` creates the ignored `overlord` binary. Benchmark reports under
-`.benchmark/`, local OpenCode runtime state under `.opencode/`, and cross-built
-`overlord-linux` binaries are generated outputs and must not be committed.
+`make check` runs all five. `make build` writes the ignored `overlord` binary.
 
 ## Agent skills
 

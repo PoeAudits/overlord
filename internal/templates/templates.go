@@ -1,199 +1,39 @@
-// Package templates provides embedded project templates and rendering utilities.
+// Package templates embeds the Setup manifest and the Templates Setup writes
+// into Projects.
 package templates
 
 import (
-	"bytes"
-	"embed"
+	_ "embed"
 	"fmt"
-	"io/fs"
-	"path"
-	"strings"
-	"text/template"
-	"time"
 
-	"github.com/PoeAudits/overlord/internal/registry"
+	"gopkg.in/yaml.v3"
 )
 
-//go:embed all:templates
-var templateFS embed.FS
+// Strategy says how Setup guarantees one manifest item.
+type Strategy string
 
-// TemplateData contains variables for template rendering.
-type TemplateData struct {
-	ProjectName string
-	Description string
-	Date        string // YYYY-MM-DD format
-	Category    string
-	Language    string
-}
-
-// NewTemplateData creates a new TemplateData with the current date.
-func NewTemplateData(projectName, description, category, language string) TemplateData {
-	return TemplateData{
-		ProjectName: projectName,
-		Description: description,
-		Date:        time.Now().Format("2006-01-02"),
-		Category:    category,
-		Language:    language,
-	}
-}
-
-// TemplateType represents the type of template file.
-type TemplateType string
-
-// Template type constants.
 const (
-	TemplateMakefile  TemplateType = "Makefile"
-	TemplateREADME    TemplateType = "README.md"
-	TemplateAGENTS    TemplateType = "AGENTS.md"
-	TemplateOpenCode  TemplateType = "opencode.jsonc"
-	TemplateTmuxLocal TemplateType = ".tmux.local"
+	Create  Strategy = "create"
+	Dir     Strategy = "dir"
+	Symlink Strategy = "symlink"
 )
 
-// ValidTemplateTypes returns all valid template types.
-func ValidTemplateTypes() []TemplateType {
-	return []TemplateType{
-		TemplateMakefile,
-		TemplateREADME,
-		TemplateAGENTS,
-		TemplateOpenCode,
-		TemplateTmuxLocal,
-	}
+// Item is one guaranteed path in a Project, relative to the Project root.
+type Item struct {
+	Path     string   `yaml:"path"`
+	Strategy Strategy `yaml:"strategy"`
+	// Target is the link destination for the symlink strategy.
+	Target string `yaml:"target"`
 }
 
-// Language represents a supported language for templates.
-type Language = registry.Language
+//go:embed manifest.yaml
+var manifest []byte
 
-// getTemplatePath returns the path to a template file within the embedded FS.
-// It handles the fallback logic: language-specific -> base -> shared.
-func getTemplatePath(lang Language, templateType TemplateType) (string, error) {
-	// Special case for .tmux.local - always use shared
-	if templateType == TemplateTmuxLocal {
-		return "templates/shared/.tmux.local", nil
+// Manifest returns the guaranteed items in the order Setup checks them.
+func Manifest() ([]Item, error) {
+	var items []Item
+	if err := yaml.Unmarshal(manifest, &items); err != nil {
+		return nil, fmt.Errorf("parse embedded manifest: %w", err)
 	}
-
-	// Determine the filename (with or without .tmpl extension)
-	filename := string(templateType)
-	tmplFilename := filename + ".tmpl"
-
-	// Try language-specific directory first
-	langDir := "templates/" + string(lang)
-	paths := []string{
-		path.Join(langDir, tmplFilename),
-		path.Join(langDir, filename),
-	}
-
-	// Fall back to base directory
-	baseDir := "templates/base"
-	paths = append(paths,
-		path.Join(baseDir, tmplFilename),
-		path.Join(baseDir, filename),
-	)
-
-	// Find the first existing path
-	for _, p := range paths {
-		if _, err := templateFS.Open(p); err == nil {
-			return p, nil
-		}
-	}
-
-	return "", fmt.Errorf("template not found: %s for language %s", templateType, lang)
-}
-
-// GetTemplate returns the raw content of a template file.
-// It uses fallback logic: language-specific -> base -> shared.
-func GetTemplate(lang Language, templateType TemplateType) (string, error) {
-	if !lang.IsValid() {
-		return "", fmt.Errorf("invalid language: %s", lang)
-	}
-
-	templatePath, err := getTemplatePath(lang, templateType)
-	if err != nil {
-		return "", err
-	}
-
-	content, err := templateFS.ReadFile(templatePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read template %s: %w", templatePath, err)
-	}
-
-	return string(content), nil
-}
-
-// RenderTemplate renders a template with the given data.
-// Templates with .tmpl extension are processed with text/template.
-// Other templates are returned as-is.
-func RenderTemplate(lang Language, templateType TemplateType, data TemplateData) (string, error) {
-	if !lang.IsValid() {
-		return "", fmt.Errorf("invalid language: %s", lang)
-	}
-
-	templatePath, err := getTemplatePath(lang, templateType)
-	if err != nil {
-		return "", err
-	}
-
-	rawContent, err := templateFS.ReadFile(templatePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read template %s: %w", templatePath, err)
-	}
-
-	// Only process .tmpl files with text/template
-	if !strings.HasSuffix(templatePath, ".tmpl") {
-		return string(rawContent), nil
-	}
-
-	tmpl, err := template.New(string(templateType)).Parse(string(rawContent))
-	if err != nil {
-		return "", fmt.Errorf("failed to parse template %s: %w", templateType, err)
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("failed to execute template %s: %w", templateType, err)
-	}
-
-	return buf.String(), nil
-}
-
-// GetAllTemplates returns all templates for a language.
-// Returns a map of template type to rendered content.
-func GetAllTemplates(lang Language, data TemplateData) (map[TemplateType]string, error) {
-	result := make(map[TemplateType]string)
-
-	for _, tt := range ValidTemplateTypes() {
-		content, err := RenderTemplate(lang, tt, data)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get template %s: %w", tt, err)
-		}
-		result[tt] = content
-	}
-
-	return result, nil
-}
-
-// ListTemplates returns a list of all available template files.
-func ListTemplates() ([]string, error) {
-	var templates []string
-
-	err := fs.WalkDir(templateFS, "templates", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() {
-			templates = append(templates, path)
-		}
-		return nil
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to list templates: %w", err)
-	}
-
-	return templates, nil
-}
-
-// OutputPath returns the output path for a template type.
-// This is the path where the template should be written in a project.
-func (t TemplateType) OutputPath() string {
-	return string(t)
+	return items, nil
 }
