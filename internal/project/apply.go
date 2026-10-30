@@ -13,9 +13,10 @@ import (
 )
 
 // Apply checks the Project at root, then creates or refreshes every missing
-// or stale item. It returns the plan as it was before the repairs; conflict
-// items are left untouched. An error means a Template failed to render or a
-// path could not be written.
+// or stale item. It returns the plan as it was before the repairs, except that
+// a labels item whose creation failed becomes a warning; conflict items are
+// left untouched. An error means a Template failed to render or a path could
+// not be written.
 func Apply(ctx context.Context, runner system.Runner, root, projectRoot string) (Plan, error) {
 	items, data, plan, err := check(ctx, runner, root, projectRoot)
 	if err != nil {
@@ -23,6 +24,10 @@ func Apply(ctx context.Context, runner system.Runner, root, projectRoot string) 
 	}
 	for i, item := range items {
 		if status := plan.Items[i].Status; status != Missing && status != Stale {
+			continue
+		}
+		if item.Strategy == templates.Labels {
+			plan.Items[i] = createLabels(ctx, runner, root, item, data, plan.Items[i])
 			continue
 		}
 		if err := repair(filepath.Join(root, item.Path), item, data, earlierBlocks(items[:i], item.Path)); err != nil {

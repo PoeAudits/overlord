@@ -45,8 +45,8 @@ func newSetupCommand(sys system.System) *cobra.Command {
 // checkWords and applyWords say what each status means before and after Setup
 // acts on it.
 var (
-	checkWords = map[project.Status]string{project.Missing: "missing", project.Stale: "stale", project.OK: "ok", project.Conflict: "conflict"}
-	applyWords = map[project.Status]string{project.Missing: "created", project.Stale: "refreshed", project.OK: "ok", project.Conflict: "conflict"}
+	checkWords = map[project.Status]string{project.Missing: "missing", project.Stale: "stale", project.OK: "ok", project.Conflict: "conflict", project.Warning: "warning"}
+	applyWords = map[project.Status]string{project.Missing: "created", project.Stale: "refreshed", project.OK: "ok", project.Conflict: "conflict", project.Warning: "warning"}
 )
 
 func printPlan(sys system.System, plan project.Plan, asJSON bool, heading string, words map[project.Status]string) error {
