@@ -22,6 +22,7 @@ const (
 	Dir     Strategy = "dir"
 	Symlink Strategy = "symlink"
 	Block   Strategy = "block"
+	Labels  Strategy = "labels"
 	// Generated renders each Role in the roles.yaml at Path into one agent
 	// file per Harness.
 	Generated Strategy = "generated"
@@ -41,7 +42,8 @@ type Item struct {
 	// Block names the Managed Block the block strategy owns in the file at
 	// Path; its body is rendered from Template.
 	Block string `yaml:"block"`
-	// Language limits a block to Projects where it is detected (see Languages).
+	// Language limits the item to Projects where it is detected (see
+	// Languages); "any" means at least one detected language.
 	Language string `yaml:"language"`
 	// CreateWith names a Template appended after the block, outside it, only
 	// when Setup creates the file.
@@ -49,6 +51,15 @@ type Item struct {
 	// Content is the rendered agent file for a generated item. Setup fills it
 	// in; the manifest never sets it.
 	Content []byte `yaml:"-"`
+	// Labels are the GitHub labels the labels strategy ensures on origin.
+	Labels []Label `yaml:"labels"`
+}
+
+// Label is one GitHub issue label; Color is hex without the leading #.
+type Label struct {
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+	Color       string `yaml:"color"`
 }
 
 // Languages are the languages Setup detects, in the order Templates see them,
