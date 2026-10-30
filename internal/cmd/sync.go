@@ -70,6 +70,7 @@ var pastTense = map[machine.Action]string{
 	machine.Create:  "created",
 	machine.Remove:  "removed",
 	machine.Replace: "replaced",
+	machine.Update:  "updated",
 }
 
 // displayPath shortens paths under home to ~/... for readable reports.

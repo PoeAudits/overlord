@@ -21,6 +21,8 @@ const (
 	Create  Action = "create"
 	Remove  Action = "remove"
 	Replace Action = "replace"
+	// Update marks an edit of some keys inside a file Sync does not own.
+	Update Action = "update"
 	// Conflict marks a path Sync must own but will not change because that
 	// would lose content. It makes a check fail.
 	Conflict Action = "conflict"
@@ -69,6 +71,8 @@ type step struct {
 var steps = []step{
 	{name: "skills", run: syncSkills},
 	{name: "instructions", run: syncInstructions},
+	{name: "roles", run: syncRoles},
+	{name: "hooks", run: syncHooks},
 }
 
 // Sync applies agentsDir to every Harness under sys.Home. With check it only

@@ -1,6 +1,7 @@
 package cmd_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,7 +27,8 @@ func TestSyncOnFreshHomeLinksEverySkillAndInstructionFile(t *testing.T) {
 		"  created   ~/.claude/skills/tdd\n" +
 		"  created   ~/.claude/CLAUDE.md\n" +
 		"  created   ~/.codex/AGENTS.md\n" +
-		"  created   ~/.config/opencode/AGENTS.md\n"
+		"  created   ~/.config/opencode/AGENTS.md\n" +
+		hookLines("created")
 	if stdout != want {
 		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
 	}
@@ -42,7 +44,8 @@ func TestSyncSecondRunChangesNothingAndCheckReportsEverythingOK(t *testing.T) {
 	allOK := "  ok        ~/.claude/skills/tdd\n" +
 		"  ok        ~/.claude/CLAUDE.md\n" +
 		"  ok        ~/.codex/AGENTS.md\n" +
-		"  ok        ~/.config/opencode/AGENTS.md\n"
+		"  ok        ~/.config/opencode/AGENTS.md\n" +
+		hookLines("ok")
 	stdout, code := run(t, sys, "sync")
 	if code != 0 || stdout != "Sync\n"+allOK {
 		t.Fatalf("second sync exit code = %d, stdout:\n%s", code, stdout)
@@ -66,7 +69,8 @@ func TestSyncCheckOnFreshHomeReportsWhatItWouldCreateAndWritesNothing(t *testing
 		"  create    ~/.claude/skills/tdd\n" +
 		"  create    ~/.claude/CLAUDE.md\n" +
 		"  create    ~/.codex/AGENTS.md\n" +
-		"  create    ~/.config/opencode/AGENTS.md\n"
+		"  create    ~/.config/opencode/AGENTS.md\n" +
+		hookLines("create")
 	if stdout != want {
 		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
 	}
@@ -260,6 +264,14 @@ func newAgentsDir(t *testing.T, home string, skills ...string) string {
 	}
 	mustWrite(t, filepath.Join(agents, "AGENTS.md"), "# Global rules\n")
 	return agents
+}
+
+// hookLines is the report of the hooks step when every hook has the given
+// action label.
+func hookLines(label string) string {
+	return fmt.Sprintf("  %-8s  ~/.claude/settings.json: SessionStart hook\n", label) +
+		fmt.Sprintf("  %-8s  ~/.codex/hooks.json: SessionStart hook\n", label) +
+		fmt.Sprintf("  %-8s  ~/.config/opencode/plugins/overlord-sync.js\n", label)
 }
 
 func instructionPaths(home string) []string {
