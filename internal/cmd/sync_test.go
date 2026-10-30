@@ -28,7 +28,8 @@ func TestSyncOnFreshHomeLinksEverySkillAndInstructionFile(t *testing.T) {
 		"  created   ~/.claude/CLAUDE.md\n" +
 		"  created   ~/.codex/AGENTS.md\n" +
 		"  created   ~/.config/opencode/AGENTS.md\n" +
-		hookLines("created")
+		hookLines("created") +
+		"  created   ~/.t3/userdata/settings.json: overlord-setup script\n"
 	if stdout != want {
 		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
 	}
@@ -45,7 +46,8 @@ func TestSyncSecondRunChangesNothingAndCheckReportsEverythingOK(t *testing.T) {
 		"  ok        ~/.claude/CLAUDE.md\n" +
 		"  ok        ~/.codex/AGENTS.md\n" +
 		"  ok        ~/.config/opencode/AGENTS.md\n" +
-		hookLines("ok")
+		hookLines("ok") +
+		"  ok        ~/.t3/userdata/settings.json: overlord-setup script\n"
 	stdout, code := run(t, sys, "sync")
 	if code != 0 || stdout != "Sync\n"+allOK {
 		t.Fatalf("second sync exit code = %d, stdout:\n%s", code, stdout)
@@ -70,11 +72,12 @@ func TestSyncCheckOnFreshHomeReportsWhatItWouldCreateAndWritesNothing(t *testing
 		"  create    ~/.claude/CLAUDE.md\n" +
 		"  create    ~/.codex/AGENTS.md\n" +
 		"  create    ~/.config/opencode/AGENTS.md\n" +
-		hookLines("create")
+		hookLines("create") +
+		"  create    ~/.t3/userdata/settings.json: overlord-setup script\n"
 	if stdout != want {
 		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
 	}
-	for _, dir := range []string{".claude", ".codex", ".config"} {
+	for _, dir := range []string{".claude", ".codex", ".config", ".t3"} {
 		if _, err := os.Lstat(filepath.Join(sys.Home, dir)); err == nil {
 			t.Fatalf("sync --check created ~/%s", dir)
 		}

@@ -95,10 +95,10 @@ func TestSyncOnFreshHomeWritesTheMainModelForClaudeAndCodexOnly(t *testing.T) {
 	}
 
 	var settings struct{ Model string }
-	if err := json.Unmarshal(readFile(t, filepath.Join(sys.Home, ".claude", "settings.json")), &settings); err != nil || settings.Model != "opus" {
+	if err := json.Unmarshal([]byte(readFile(t, filepath.Join(sys.Home, ".claude", "settings.json"))), &settings); err != nil || settings.Model != "opus" {
 		t.Fatalf("settings.json model = %q, want opus: %v", settings.Model, err)
 	}
-	if got := string(readFile(t, filepath.Join(sys.Home, ".codex", "config.toml"))); got != "model = \"gpt-6\"\n" {
+	if got := readFile(t, filepath.Join(sys.Home, ".codex", "config.toml")); got != "model = \"gpt-6\"\n" {
 		t.Fatalf("config.toml:\n%s", got)
 	}
 	if _, err := os.Lstat(filepath.Join(sys.Home, ".config", "opencode", "opencode.jsonc")); !os.IsNotExist(err) {
@@ -137,10 +137,10 @@ func TestSyncChangesOnlyTheModelInExistingSettingsAndConfig(t *testing.T) {
 			if code != 0 {
 				t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
 			}
-			if got := string(readFile(t, settings)); got != tc.wantSettings {
+			if got := readFile(t, settings); got != tc.wantSettings {
 				t.Errorf("settings.json:\n%s\nwant:\n%s", got, tc.wantSettings)
 			}
-			if got := string(readFile(t, config)); got != tc.wantConfig {
+			if got := readFile(t, config); got != tc.wantConfig {
 				t.Errorf("config.toml:\n%s\nwant:\n%s", got, tc.wantConfig)
 			}
 			for _, line := range []string{"  updated   ~/.claude/settings.json: main Model\n", "  updated   ~/.codex/config.toml: main Model\n"} {
@@ -155,12 +155,3 @@ func TestSyncChangesOnlyTheModelInExistingSettingsAndConfig(t *testing.T) {
 // overlordHook is a settings.json hooks member that already runs Overlord's
 // Sync at session start, so a test of the Model sees only the Model change.
 const overlordHook = `  "hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "overlord sync --quiet"}]}]}`
-
-func readFile(t *testing.T, path string) []byte {
-	t.Helper()
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return content
-}

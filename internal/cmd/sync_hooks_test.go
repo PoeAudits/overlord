@@ -22,7 +22,7 @@ func TestSyncOnFreshHomeInstallsTheSessionHooksAndTheOpenCodePlugin(t *testing.T
 			t.Errorf("%s SessionStart commands = %q", path, commands)
 		}
 	}
-	plugin := string(readFile(t, filepath.Join(sys.Home, ".config", "opencode", "plugins", "overlord-sync.js")))
+	plugin := readFile(t, filepath.Join(sys.Home, ".config", "opencode", "plugins", "overlord-sync.js"))
 	for _, want := range []string{`"session.created"`, `spawn("overlord", ["sync", "--quiet"]`} {
 		if !strings.Contains(plugin, want) {
 			t.Errorf("plugin lacks %s:\n%s", want, plugin)
@@ -31,8 +31,8 @@ func TestSyncOnFreshHomeInstallsTheSessionHooksAndTheOpenCodePlugin(t *testing.T
 	want := "  created   ~/.claude/settings.json: SessionStart hook\n" +
 		"  created   ~/.codex/hooks.json: SessionStart hook\n" +
 		"  created   ~/.config/opencode/plugins/overlord-sync.js\n"
-	if !strings.HasSuffix(stdout, want) {
-		t.Fatalf("stdout:\n%s\nwant suffix:\n%s", stdout, want)
+	if !strings.Contains(stdout, want) {
+		t.Fatalf("stdout:\n%s\nwant lines:\n%s", stdout, want)
 	}
 }
 
@@ -81,11 +81,11 @@ func TestSyncKeepsExistingHooksAndAddsOverlordsOnce(t *testing.T) {
   }
 }
 `
-	if got := string(readFile(t, settings)); got != wantSettings {
+	if got := readFile(t, settings); got != wantSettings {
 		t.Errorf("settings.json:\n%s\nwant:\n%s", got, wantSettings)
 	}
 	wantCodex := `{"hooks": {"SessionStart": [{"hooks":[{"type":"command","command":"overlord sync --quiet"}]}], "Stop": [{"hooks": [{"type": "command", "command": "notify"}]}]}}`
-	if got := string(readFile(t, codexHooks)); got != wantCodex {
+	if got := readFile(t, codexHooks); got != wantCodex {
 		t.Errorf("hooks.json:\n%s\nwant:\n%s", got, wantCodex)
 	}
 
@@ -93,10 +93,10 @@ func TestSyncKeepsExistingHooksAndAddsOverlordsOnce(t *testing.T) {
 	if code != 0 || !strings.Contains(stdout, "  ok        ~/.claude/settings.json: SessionStart hook\n") {
 		t.Fatalf("second sync exit code = %d, stdout:\n%s", code, stdout)
 	}
-	if got := string(readFile(t, settings)); got != wantSettings {
+	if got := readFile(t, settings); got != wantSettings {
 		t.Errorf("second sync changed settings.json:\n%s", got)
 	}
-	if got := string(readFile(t, codexHooks)); got != wantCodex {
+	if got := readFile(t, codexHooks); got != wantCodex {
 		t.Errorf("second sync changed hooks.json:\n%s", got)
 	}
 }
@@ -141,7 +141,7 @@ func sessionStartCommands(t *testing.T, path string) []string {
 			}
 		}
 	}
-	if err := json.Unmarshal(readFile(t, path), &file); err != nil {
+	if err := json.Unmarshal([]byte(readFile(t, path)), &file); err != nil {
 		t.Fatalf("%s: %v", path, err)
 	}
 	var commands []string
