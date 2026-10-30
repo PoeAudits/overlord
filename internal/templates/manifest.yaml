@@ -12,6 +12,10 @@
 #            from the rendered Template. `language` limits the block to
 #            Projects where that language is detected; `createWith` names a
 #            Template written after the block only when the file is created.
+#   generated  when the Project has the roles file at `path`, one agent file
+#            per Role and Harness under .claude/agents, .codex/agents and
+#            .opencode/agents, replaced only when its content differs. A file
+#            there without Overlord's generated header is left untouched.
 #
 # Create items come before the dirs they live in, so docs/adr gets the starter
 # ADR rather than a .gitkeep.
@@ -67,3 +71,5 @@
 - path: .claude/skills
   strategy: symlink
   target: ../.agents/skills
+- path: .agents/roles.yaml
+  strategy: generated
