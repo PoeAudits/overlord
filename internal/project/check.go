@@ -67,7 +67,7 @@ func check(ctx context.Context, runner system.Runner, root, projectRoot string) 
 	var items []templates.Item
 	plan := Plan{Root: root}
 	for _, item := range manifest {
-		if item.Language != "" && !slices.Contains(data.Languages, item.Language) {
+		if !appliesTo(item, data.Languages) {
 			continue
 		}
 		status, detail, err := itemStatus(root, item, data)
@@ -78,6 +78,18 @@ func check(ctx context.Context, runner system.Runner, root, projectRoot string) 
 		plan.Items = append(plan.Items, Item{Path: item.Path, Block: item.Block, Strategy: item.Strategy, Status: status, Detail: detail})
 	}
 	return items, data, plan, nil
+}
+
+// appliesTo reports whether the item's language condition holds: none, "any"
+// (at least one detected language) or one named language.
+func appliesTo(item templates.Item, languages []string) bool {
+	switch item.Language {
+	case "":
+		return true
+	case "any":
+		return len(languages) > 0
+	}
+	return slices.Contains(languages, item.Language)
 }
 
 func itemStatus(root string, item templates.Item, data templates.Data) (Status, string, error) {

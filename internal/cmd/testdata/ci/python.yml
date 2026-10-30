@@ -1,0 +1,18 @@
+# Lint and tests for every language Overlord detected when it created this
+# file. Overlord never rewrites it; edit freely.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync
+      - run: uvx ruff check
+      - run: uv run --with pytest pytest

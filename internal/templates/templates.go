@@ -38,7 +38,8 @@ type Item struct {
 	// Block names the Managed Block the block strategy owns in the file at
 	// Path; its body is rendered from Template.
 	Block string `yaml:"block"`
-	// Language limits a block to Projects where it is detected (see Languages).
+	// Language limits the item to Projects where it is detected (see
+	// Languages); "any" means at least one detected language.
 	Language string `yaml:"language"`
 	// CreateWith names a Template appended after the block, outside it, only
 	// when Setup creates the file.

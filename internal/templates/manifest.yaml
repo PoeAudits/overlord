@@ -9,9 +9,11 @@
 #            from `template`. Setup creates the file holding the block when it
 #            is absent, inserts the block after the file's earlier blocks (or
 #            at the top) when it is missing, and replaces it when it differs
-#            from the rendered Template. `language` limits the block to
-#            Projects where that language is detected; `createWith` names a
-#            Template written after the block only when the file is created.
+#            from the rendered Template. `createWith` names a Template written
+#            after the block only when the file is created.
+#
+# `language` limits any item to Projects where that language is detected;
+# `any` means at least one language.
 #
 # Create items come before the dirs they live in, so docs/adr gets the starter
 # ADR rather than a .gitkeep.
@@ -60,6 +62,10 @@
 - path: docs/agents/domain.md
   strategy: create
   template: domain.md.tmpl
+- path: .github/workflows/ci.yml
+  strategy: create
+  template: ci.yml.tmpl
+  language: any
 - path: docs/adr
   strategy: dir
 - path: .agents/skills
