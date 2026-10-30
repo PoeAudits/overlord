@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -18,15 +19,18 @@ func newSetupCommand(sys system.System) *cobra.Command {
 		Short: "Create or refresh the files Overlord guarantees in a Project",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(command *cobra.Command, args []string) error {
-			root := projectRoot(sys, args)
+			root := setupTarget(sys, args)
+			// T3 points T3CODE_PROJECT_ROOT at the main checkout, where
+			// languages are detected; without it the target is the Project.
+			projectRoot := cmp.Or(sys.Getenv("T3CODE_PROJECT_ROOT"), root)
 			if check {
-				plan, err := project.Check(root)
+				plan, err := project.Check(command.Context(), sys.Runner, root, projectRoot)
 				if err != nil {
 					return err
 				}
 				return printPlan(sys, plan, asJSON, "Setup plan for", checkWords)
 			}
-			plan, err := project.Apply(command.Context(), sys.Runner, root)
+			plan, err := project.Apply(command.Context(), sys.Runner, root, projectRoot)
 			if err != nil {
 				return err
 			}
@@ -53,7 +57,11 @@ func printPlan(sys system.System, plan project.Plan, asJSON bool, heading string
 	}
 	fmt.Fprintf(sys.Stdout, "%s %s\n", heading, plan.Root)
 	for _, item := range plan.Items {
-		line := fmt.Sprintf("  %-9s  %s", words[item.Status], item.Path)
+		path := item.Path
+		if item.Block != "" {
+			path += "#" + item.Block
+		}
+		line := fmt.Sprintf("  %-9s  %s", words[item.Status], path)
 		if item.Detail != "" {
 			line += " (" + item.Detail + ")"
 		}
@@ -62,11 +70,11 @@ func printPlan(sys system.System, plan project.Plan, asJSON bool, heading string
 	return nil
 }
 
-// projectRoot picks the checkout Setup works on: the path argument, else T3
+// setupTarget picks the checkout Setup works on: the path argument, else T3
 // Code's T3CODE_WORKTREE_PATH, else the working directory. T3CODE_PROJECT_ROOT
 // is never the target: T3 sets it to the main checkout, so writing there would
 // leave the new worktree unchanged.
-func projectRoot(sys system.System, args []string) string {
+func setupTarget(sys system.System, args []string) string {
 	if len(args) > 0 && filepath.IsAbs(args[0]) {
 		return filepath.Clean(args[0])
 	}
