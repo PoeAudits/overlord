@@ -1,0 +1,12 @@
+# Items Setup guarantees in every Project, checked in this order.
+# strategy: create (whole file, only if absent), dir (directory exists),
+# symlink (relative link to target).
+- path: GLOSSARY.md
+  strategy: create
+- path: docs/adr
+  strategy: dir
+- path: .agents/skills
+  strategy: dir
+- path: .claude/skills
+  strategy: symlink
+  target: ../.agents/skills

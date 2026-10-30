@@ -1,0 +1,175 @@
+package cmd_test
+
+import (
+	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/PoeAudits/overlord/internal/cmd"
+	"github.com/PoeAudits/overlord/internal/system"
+)
+
+func TestSetupCheckOnEmptyProjectListsEveryItemMissingAndWritesNothing(t *testing.T) {
+	project := t.TempDir()
+
+	stdout, code := run(t, newSystem(t, project), "setup", "--check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	want := "Setup plan for " + project + "\n" +
+		"  missing  GLOSSARY.md\n" +
+		"  missing  docs/adr\n" +
+		"  missing  .agents/skills\n" +
+		"  missing  .claude/skills\n"
+	if stdout != want {
+		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
+	}
+	entries, err := os.ReadDir(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("setup --check wrote %d entries into the project", len(entries))
+	}
+}
+
+func TestSetupCheckOnCompleteProjectReportsEveryItemOK(t *testing.T) {
+	project := completeProject(t)
+
+	stdout, code := run(t, newSystem(t, project), "setup", "--check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	want := "Setup plan for " + project + "\n" +
+		"  ok       GLOSSARY.md\n" +
+		"  ok       docs/adr\n" +
+		"  ok       .agents/skills\n" +
+		"  ok       .claude/skills\n"
+	if stdout != want {
+		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
+	}
+}
+
+func TestSetupCheckJSONEmitsThePlan(t *testing.T) {
+	project := t.TempDir()
+	mustMkdir(t, filepath.Join(project, "docs", "adr"))
+
+	stdout, code := run(t, newSystem(t, project), "setup", "--check", "--json")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	var got any
+	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
+		t.Fatalf("stdout is not JSON: %v\n%s", err, stdout)
+	}
+	var want any
+	if err := json.Unmarshal([]byte(`{
+		"root": "`+project+`",
+		"items": [
+			{"path": "GLOSSARY.md", "strategy": "create", "status": "missing"},
+			{"path": "docs/adr", "strategy": "dir", "status": "ok"},
+			{"path": ".agents/skills", "strategy": "dir", "status": "missing"},
+			{"path": ".claude/skills", "strategy": "symlink", "status": "missing"}
+		]
+	}`), &want); err != nil {
+		t.Fatal(err)
+	}
+	if !jsonEqual(got, want) {
+		t.Fatalf("plan JSON:\n%s", stdout)
+	}
+}
+
+func TestSetupCheckProjectRoot(t *testing.T) {
+	complete := completeProject(t)
+	empty := t.TempDir()
+
+	tests := []struct {
+		name    string
+		envRoot string
+		workdir string
+		args    []string
+	}{
+		{name: "T3CODE_PROJECT_ROOT wins over the path argument", envRoot: complete, workdir: empty, args: []string{empty}},
+		{name: "path argument wins over the working directory", workdir: empty, args: []string{complete}},
+		{name: "relative path argument resolves against the working directory", workdir: filepath.Dir(complete), args: []string{filepath.Base(complete)}},
+		{name: "working directory is the fallback", workdir: complete},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sys := newSystem(t, tt.workdir)
+			sys.Getenv = func(key string) string {
+				if key == "T3CODE_PROJECT_ROOT" {
+					return tt.envRoot
+				}
+				return ""
+			}
+
+			stdout, code := run(t, sys, append([]string{"setup", "--check"}, tt.args...)...)
+
+			if code != 0 {
+				t.Fatalf("exit code = %d, want 0", code)
+			}
+			if !strings.HasPrefix(stdout, "Setup plan for "+complete+"\n") || strings.Contains(stdout, "missing") {
+				t.Fatalf("checked the wrong root:\n%s", stdout)
+			}
+		})
+	}
+}
+
+// completeProject returns a Project directory that already has every item.
+func completeProject(t *testing.T) string {
+	t.Helper()
+	project := t.TempDir()
+	mustMkdir(t, filepath.Join(project, "docs", "adr"))
+	mustMkdir(t, filepath.Join(project, ".agents", "skills"))
+	mustMkdir(t, filepath.Join(project, ".claude"))
+	if err := os.WriteFile(filepath.Join(project, "GLOSSARY.md"), []byte("# Project\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../.agents/skills", filepath.Join(project, ".claude", "skills")); err != nil {
+		t.Fatal(err)
+	}
+	return project
+}
+
+func jsonEqual(a, b any) bool {
+	left, _ := json.Marshal(a)
+	right, _ := json.Marshal(b)
+	return bytes.Equal(left, right)
+}
+
+// newSystem returns a System with a temporary HOME, no environment and the
+// given working directory.
+func newSystem(t *testing.T, workdir string) system.System {
+	t.Helper()
+	return system.System{
+		Home:    t.TempDir(),
+		Getenv:  func(string) string { return "" },
+		Workdir: workdir,
+	}
+}
+
+func run(t *testing.T, sys system.System, args ...string) (string, int) {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	sys.Stdout = &stdout
+	sys.Stderr = &stderr
+	code := cmd.Execute(sys, args)
+	if stderr.Len() > 0 {
+		t.Logf("stderr: %s", stderr.String())
+	}
+	return stdout.String(), code
+}
+
+func mustMkdir(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
