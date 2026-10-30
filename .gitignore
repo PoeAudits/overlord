@@ -1,1 +1,4 @@
 /overlord
+/overlord-linux
+.benchmark/
+.opencode/
