@@ -11,6 +11,7 @@ import (
 
 	"github.com/PoeAudits/overlord/internal/catalog"
 	"github.com/PoeAudits/overlord/internal/system"
+	"github.com/PoeAudits/overlord/internal/t3"
 )
 
 // Action is what Sync did, or in a check would do, to one path.
@@ -21,6 +22,8 @@ const (
 	Create  Action = "create"
 	Remove  Action = "remove"
 	Replace Action = "replace"
+	// Update marks an edit of some keys inside a file Sync does not own.
+	Update Action = "update"
 	// Conflict marks a path Sync must own but will not change because that
 	// would lose content. It makes a check fail.
 	Conflict Action = "conflict"
@@ -69,6 +72,9 @@ type step struct {
 var steps = []step{
 	{name: "skills", run: syncSkills},
 	{name: "instructions", run: syncInstructions},
+	{name: "roles", run: syncRoles},
+	{name: "hooks", run: syncHooks},
+	{name: "t3", run: syncT3},
 }
 
 // Sync applies agentsDir to every Harness under sys.Home. With check it only
@@ -244,3 +250,14 @@ func (run syncRun) createLink(path, target string) error {
 	}
 	return os.Symlink(target, path)
 }
+
+// syncT3 ensures T3 Code runs `overlord setup` on every new worktree.
+func syncT3(run syncRun) ([]Result, error) {
+	status, err := t3.EnsureSetupScript(run.sys.Home, run.check)
+	if err != nil {
+		return nil, err
+	}
+	return []Result{{Path: t3.SettingsPath(run.sys.Home), Action: t3Actions[status], Detail: "overlord-setup script"}}, nil
+}
+
+var t3Actions = map[t3.Status]Action{t3.Missing: Create, t3.Stale: Replace, t3.OK: OK}

@@ -76,12 +76,20 @@ func check(ctx context.Context, runner system.Runner, root, projectRoot string) 
 		if !appliesTo(item, data.Languages) {
 			continue
 		}
-		row, err := planRow(ctx, runner, root, item, data)
-		if err != nil {
-			return nil, templates.Data{}, Plan{}, fmt.Errorf("check %s: %w", item.Path, err)
+		expanded := []templates.Item{item}
+		if item.Strategy == templates.Generated {
+			if expanded, err = agentFiles(root, item); err != nil {
+				return nil, templates.Data{}, Plan{}, fmt.Errorf("check %s: %w", item.Path, err)
+			}
 		}
-		items = append(items, item)
-		plan.Items = append(plan.Items, row)
+		for _, item := range expanded {
+			row, err := planRow(ctx, runner, root, item, data)
+			if err != nil {
+				return nil, templates.Data{}, Plan{}, fmt.Errorf("check %s: %w", item.Path, err)
+			}
+			items = append(items, item)
+			plan.Items = append(plan.Items, row)
+		}
 	}
 	return items, data, plan, nil
 }
@@ -113,6 +121,9 @@ func itemStatus(root string, item templates.Item, data templates.Data) (Status, 
 	path := filepath.Join(root, item.Path)
 	if item.Strategy == templates.Block {
 		return blockStatus(path, item, data)
+	}
+	if item.Strategy == templates.Generated {
+		return generatedStatus(path, item.Content)
 	}
 	info, err := os.Lstat(path)
 	if errors.Is(err, fs.ErrNotExist) {

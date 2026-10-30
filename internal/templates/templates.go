@@ -23,6 +23,9 @@ const (
 	Symlink Strategy = "symlink"
 	Block   Strategy = "block"
 	Labels  Strategy = "labels"
+	// Generated renders each Role in the roles.yaml at Path into one agent
+	// file per Harness.
+	Generated Strategy = "generated"
 )
 
 // Item is one guaranteed path in a Project, relative to the Project root.
@@ -45,6 +48,9 @@ type Item struct {
 	// CreateWith names a Template appended after the block, outside it, only
 	// when Setup creates the file.
 	CreateWith string `yaml:"createWith"`
+	// Content is the rendered agent file for a generated item. Setup fills it
+	// in; the manifest never sets it.
+	Content []byte `yaml:"-"`
 	// Labels are the GitHub labels the labels strategy ensures on origin.
 	Labels []Label `yaml:"labels"`
 }
