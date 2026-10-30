@@ -2,6 +2,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -22,7 +23,7 @@ func Execute(sys system.System, args []string) int {
 	root.SetOut(sys.Stdout)
 	root.SetErr(sys.Stderr)
 	root.AddCommand(newSetupCommand(sys))
-	if err := root.Execute(); err != nil {
+	if err := root.ExecuteContext(context.Background()); err != nil {
 		fmt.Fprintln(sys.Stderr, "overlord:", err)
 		return 1
 	}
