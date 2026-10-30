@@ -145,3 +145,23 @@ func cmdExecute(sys system.System, stderr *strings.Builder, args ...string) int 
 	sys.Stderr = stderr
 	return cmd.Execute(sys, args)
 }
+
+func TestNewProjectClonesUnderTheProjectsRootFromOverlordsConfig(t *testing.T) {
+	sys := newSystem(t, t.TempDir())
+	mustWrite(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), "projectsRoot: ~/code\n")
+	root := filepath.Join(sys.Home, "code")
+	path := filepath.Join(root, "sample")
+	runner := newProjectRunner(t, sys.Home, "sample")
+	runner.clonePath = path
+	runner.outputs["gh repo clone PoeAudits/sample "+path] = ""
+	runner.outputs[filepath.Join(sys.Home, ".t3", "bin", "t3")+" project add --title sample "+path] = ""
+	sys.Runner = runner
+
+	if stdout, code := run(t, sys, "new-project", "sample"); code != 0 {
+		t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
+	}
+
+	if want := root + ": gh repo clone PoeAudits/sample " + path; runner.calls[1] != want {
+		t.Fatalf("second command = %q, want %q", runner.calls[1], want)
+	}
+}

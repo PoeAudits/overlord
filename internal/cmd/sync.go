@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/PoeAudits/overlord/internal/config"
 	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/system"
 )
@@ -31,9 +32,11 @@ override replaces the global list entirely, so Setup does not run for that
 Project unless the override includes the overlord-setup entry.`,
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			// The agents directory becomes configurable with Overlord's config
-			// file; until then it is always ~/.agents.
-			report, err := machine.Sync(sys, filepath.Join(sys.Home, ".agents"), check)
+			cfg, err := config.Load(sys.Home)
+			if err != nil {
+				return err
+			}
+			report, err := machine.Sync(sys, cfg.AgentsDir, check)
 			if err != nil {
 				return err
 			}

@@ -295,3 +295,18 @@ func assertLink(t *testing.T, path, target string) {
 		t.Fatalf("%s -> %s, want -> %s", path, got, target)
 	}
 }
+
+func TestSyncUsesTheAgentsDirFromOverlordsConfig(t *testing.T) {
+	sys := newSystem(t, t.TempDir())
+	catalog := filepath.Join(sys.Home, "src", "agents")
+	mustWrite(t, filepath.Join(catalog, "skills", "grill", "SKILL.md"), "# grill\n")
+	mustWrite(t, filepath.Join(catalog, "AGENTS.md"), "# Global rules\n")
+	mustWrite(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), "agentsDir: ~/src/agents\n")
+
+	if stdout, code := run(t, sys, "sync"); code != 0 {
+		t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
+	}
+
+	assertLink(t, filepath.Join(sys.Home, ".claude", "skills", "grill"), filepath.Join(catalog, "skills", "grill"))
+	assertLink(t, filepath.Join(sys.Home, ".codex", "AGENTS.md"), filepath.Join(catalog, "AGENTS.md"))
+}

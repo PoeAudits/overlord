@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/PoeAudits/overlord/internal/config"
 	"github.com/PoeAudits/overlord/internal/project"
 	"github.com/PoeAudits/overlord/internal/system"
 )
@@ -35,7 +36,11 @@ clone it into <projectsRoot>/<name>, run Setup in the clone, commit
 			if name != filepath.Base(name) || name == "." || name == ".." {
 				return fmt.Errorf("project name %q must be a single directory name", name)
 			}
-			root := projectsRoot(sys)
+			cfg, err := config.Load(sys.Home)
+			if err != nil {
+				return err
+			}
+			root := cfg.ProjectsRoot
 			path := filepath.Join(root, name)
 			if _, err := os.Lstat(path); !errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf("%s already exists; choose another name or remove it", path)
@@ -83,12 +88,6 @@ clone it into <projectsRoot>/<name>, run Setup in the clone, commit
 	command.Flags().StringVar(&description, "description", "", "GitHub repository description")
 	command.Flags().BoolVar(&public, "public", false, "create a public repository (default private)")
 	return command
-}
-
-// projectsRoot is where new Projects are cloned. It is fixed to ~/projects
-// until Overlord's config file provides projectsRoot.
-func projectsRoot(sys system.System) string {
-	return filepath.Join(sys.Home, "projects")
 }
 
 func visibility(public bool) string {
