@@ -22,6 +22,7 @@ const (
 	Dir     Strategy = "dir"
 	Symlink Strategy = "symlink"
 	Block   Strategy = "block"
+	Labels  Strategy = "labels"
 )
 
 // Item is one guaranteed path in a Project, relative to the Project root.
@@ -44,6 +45,15 @@ type Item struct {
 	// CreateWith names a Template appended after the block, outside it, only
 	// when Setup creates the file.
 	CreateWith string `yaml:"createWith"`
+	// Labels are the GitHub labels the labels strategy ensures on origin.
+	Labels []Label `yaml:"labels"`
+}
+
+// Label is one GitHub issue label; Color is hex without the leading #.
+type Label struct {
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+	Color       string `yaml:"color"`
 }
 
 // Languages are the languages Setup detects, in the order Templates see them,

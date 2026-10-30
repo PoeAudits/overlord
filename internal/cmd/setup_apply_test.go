@@ -16,6 +16,7 @@ func TestSetupOnEmptyProjectCreatesEveryItemFromTheGoldenFiles(t *testing.T) {
 	sys := newSystem(t, project)
 	runner := &fakeRunner{outputs: map[string]string{
 		"git remote get-url origin": "git@github.com:PoeAudits/sample.git\n",
+		labelList:                   allTriageLabels,
 	}}
 	sys.Runner = runner
 
@@ -37,11 +38,12 @@ func TestSetupOnEmptyProjectCreatesEveryItemFromTheGoldenFiles(t *testing.T) {
 		"  created    docs/agents/domain.md\n" +
 		"  created    docs/adr\n" +
 		"  created    .agents/skills\n" +
-		"  created    .claude/skills\n"
+		"  created    .claude/skills\n" +
+		"  ok         triage labels\n"
 	if stdout != want {
 		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
 	}
-	if want := []string{project + ": git remote get-url origin"}; !reflect.DeepEqual(runner.calls, want) {
+	if want := []string{project + ": git remote get-url origin", project + ": " + labelList}; !reflect.DeepEqual(runner.calls, want) {
 		t.Fatalf("commands = %q, want %q", runner.calls, want)
 	}
 }
@@ -126,7 +128,8 @@ func TestSetupSecondRunChangesNothingAndReportsEveryItemOK(t *testing.T) {
 		"  ok         docs/agents/domain.md\n" +
 		"  ok         docs/adr\n" +
 		"  ok         .agents/skills\n" +
-		"  ok         .claude/skills\n"
+		"  ok         .claude/skills\n" +
+		"  warning    triage labels (no GitHub origin remote)\n"
 	if stdout != want {
 		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
 	}

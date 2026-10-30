@@ -11,6 +11,11 @@
 #            at the top) when it is missing, and replaces it when it differs
 #            from the rendered Template. `createWith` names a Template written
 #            after the block only when the file is created.
+#   labels   the GitHub labels in `labels` exist on the repo named by the
+#            origin remote; Setup creates only the missing ones through `gh`
+#            and never edits existing ones. `path` is only the name Setup
+#            prints. Without a GitHub origin, or when `gh` fails, the item is
+#            a warning and Setup still exits 0.
 #
 # `language` limits any item to Projects where that language is detected;
 # `any` means at least one language.
@@ -73,3 +78,23 @@
 - path: .claude/skills
   strategy: symlink
   target: ../.agents/skills
+# Descriptions are the Pocock triage defaults (setup-matt-pocock-skills
+# triage-labels.md); the skills define no colours, so these are Overlord's.
+- path: triage labels
+  strategy: labels
+  labels:
+    - name: needs-triage
+      description: Maintainer needs to evaluate this issue
+      color: "e4e669"
+    - name: needs-info
+      description: Waiting on reporter for more information
+      color: "d876e3"
+    - name: ready-for-agent
+      description: Fully specified, ready for an AFK agent
+      color: "0e8a16"
+    - name: ready-for-human
+      description: Requires human implementation
+      color: "1d76db"
+    - name: wontfix
+      description: Will not be actioned
+      color: "ffffff"

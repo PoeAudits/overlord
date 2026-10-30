@@ -26,6 +26,9 @@ const (
 	// Conflict means something Overlord does not own occupies the path, so
 	// Setup reports it and leaves it untouched.
 	Conflict Status = "conflict"
+	// Warning means Setup could not check or repair the item for a reason
+	// outside the Project (no GitHub origin, gh failing) and moved on.
+	Warning Status = "warning"
 )
 
 // Plan is the result of checking a Project.
@@ -41,8 +44,11 @@ type Item struct {
 	Block    string             `json:"block,omitempty"`
 	Strategy templates.Strategy `json:"strategy"`
 	Status   Status             `json:"status"`
-	// Detail says why an item is in conflict.
+	// Detail says why an item is in conflict or a warning, or which labels
+	// are missing.
 	Detail string `json:"detail,omitempty"`
+	// MissingLabels names the labels Setup creates for the labels strategy.
+	MissingLabels []string `json:"missingLabels,omitempty"`
 }
 
 // Check reports the status of every manifest item in the Project checkout at
@@ -70,12 +76,12 @@ func check(ctx context.Context, runner system.Runner, root, projectRoot string) 
 		if !appliesTo(item, data.Languages) {
 			continue
 		}
-		status, detail, err := itemStatus(root, item, data)
+		row, err := planRow(ctx, runner, root, item, data)
 		if err != nil {
 			return nil, templates.Data{}, Plan{}, fmt.Errorf("check %s: %w", item.Path, err)
 		}
 		items = append(items, item)
-		plan.Items = append(plan.Items, Item{Path: item.Path, Block: item.Block, Strategy: item.Strategy, Status: status, Detail: detail})
+		plan.Items = append(plan.Items, row)
 	}
 	return items, data, plan, nil
 }
@@ -90,6 +96,17 @@ func appliesTo(item templates.Item, languages []string) bool {
 		return len(languages) > 0
 	}
 	return slices.Contains(languages, item.Language)
+}
+
+func planRow(ctx context.Context, runner system.Runner, root string, item templates.Item, data templates.Data) (Item, error) {
+	row := Item{Path: item.Path, Block: item.Block, Strategy: item.Strategy}
+	if item.Strategy == templates.Labels {
+		row.Status, row.Detail, row.MissingLabels = labelsStatus(ctx, runner, root, item, data)
+		return row, nil
+	}
+	var err error
+	row.Status, row.Detail, err = itemStatus(root, item, data)
+	return row, err
 }
 
 func itemStatus(root string, item templates.Item, data templates.Data) (Status, string, error) {
