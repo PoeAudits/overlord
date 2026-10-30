@@ -17,7 +17,19 @@ func newSyncCommand(sys system.System) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "sync",
 		Short: "Apply skills and global instructions from the agents directory to every Harness",
-		Args:  cobra.NoArgs,
+		Long: `Apply skills and global instructions from the agents directory to every
+Harness, and register "overlord setup" with T3 Code.
+
+The T3 step ensures ~/.t3/userdata/settings.json has a defaultProjectScripts
+entry with id overlord-setup that runs "overlord setup" on every new
+worktree. Every other setting is kept as it is.
+
+T3 runs only the first script marked to run on worktree creation, so chain
+Project-specific post-clone commands behind "overlord setup" instead of adding
+a second script. If a Project has its own scripts override in T3, that
+override replaces the global list entirely, so Setup does not run for that
+Project unless the override includes the overlord-setup entry.`,
+		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// The agents directory becomes configurable with Overlord's config
 			// file; until then it is always ~/.agents.
