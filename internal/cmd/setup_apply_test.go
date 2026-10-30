@@ -96,3 +96,198 @@ func (r *fakeRunner) Run(_ context.Context, dir, name string, args ...string) ([
 	}
 	return []byte(output), nil
 }
+
+func TestSetupSecondRunChangesNothingAndReportsEveryItemOK(t *testing.T) {
+	project := t.TempDir()
+	sys := newSystem(t, project)
+	sys.Runner = &fakeRunner{}
+	if _, code := run(t, sys, "setup"); code != 0 {
+		t.Fatalf("first run exit code = %d", code)
+	}
+	before := tree(t, project)
+
+	stdout, code := run(t, sys, "setup")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	if after := tree(t, project); !reflect.DeepEqual(after, before) {
+		t.Fatalf("second run changed the project:\nbefore %v\nafter  %v", keys(before), keys(after))
+	}
+	want := "Setup applied to " + project + "\n" +
+		"  ok         GLOSSARY.md\n" +
+		"  ok         docs/adr/0001-lint-and-tests-must-pass-before-merge.md\n" +
+		"  ok         docs/agents/issue-tracker.md\n" +
+		"  ok         docs/agents/triage-labels.md\n" +
+		"  ok         docs/agents/domain.md\n" +
+		"  ok         docs/adr\n" +
+		"  ok         .agents/skills\n" +
+		"  ok         .claude/skills\n"
+	if stdout != want {
+		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
+	}
+}
+
+func TestSetupNeverRewritesAnExistingFile(t *testing.T) {
+	project := t.TempDir()
+	mustWrite(t, filepath.Join(project, "GLOSSARY.md"), "# Mine\n\nHand-written.\n")
+	mustWrite(t, filepath.Join(project, "docs", "agents", "domain.md"), "custom\n")
+	sys := newSystem(t, project)
+	sys.Runner = &fakeRunner{}
+
+	stdout, code := run(t, sys, "setup")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	files := tree(t, project)
+	if files["GLOSSARY.md"] != "# Mine\n\nHand-written.\n" || files["docs/agents/domain.md"] != "custom\n" {
+		t.Fatalf("existing files were rewritten: GLOSSARY.md=%q domain.md=%q", files["GLOSSARY.md"], files["docs/agents/domain.md"])
+	}
+	for _, line := range []string{"  ok         GLOSSARY.md\n", "  ok         docs/agents/domain.md\n", "  created    docs/agents/issue-tracker.md\n"} {
+		if !strings.Contains(stdout, line) {
+			t.Fatalf("stdout lacks %q:\n%s", line, stdout)
+		}
+	}
+}
+
+func TestSetupLeavesARealClaudeSkillsDirectoryWithContentUntouched(t *testing.T) {
+	project := t.TempDir()
+	mustWrite(t, filepath.Join(project, ".claude", "skills", "verify", "SKILL.md"), "# verify\n")
+	sys := newSystem(t, project)
+	sys.Runner = &fakeRunner{}
+
+	stdout, code := run(t, sys, "setup")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	if got := tree(t, project)[".claude/skills/verify/SKILL.md"]; got != "# verify\n" {
+		t.Fatalf(".claude/skills/verify/SKILL.md = %q, want it untouched", got)
+	}
+	want := "  conflict   .claude/skills (real directory with content; left untouched)\n"
+	if !strings.Contains(stdout, want) {
+		t.Fatalf("stdout lacks %q:\n%s", want, stdout)
+	}
+	checkOut, _ := run(t, sys, "setup", "--check")
+	if !strings.Contains(checkOut, want) {
+		t.Fatalf("setup --check lacks %q:\n%s", want, checkOut)
+	}
+}
+
+func TestSetupReplacesAnEmptyRealClaudeSkillsDirectoryWithTheLink(t *testing.T) {
+	project := t.TempDir()
+	mustMkdir(t, filepath.Join(project, ".claude", "skills"))
+	sys := newSystem(t, project)
+	sys.Runner = &fakeRunner{}
+
+	stdout, code := run(t, sys, "setup")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	if got := tree(t, project)[".claude/skills"]; got != "-> ../.agents/skills" {
+		t.Fatalf(".claude/skills = %q, want the link", got)
+	}
+	if !strings.Contains(stdout, "  refreshed  .claude/skills\n") {
+		t.Fatalf("stdout:\n%s", stdout)
+	}
+}
+
+func TestSetupSkipsTheStarterADRWhenTheProjectHasAnADR(t *testing.T) {
+	project := t.TempDir()
+	mustWrite(t, filepath.Join(project, "docs", "adr", "0001-use-postgres.md"), "# Use Postgres\n")
+	sys := newSystem(t, project)
+	sys.Runner = &fakeRunner{}
+
+	stdout, code := run(t, sys, "setup")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	var adrs []string
+	for path := range tree(t, project) {
+		if strings.HasPrefix(path, "docs/adr/") {
+			adrs = append(adrs, path)
+		}
+	}
+	if want := []string{"docs/adr/0001-use-postgres.md"}; !reflect.DeepEqual(adrs, want) {
+		t.Fatalf("docs/adr holds %v, want %v", adrs, want)
+	}
+	if !strings.Contains(stdout, "  ok         docs/adr/0001-lint-and-tests-must-pass-before-merge.md\n") {
+		t.Fatalf("stdout:\n%s", stdout)
+	}
+}
+
+func TestSetupRemovesTheGitkeepOnceADirectoryHasContent(t *testing.T) {
+	project := t.TempDir()
+	sys := newSystem(t, project)
+	sys.Runner = &fakeRunner{}
+	if _, code := run(t, sys, "setup"); code != 0 {
+		t.Fatalf("first run exit code = %d", code)
+	}
+	mustWrite(t, filepath.Join(project, ".agents", "skills", "verify", "SKILL.md"), "# verify\n")
+
+	stdout, code := run(t, sys, "setup")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	if _, ok := tree(t, project)[".agents/skills/.gitkeep"]; ok {
+		t.Fatal(".agents/skills/.gitkeep still present beside a skill")
+	}
+	if !strings.Contains(stdout, "  refreshed  .agents/skills\n") {
+		t.Fatalf("stdout:\n%s", stdout)
+	}
+}
+
+func TestSetupWithoutAGitHubRemoteNamesTheProjectAfterItsDirectory(t *testing.T) {
+	project := filepath.Join(t.TempDir(), "my-tool")
+	mustMkdir(t, project)
+	sys := newSystem(t, project)
+	sys.Runner = &fakeRunner{}
+
+	_, code := run(t, sys, "setup")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	if got := tree(t, project)["GLOSSARY.md"]; got != "# my-tool\n\n## Language\n" {
+		t.Fatalf("GLOSSARY.md = %q", got)
+	}
+}
+
+func TestSetupExitsNonZeroWhenAFileCannotBeWritten(t *testing.T) {
+	project := t.TempDir()
+	if err := os.Chmod(project, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(project, 0o755) })
+	sys := newSystem(t, project)
+	sys.Runner = &fakeRunner{}
+
+	_, code := run(t, sys, "setup")
+
+	if code == 0 {
+		t.Fatal("exit code = 0, want non-zero")
+	}
+}
+
+func TestSetupLeavesAFileWhereADirectoryBelongsUntouched(t *testing.T) {
+	project := t.TempDir()
+	mustWrite(t, filepath.Join(project, ".agents", "skills"), "not a directory\n")
+	sys := newSystem(t, project)
+	sys.Runner = &fakeRunner{}
+
+	stdout, code := run(t, sys, "setup")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	if got := tree(t, project)[".agents/skills"]; got != "not a directory\n" {
+		t.Fatalf(".agents/skills = %q, want it untouched", got)
+	}
+	if want := "  conflict   .agents/skills (not a directory; left untouched)\n"; !strings.Contains(stdout, want) {
+		t.Fatalf("stdout lacks %q:\n%s", want, stdout)
+	}
+}

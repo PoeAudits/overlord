@@ -44,7 +44,7 @@ func repair(path string, item templates.Item, data templates.Data) error {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return err
 		}
-		return writeNew(path, content)
+		return os.WriteFile(path, content, 0o644)
 	case templates.Dir:
 		return repairDir(path)
 	case templates.Symlink:
@@ -61,19 +61,6 @@ func repair(path string, item templates.Item, data templates.Data) error {
 	return fmt.Errorf("unknown strategy %q", item.Strategy)
 }
 
-// writeNew creates path with content and never overwrites an existing file.
-func writeNew(path string, content []byte) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
-	if err != nil {
-		return err
-	}
-	if _, err := file.Write(content); err != nil {
-		file.Close()
-		return err
-	}
-	return file.Close()
-}
-
 // repairDir ensures the directory exists with a .gitkeep only while empty.
 func repairDir(path string) error {
 	if err := os.MkdirAll(path, 0o755); err != nil {
@@ -85,7 +72,7 @@ func repairDir(path string) error {
 	}
 	keep := filepath.Join(path, ".gitkeep")
 	if empty && !hasKeep {
-		return writeNew(keep, nil)
+		return os.WriteFile(keep, nil, 0o644)
 	}
 	if !empty && hasKeep {
 		return os.Remove(keep)
