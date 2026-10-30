@@ -30,7 +30,8 @@ func TestSetupCheckOnEmptyProjectListsEveryItemMissingAndWritesNothing(t *testin
 		"  missing    docs/agents/domain.md\n" +
 		"  missing    docs/adr\n" +
 		"  missing    .agents/skills\n" +
-		"  missing    .claude/skills\n"
+		"  missing    .claude/skills\n" +
+		"  ok         triage labels\n"
 	if stdout != want {
 		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
 	}
@@ -61,7 +62,8 @@ func TestSetupCheckOnCompleteProjectReportsEveryItemOK(t *testing.T) {
 		"  ok         docs/agents/domain.md\n" +
 		"  ok         docs/adr\n" +
 		"  ok         .agents/skills\n" +
-		"  ok         .claude/skills\n"
+		"  ok         .claude/skills\n" +
+		"  ok         triage labels\n"
 	if stdout != want {
 		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
 	}
@@ -94,7 +96,8 @@ func TestSetupCheckJSONEmitsThePlan(t *testing.T) {
 			{"path": "docs/agents/domain.md", "strategy": "create", "status": "missing"},
 			{"path": "docs/adr", "strategy": "dir", "status": "ok"},
 			{"path": ".agents/skills", "strategy": "dir", "status": "missing"},
-			{"path": ".claude/skills", "strategy": "symlink", "status": "missing"}
+			{"path": ".claude/skills", "strategy": "symlink", "status": "missing"},
+			{"path": "triage labels", "strategy": "labels", "status": "ok"}
 		]
 	}`), &want); err != nil {
 		t.Fatal(err)
@@ -166,14 +169,17 @@ func jsonEqual(a, b any) bool {
 
 // newSystem returns a System with a temporary HOME, no environment, the given
 // working directory and a runner that reports the PoeAudits/sample GitHub
-// origin.
+// origin with every triage label present.
 func newSystem(t *testing.T, workdir string) system.System {
 	t.Helper()
 	return system.System{
 		Home:    t.TempDir(),
 		Getenv:  func(string) string { return "" },
 		Workdir: workdir,
-		Runner:  &fakeRunner{outputs: map[string]string{"git remote get-url origin": "git@github.com:PoeAudits/sample.git\n"}},
+		Runner: &fakeRunner{outputs: map[string]string{
+			"git remote get-url origin": "git@github.com:PoeAudits/sample.git\n",
+			labelList:                   allTriageLabels,
+		}},
 	}
 }
 
