@@ -162,11 +162,18 @@ func TestStartReportsAServiceThatNeverBecomesHealthyAndStillStartsTheRest(t *tes
 		return true
 	})
 	runner.outputs = map[string]string{appRunningCheck: "381421\n"}
+	var slept time.Duration
+	sys.Sleep = func(d time.Duration) { slept += d }
 
 	stdout, code := run(t, sys, "start")
 
 	if code == 0 {
 		t.Fatalf("exit code = 0, want non-zero\n%s", stdout)
+	}
+	// t3 gets its whole 30s timeout; sleev, healthy on its second check,
+	// adds one short wait.
+	if slept < 30*time.Second || slept > 31*time.Second {
+		t.Errorf("slept %s in total, want 30s for t3's timeout plus at most 1s", slept)
 	}
 	want := "Start\n" +
 		"  failed    t3: not healthy after 30s; see ~/.local/state/overlord/t3.log\n" +
