@@ -37,6 +37,18 @@ type Plan struct {
 	Items []Item `json:"items"`
 }
 
+// NeedsWork reports whether any item is missing, stale or in conflict. A
+// warning is not a Project problem (no origin, or gh failed), so it does not
+// count.
+func (p Plan) NeedsWork() bool {
+	for _, item := range p.Items {
+		if item.Status != OK && item.Status != Warning {
+			return true
+		}
+	}
+	return false
+}
+
 // Item is one guaranteed path and its current status.
 type Item struct {
 	Path string `json:"path"`

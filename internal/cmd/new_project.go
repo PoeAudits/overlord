@@ -1,14 +1,7 @@
 package cmd
 
 import (
-	"bytes"
-	"context"
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -32,10 +25,6 @@ githubOwner and projectsRoot come from ~/.config/overlord/config.yaml
 (defaults PoeAudits and ~/projects).`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(command *cobra.Command, args []string) error {
-			name := args[0]
-			if name != filepath.Base(name) || name == "." || name == ".." {
-				return fmt.Errorf("project name %q must be a single directory name", name)
-			}
 			if err := config.WriteDefault(sys.Home); err != nil {
 				return err
 			}
@@ -43,72 +32,26 @@ githubOwner and projectsRoot come from ~/.config/overlord/config.yaml
 			if err != nil {
 				return err
 			}
-			root := cfg.ProjectsRoot
-			path := filepath.Join(root, name)
-			if _, err := os.Lstat(path); !errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("%s already exists; choose another name or remove it", path)
+			plan, err := project.Create(command.Context(), sys.Runner, project.NewProject{
+				Name:        args[0],
+				Owner:       cfg.GitHubOwner,
+				Root:        cfg.ProjectsRoot,
+				Description: description,
+				Public:      public,
+				Launcher:    t3.LauncherPath(sys.Home),
+			})
+			// Text output cannot fail; only JSON encoding can.
+			if plan.Root != "" {
+				_ = printPlan(sys, plan, false, "Setup applied to", applyWords)
 			}
-			if err := os.MkdirAll(root, 0o755); err != nil {
-				return err
-			}
-			ctx := command.Context()
-			repo := cfg.GitHubOwner + "/" + name
-			create := []string{"repo", "create", repo, visibility(public)}
-			if description != "" {
-				create = append(create, "--description", description)
-			}
-			if err := step(ctx, sys, root, "gh", create...); err != nil {
-				return err
-			}
-			if err := step(ctx, sys, root, "gh", "repo", "clone", repo, path); err != nil {
-				return err
-			}
-			plan, err := project.Apply(ctx, sys.Runner, path, path)
 			if err != nil {
-				return fmt.Errorf("setup in %s: %w", path, err)
-			}
-			if err := printPlan(sys, plan, false, "Setup applied to", applyWords); err != nil {
 				return err
 			}
-			for _, args := range [][]string{
-				{"add", "-A"},
-				{"commit", "-m", "Initial project setup"},
-				{"push", "-u", "origin", "HEAD"},
-			} {
-				if err := step(ctx, sys, path, "git", args...); err != nil {
-					return err
-				}
-			}
-			if err := step(ctx, sys, path, t3.LauncherPath(sys.Home), "project", "add", "--title", name, path); err != nil {
-				return err
-			}
-			fmt.Fprintf(sys.Stdout, "Created %s at %s and registered it with T3 Code\n", repo, path)
+			fmt.Fprintf(sys.Stdout, "Created %s/%s at %s and registered it with T3 Code\n", cfg.GitHubOwner, args[0], plan.Root)
 			return nil
 		},
 	}
 	command.Flags().StringVar(&description, "description", "", "GitHub repository description")
 	command.Flags().BoolVar(&public, "public", false, "create a public repository (default private)")
 	return command
-}
-
-func visibility(public bool) string {
-	if public {
-		return "--public"
-	}
-	return "--private"
-}
-
-// step runs one external command and turns a failure into an error naming
-// the command and its first line of output.
-func step(ctx context.Context, sys system.System, dir, name string, args ...string) error {
-	output, err := sys.Runner.Run(ctx, dir, name, args...)
-	if err == nil {
-		return nil
-	}
-	line, _, _ := bytes.Cut(bytes.TrimSpace(output), []byte("\n"))
-	command := strings.Join(append([]string{filepath.Base(name)}, args...), " ")
-	if len(line) == 0 {
-		return fmt.Errorf("%s failed: %w", command, err)
-	}
-	return fmt.Errorf("%s failed: %s (%w)", command, line, err)
 }

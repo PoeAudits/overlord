@@ -118,7 +118,7 @@ func TestNewProjectStopsAtTheFirstFailingRemoteStep(t *testing.T) {
 	if last := runner.calls[len(runner.calls)-1]; !strings.HasSuffix(last, ": git push -u origin HEAD") {
 		t.Fatalf("last command = %q, want the push; t3 registration must not run", last)
 	}
-	want := "overlord: git push -u origin HEAD failed: fake: command failed (exit status 1)\n"
+	want := "overlord: git push -u origin HEAD failed: fake: command failed\n"
 	if stderr.String() != want {
 		t.Fatalf("stderr = %q, want %q", stderr.String(), want)
 	}

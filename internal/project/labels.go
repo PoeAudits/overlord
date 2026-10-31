@@ -59,7 +59,7 @@ func createLabels(ctx context.Context, runner system.Runner, root string, item t
 	return row
 }
 
-// failure is the first line gh printed, else the process error.
+// failure is the first line a command printed, else the process error.
 func failure(output []byte, err error) string {
 	line, _, _ := bytes.Cut(bytes.TrimSpace(output), []byte("\n"))
 	if len(line) == 0 {

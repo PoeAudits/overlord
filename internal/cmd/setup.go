@@ -29,15 +29,11 @@ func newSetupCommand(sys system.System) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				if err := printPlan(sys, plan, asJSON, "Setup plan for", checkWords); err != nil {
+				if err := printPlan(sys, plan, asJSON, "Setup plan for", nil); err != nil {
 					return err
 				}
-				// A labels warning is not a Project problem (no origin, or gh
-				// failed), so it does not fail the check.
-				for _, item := range plan.Items {
-					if item.Status != project.OK && item.Status != project.Warning {
-						return errors.New("setup --check found items that need work")
-					}
+				if plan.NeedsWork() {
+					return errors.New("setup --check found items that need work")
 				}
 				return nil
 			}
@@ -53,12 +49,9 @@ func newSetupCommand(sys system.System) *cobra.Command {
 	return command
 }
 
-// checkWords and applyWords say what each status means before and after Setup
-// acts on it.
-var (
-	checkWords = map[project.Status]string{project.Missing: "missing", project.Stale: "stale", project.OK: "ok", project.Conflict: "conflict", project.Warning: "warning"}
-	applyWords = map[project.Status]string{project.Missing: "created", project.Stale: "refreshed", project.OK: "ok", project.Conflict: "conflict", project.Warning: "warning"}
-)
+// applyWords says what a status Setup acted on became; every other status is
+// printed as it is.
+var applyWords = map[project.Status]string{project.Missing: "created", project.Stale: "refreshed"}
 
 func printPlan(sys system.System, plan project.Plan, asJSON bool, heading string, words map[project.Status]string) error {
 	if asJSON {
@@ -72,7 +65,7 @@ func printPlan(sys system.System, plan project.Plan, asJSON bool, heading string
 		if item.Block != "" {
 			path += "#" + item.Block
 		}
-		line := fmt.Sprintf("  %-9s  %s", words[item.Status], path)
+		line := fmt.Sprintf("  %-9s  %s", cmp.Or(words[item.Status], string(item.Status)), path)
 		if item.Detail != "" {
 			line += " (" + item.Detail + ")"
 		}
