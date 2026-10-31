@@ -32,6 +32,8 @@ const defaultConfig = `# Overlord's config. Written once with defaults; Overlord
 #
 # agentsDir: the source of skills, Roles and global instructions for Sync.
 # projectsRoot: where new-project clones new Projects.
+# githubOwner: the GitHub account or organisation new-project creates
+# repositories under.
 # services: what start brings up, in order. A service is healthy when its
 # health URL answers with any HTTP status below 500. When it is not, start
 # runs command with sh -c, detached, output appended to
@@ -42,6 +44,7 @@ const defaultConfig = `# Overlord's config. Written once with defaults; Overlord
 # ~/.t3/userdata/server-runtime.json; http://127.0.0.1:3773 when absent).
 agentsDir: ~/.agents
 projectsRoot: ~/projects
+githubOwner: PoeAudits
 services:
   - name: t3
     command: ~/.t3/bin/t3 service install

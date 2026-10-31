@@ -16,17 +16,17 @@ description: Create a brand-new Project with `overlord new-project`, a GitHub re
    overlord new-project <name> [--description "<text>"] [--public]
    ```
 
-   `<projectsRoot>` is `projectsRoot` in `~/.config/overlord/config.yaml` (default `~/projects`). It runs these steps in order and stops at the first failure:
+   `<projectsRoot>` is `projectsRoot` and `<owner>` is `githubOwner` in `~/.config/overlord/config.yaml` (defaults `~/projects` and `PoeAudits`). It runs these steps in order and stops at the first failure:
 
    1. Refuses if `<projectsRoot>/<name>` already exists, before touching GitHub.
-   2. `gh repo create PoeAudits/<name> --private` (or `--public`, plus `--description`).
-   3. `gh repo clone PoeAudits/<name> <projectsRoot>/<name>`.
+   2. `gh repo create <owner>/<name> --private` (or `--public`, plus `--description`).
+   3. `gh repo clone <owner>/<name> <projectsRoot>/<name>`.
    4. Setup in the clone, printing the plan as `overlord setup` does (`Setup applied to ...`, then `created` / `ok` / `warning` lines; see the `project-setup` skill for each word).
    5. `git add -A`, `git commit -m "Initial project setup"`, `git push -u origin HEAD`.
    6. `~/.t3/bin/t3 project add --title <name> <projectsRoot>/<name>`.
 
-   Done when it exits 0 and its last line is `Created PoeAudits/<name> at <path> and registered it with T3 Code`.
-3. **Tell the user.** The repo `PoeAudits/<name>` exists on GitHub with the first commit pushed, and `<name>` is now a T3 Code project: open a new thread in it to start work. Mention that Go, TypeScript, Python or Rust standards and the CI workflow appear on a later Setup, once the Project has its `go.mod`, `package.json`, `pyproject.toml` or `Cargo.toml`, since a new repo has no language yet.
+   Done when it exits 0 and its last line is `Created <owner>/<name> at <path> and registered it with T3 Code`.
+3. **Tell the user.** The repo `<owner>/<name>` exists on GitHub with the first commit pushed, and `<name>` is now a T3 Code project: open a new thread in it to start work. Mention that Go, TypeScript, Python or Rust standards and the CI workflow appear on a later Setup, once the Project has its `go.mod`, `package.json`, `pyproject.toml` or `Cargo.toml`, since a new repo has no language yet.
 
 ## When it fails
 
