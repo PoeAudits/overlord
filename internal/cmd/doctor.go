@@ -20,6 +20,7 @@ sync --check" would change (missing or dangling skill links, global
 instruction files that are not symlinks, missing session hooks, a missing T3
 overlord-setup script), plus:
 
+  - global instruction links and ~/.claude/skills links whose target is gone
   - ~/.config/opencode/skills, or an agents directory that is not a git
     checkout: stale skill copies
   - global agent files without the generated header, Role or not
@@ -65,6 +66,6 @@ func printFindings(sys system.System, header string, findings []machine.Finding)
 	}
 	fmt.Fprintln(sys.Stdout, header)
 	for _, finding := range findings {
-		fmt.Fprintf(sys.Stdout, "  %s: %s\n", displayPath(sys.Home, finding.Path), finding.Problem)
+		fmt.Fprintf(sys.Stdout, "  %s: %s\n", machine.DisplayPath(sys.Home, finding.Path), finding.Problem)
 	}
 }

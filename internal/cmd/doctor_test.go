@@ -140,6 +140,21 @@ func TestDoctorReportsEachDriftConditionAndWritesNothing(t *testing.T) {
 			want: "  ~/.claude/agents/reviewer.md: agent file without the generated header\n",
 		},
 		{
+			name:  "missing catalog instructions",
+			drift: func(t *testing.T, home string) { mustRemove(t, filepath.Join(home, ".agents", "AGENTS.md")) },
+			want: "  ~/.agents/AGENTS.md: missing, so no Harness gets global instructions; create it\n" +
+				"  ~/.claude/CLAUDE.md: dangling link to ~/.agents/AGENTS.md\n" +
+				"  ~/.codex/AGENTS.md: dangling link to ~/.agents/AGENTS.md\n" +
+				"  ~/.config/opencode/AGENTS.md: dangling link to ~/.agents/AGENTS.md\n",
+		},
+		{
+			name: "dangling skill link outside the catalog",
+			drift: func(t *testing.T, home string) {
+				mustSymlink(t, filepath.Join(home, "gone"), filepath.Join(home, ".claude", "skills", "old"))
+			},
+			want: "  ~/.claude/skills/old: dangling link to ~/gone\n",
+		},
+		{
 			name:  "missing T3 default script",
 			drift: func(t *testing.T, home string) { mustWrite(t, t3Settings(home), "{}\n") },
 			want:  "  ~/.t3/userdata/settings.json: overlord-setup script missing\n",
@@ -292,5 +307,12 @@ func TestDoctorUsesTheAgentsDirFromOverlordsConfig(t *testing.T) {
 
 	if code != 0 || stdout != "Doctor: no drift found\n" {
 		t.Fatalf("exit code = %d, stdout:\n%s", code, stdout)
+	}
+}
+
+func mustSymlink(t *testing.T, target, path string) {
+	t.Helper()
+	if err := os.Symlink(target, path); err != nil {
+		t.Fatal(err)
 	}
 }

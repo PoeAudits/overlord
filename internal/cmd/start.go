@@ -53,7 +53,7 @@ from starting; start then exits non-zero too.`,
 			for _, result := range machine.Start(command.Context(), sys, cfg.Services) {
 				line := fmt.Sprintf("  %-8s  %s: %s", result.Status, result.Name, result.Detail)
 				if result.Log != "" {
-					line += "; see " + displayPath(sys.Home, result.Log)
+					line += "; see " + machine.DisplayPath(sys.Home, result.Log)
 				}
 				fmt.Fprintln(sys.Stdout, line)
 				failed = failed || result.Status == machine.Failed

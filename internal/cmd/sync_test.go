@@ -310,3 +310,24 @@ func TestSyncUsesTheAgentsDirFromOverlordsConfig(t *testing.T) {
 	assertLink(t, filepath.Join(sys.Home, ".claude", "skills", "grill"), filepath.Join(catalog, "skills", "grill"))
 	assertLink(t, filepath.Join(sys.Home, ".codex", "AGENTS.md"), filepath.Join(catalog, "AGENTS.md"))
 }
+
+func TestSyncWithoutCatalogInstructionsReportsAConflictAndLinksNothing(t *testing.T) {
+	sys := newSystem(t, t.TempDir())
+	agents := newAgentsDir(t, sys.Home, "tdd")
+	mustRemove(t, filepath.Join(agents, "AGENTS.md"))
+
+	stdout, code := run(t, sys, "sync")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
+	}
+	for _, path := range instructionPaths(sys.Home) {
+		if _, err := os.Lstat(path); !os.IsNotExist(err) {
+			t.Errorf("%s exists (err %v); want no link to a missing file", path, err)
+		}
+	}
+	assertContains(t, stdout, "  conflict  ~/.agents/AGENTS.md: missing, so no Harness gets global instructions; create it\n")
+	if _, code := run(t, sys, "sync", "--check"); code != 1 {
+		t.Fatalf("sync --check exit code = %d, want 1", code)
+	}
+}

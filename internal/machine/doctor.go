@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/PoeAudits/overlord/internal/catalog"
@@ -44,6 +45,11 @@ func Doctor(ctx context.Context, sys system.System, agentsDir string) (Diagnosis
 		}
 		diagnosis.Findings = append(diagnosis.Findings, Finding{Path: result.Path, Problem: syncProblem(result)})
 	}
+	dangling, err := findDanglingLinks(sys.Home, diagnosis.Findings)
+	if err != nil {
+		return Diagnosis{}, err
+	}
+	diagnosis.Findings = append(diagnosis.Findings, dangling...)
 	diagnosis.Findings = append(diagnosis.Findings, findStaleSkillCopies(sys.Home, agentsDir)...)
 	agents, err := findHandWrittenAgents(sys.Home)
 	if err != nil {
@@ -118,6 +124,33 @@ func findMovedUpstreams(ctx context.Context, runner system.Runner, agentsDir str
 	return moved, unreachable, nil
 }
 
+// findDanglingLinks reports global instruction links and skill links whose
+// target is gone, except paths already found.
+func findDanglingLinks(home string, found []Finding) ([]Finding, error) {
+	paths := instructionPaths(home)
+	linksDir := filepath.Join(home, ".claude", "skills")
+	entries, err := os.ReadDir(linksDir)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	for _, entry := range entries {
+		if !protectedSkillEntries[entry.Name()] {
+			paths = append(paths, filepath.Join(linksDir, entry.Name()))
+		}
+	}
+	var findings []Finding
+	for _, path := range paths {
+		target, err := os.Readlink(path)
+		if err != nil || slices.ContainsFunc(found, func(f Finding) bool { return f.Path == path }) {
+			continue
+		}
+		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+			findings = append(findings, Finding{Path: path, Problem: "dangling link to " + DisplayPath(home, target)})
+		}
+	}
+	return findings, nil
+}
+
 // findStaleSkillCopies reports skill directories left from before the agents
 // directory became a git checkout that every Harness reads through links.
 func findStaleSkillCopies(home, agentsDir string) []Finding {
@@ -166,6 +199,9 @@ func findHandWrittenAgents(home string) ([]Finding, error) {
 
 // syncProblem describes, as drift, what a Sync check would change at a path.
 func syncProblem(result Result) string {
+	if result.Detail == missingInstructions {
+		return result.Detail
+	}
 	if result.Step == "instructions" {
 		return instructionsProblem[result.Action]
 	}

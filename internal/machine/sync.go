@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/PoeAudits/overlord/internal/catalog"
 	"github.com/PoeAudits/overlord/internal/system"
@@ -179,12 +180,12 @@ var protectedSkillEntries = map[string]bool{"synced": true, ".trash": true}
 
 func syncInstructions(run syncRun) ([]Result, error) {
 	source := catalog.InstructionsPath(run.agentsDir)
+	if _, err := os.Stat(source); errors.Is(err, os.ErrNotExist) {
+		// Linking now would leave every Harness with a dangling link.
+		return []Result{{Path: source, Action: Conflict, Detail: missingInstructions}}, nil
+	}
 	var results []Result
-	for _, path := range []string{
-		filepath.Join(run.sys.Home, ".claude", "CLAUDE.md"),
-		filepath.Join(run.sys.Home, ".codex", "AGENTS.md"),
-		filepath.Join(run.sys.Home, ".config", "opencode", "AGENTS.md"),
-	} {
+	for _, path := range instructionPaths(run.sys.Home) {
 		info, err := os.Lstat(path)
 		switch {
 		case errors.Is(err, os.ErrNotExist):
@@ -207,6 +208,17 @@ func syncInstructions(run syncRun) ([]Result, error) {
 		}
 	}
 	return results, nil
+}
+
+const missingInstructions = "missing, so no Harness gets global instructions; create it"
+
+// instructionPaths are where each Harness reads global instructions.
+func instructionPaths(home string) []string {
+	return []string{
+		filepath.Join(home, ".claude", "CLAUDE.md"),
+		filepath.Join(home, ".codex", "AGENTS.md"),
+		filepath.Join(home, ".config", "opencode", "AGENTS.md"),
+	}
 }
 
 // replaceIdenticalFile replaces the regular file at path with a link to
@@ -261,3 +273,12 @@ func syncT3(run syncRun) ([]Result, error) {
 }
 
 var t3Actions = map[t3.Status]Action{t3.Missing: Create, t3.Stale: Replace, t3.OK: OK}
+
+// DisplayPath shortens paths under home to ~/... for readable reports.
+func DisplayPath(home, path string) string {
+	rel, err := filepath.Rel(home, path)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return path
+	}
+	return "~/" + rel
+}

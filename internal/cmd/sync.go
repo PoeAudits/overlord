@@ -3,8 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -20,6 +18,9 @@ func newSyncCommand(sys system.System) *cobra.Command {
 		Short: "Apply skills and global instructions from the agents directory to every Harness",
 		Long: `Apply skills and global instructions from the agents directory to every
 Harness, and register "overlord setup" with T3 Code.
+
+When the agents directory has no AGENTS.md, Sync links no global instruction
+file and reports the missing file as a conflict, so "sync --check" fails.
 
 The T3 step ensures ~/.t3/userdata/settings.json has a defaultProjectScripts
 entry with id overlord-setup that runs "overlord setup" on every new
@@ -74,7 +75,7 @@ func resultLine(home string, result machine.Result, check bool) string {
 	if !check && pastTense[result.Action] != "" {
 		label = pastTense[result.Action]
 	}
-	line := fmt.Sprintf("  %-8s  %s", label, displayPath(home, result.Path))
+	line := fmt.Sprintf("  %-8s  %s", label, machine.DisplayPath(home, result.Path))
 	if result.Detail == "" {
 		return line
 	}
@@ -86,13 +87,4 @@ var pastTense = map[machine.Action]string{
 	machine.Remove:  "removed",
 	machine.Replace: "replaced",
 	machine.Update:  "updated",
-}
-
-// displayPath shortens paths under home to ~/... for readable reports.
-func displayPath(home, path string) string {
-	rel, err := filepath.Rel(home, path)
-	if err != nil || strings.HasPrefix(rel, "..") {
-		return path
-	}
-	return "~/" + rel
 }
