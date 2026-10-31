@@ -261,8 +261,8 @@ Prose and headings are ignored; only entries of the form below are read.
 func TestDoctorReportsUpstreamSourcesWhoseRemoteHeadMoved(t *testing.T) {
 	sys := syncedHome(t)
 	mustWrite(t, filepath.Join(sys.Home, ".agents", "UPSTREAM.md"), upstreamFile)
-	sys.runner.outputs["git ls-remote https://github.com/mattpocock/skills HEAD"] = "1111111111111111111111111111111111111111\tHEAD\n"
-	sys.runner.outputs["git ls-remote https://github.com/cursor/plugins HEAD"] = "9f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e\tHEAD\n"
+	sys.runner.outputs["env GIT_TERMINAL_PROMPT=0 git ls-remote https://github.com/mattpocock/skills HEAD"] = "1111111111111111111111111111111111111111\tHEAD\n"
+	sys.runner.outputs["env GIT_TERMINAL_PROMPT=0 git ls-remote https://github.com/cursor/plugins HEAD"] = "9f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e\tHEAD\n"
 
 	stdout, code := run(t, sys.System, "doctor")
 
@@ -286,7 +286,7 @@ func TestDoctorSkipsUpstreamChecksWithANoteWhenOffline(t *testing.T) {
 	if code != 0 || stdout != want {
 		t.Fatalf("exit code = %d, stdout:\n%s\nwant:\n%s", code, stdout, want)
 	}
-	if !slices.Contains(sys.runner.calls, ": git ls-remote https://github.com/mattpocock/skills HEAD") {
+	if !slices.Contains(sys.runner.calls, ": env GIT_TERMINAL_PROMPT=0 git ls-remote https://github.com/mattpocock/skills HEAD") {
 		t.Errorf("recorded commands lack the remote lookup: %v", sys.runner.calls)
 	}
 }

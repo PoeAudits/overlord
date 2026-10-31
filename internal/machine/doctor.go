@@ -107,7 +107,9 @@ func findMovedUpstreams(ctx context.Context, runner system.Runner, agentsDir str
 	for _, entry := range entries {
 		head, asked := heads[entry.URL]
 		if !asked {
-			output, err := runner.Run(ctx, "", "git", "ls-remote", entry.URL, "HEAD")
+			// A private remote must fail instead of waiting on a password
+			// prompt nobody sees.
+			output, err := runner.Run(ctx, "", "env", "GIT_TERMINAL_PROMPT=0", "git", "ls-remote", entry.URL, "HEAD")
 			if err == nil {
 				head, _, _ = strings.Cut(string(output), "\t")
 			}
