@@ -173,3 +173,23 @@ func TestSetupLeavesAHandWrittenAgentFileUntouched(t *testing.T) {
 		t.Fatalf("stdout does not report the conflict:\n%s", stdout)
 	}
 }
+
+func TestSetupRestrictsAReadOnlyRoleInItsClaudeAndOpenCodeFiles(t *testing.T) {
+	project := rolesProject(t)
+
+	if _, code := run(t, newSystem(t, project), "setup"); code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	// Codex agent files have no read-only setting, so only these two carry it.
+	for path, restriction := range map[string]string{
+		".claude/agents/reviewer.md": "model: sonnet\ntools: Read, Grep, Glob, Bash, WebFetch, WebSearch\n---\n",
+		".opencode/agents/reviewer.md": "model: openai/gpt-6-mini\npermissions:\n" +
+			"  - action: edit\n    resource: \"*\"\n    effect: deny\n" +
+			"  - action: shell\n    resource: \"*\"\n    effect: deny\n---\n",
+	} {
+		if content := readFile(t, filepath.Join(project, path)); !strings.Contains(content, restriction) {
+			t.Errorf("%s:\n%s\nwant the read-only restriction:\n%s", path, content, restriction)
+		}
+	}
+}

@@ -228,13 +228,15 @@ func TestStartChecksT3HealthOnThePortInT3ServerRuntimeFileAtStartTime(t *testing
 	mustWrite(t, filepath.Join(sys.Home, ".t3", "userdata", "server-runtime.json"),
 		`{"version":1,"pid":381664,"host":"127.0.0.1","port":3801,"origin":"http://127.0.0.1:3801"}`)
 
+	health := sys.Health.(*fakeHealth)
+	health.calls = map[string]int{}
+
 	if _, code := run(t, sys, "start"); code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
 
-	health := sys.Health.(*fakeHealth)
-	if health.calls["http://127.0.0.1:3801/.well-known/t3/environment"] != 1 {
-		t.Fatalf("health checks = %v, want one of T3 on port 3801", health.calls)
+	if health.calls["http://127.0.0.1:3801/.well-known/t3/environment"] != 1 || health.calls[t3Health] != 0 {
+		t.Fatalf("second run health checks = %v, want T3 checked on port 3801 only", health.calls)
 	}
 }
 
