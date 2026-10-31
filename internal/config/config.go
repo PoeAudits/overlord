@@ -138,7 +138,7 @@ const defaultFile = `# Overlord's config. Written once with defaults; Overlord n
 # origin T3 Code's server last ran on (from
 # ~/.t3/userdata/server-runtime.json; http://127.0.0.1:3773 when absent).
 agentsDir: ~/.agents
-projectsRoot: ~/projects
+projectsRoot: ~/Overlord/projects
 githubOwner: PoeAudits
 services:
   - name: t3

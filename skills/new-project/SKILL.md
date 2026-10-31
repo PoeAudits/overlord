@@ -16,7 +16,7 @@ description: Create a brand-new Project with `overlord new-project`, a GitHub re
    overlord new-project <name> [--description "<text>"] [--public]
    ```
 
-   `<projectsRoot>` is `projectsRoot` and `<owner>` is `githubOwner` in `~/.config/overlord/config.yaml` (defaults `~/projects` and `PoeAudits`). It runs these steps in order and stops at the first failure:
+   `<projectsRoot>` is `projectsRoot` and `<owner>` is `githubOwner` in `~/.config/overlord/config.yaml` (defaults `~/Overlord/projects` and `PoeAudits`). It runs these steps in order and stops at the first failure:
 
    1. Refuses if `<projectsRoot>/<name>` already exists, before touching GitHub.
    2. `gh repo create <owner>/<name> --private` (or `--public`, plus `--description`).

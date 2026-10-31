@@ -23,7 +23,7 @@ Run every command in the checkout you are working in. In a T3 thread that is the
 Both runs print a heading, then one line per item: the status word, the path, and a reason in parentheses for conflicts, warnings, failures and labels.
 
 ```
-Setup plan for /home/me/projects/sample
+Setup plan for /home/me/Overlord/projects/sample
   missing    AGENTS.md#agents
   stale      docs/coding-standards.md#lang-go
   ok         GLOSSARY.md

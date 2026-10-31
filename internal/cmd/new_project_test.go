@@ -43,7 +43,7 @@ func (r *cloneRunner) Run(ctx context.Context, dir, name string, args ...string)
 }
 
 func newProjectRunner(t *testing.T, home, name string) *cloneRunner {
-	path := filepath.Join(home, "projects", name)
+	path := filepath.Join(home, "Overlord", "projects", name)
 	t3 := filepath.Join(home, ".t3", "bin", "t3")
 	return &cloneRunner{t: t, clonePath: path, fakeRunner: fakeRunner{outputs: map[string]string{
 		"gh repo create PoeAudits/" + name + " --private":                           "",
@@ -69,7 +69,7 @@ func TestNewProjectCreatesClonesSetsUpCommitsPushesAndRegistersInOrder(t *testin
 		t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
 	}
 	assertFile(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), defaultConfig)
-	root := filepath.Join(sys.Home, "projects")
+	root := filepath.Join(sys.Home, "Overlord", "projects")
 	path := filepath.Join(root, "sample")
 	want := []string{
 		root + ": gh repo create PoeAudits/sample --private",
@@ -169,7 +169,7 @@ func TestNewProjectPublicWithDescriptionPassesBothToGitHub(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
-	want := filepath.Join(sys.Home, "projects") + ": gh repo create PoeAudits/sample --public --description A small tool"
+	want := filepath.Join(sys.Home, "Overlord", "projects") + ": gh repo create PoeAudits/sample --public --description A small tool"
 	if runner.calls[0] != want {
 		t.Fatalf("first command = %q, want %q", runner.calls[0], want)
 	}
@@ -205,7 +205,7 @@ func TestNewProjectClonesUnderTheProjectsRootFromOverlordsConfig(t *testing.T) {
 func TestNewProjectCreatesTheRepoUnderTheGitHubOwnerFromOverlordsConfig(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	mustWrite(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), "githubOwner: acme\n")
-	path := filepath.Join(sys.Home, "projects", "sample")
+	path := filepath.Join(sys.Home, "Overlord", "projects", "sample")
 	runner := newProjectRunner(t, sys.Home, "sample")
 	runner.outputs["gh repo create acme/sample --private"] = ""
 	runner.outputs["gh repo clone acme/sample "+path] = ""
@@ -216,7 +216,7 @@ func TestNewProjectCreatesTheRepoUnderTheGitHubOwnerFromOverlordsConfig(t *testi
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
 	}
-	root := filepath.Join(sys.Home, "projects")
+	root := filepath.Join(sys.Home, "Overlord", "projects")
 	if got, want := runner.calls[:2], []string{
 		root + ": gh repo create acme/sample --private",
 		root + ": gh repo clone acme/sample " + path,

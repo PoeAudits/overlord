@@ -22,7 +22,7 @@ clone it into <projectsRoot>/<name>, run Setup in the clone, commit
 "Initial project setup", push it, and register the clone with T3 Code
 (t3 project add). The command stops at the first step that fails.
 githubOwner and projectsRoot come from ~/.config/overlord/config.yaml
-(defaults PoeAudits and ~/projects).`,
+(defaults PoeAudits and ~/Overlord/projects).`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(command *cobra.Command, args []string) error {
 			if err := config.WriteDefault(sys.Home); err != nil {
