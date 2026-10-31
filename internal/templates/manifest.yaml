@@ -1,0 +1,106 @@
+# Items Setup guarantees in every Project, checked and applied in this order.
+#
+# strategy:
+#   create   write the whole file from `template` (in files/) only if absent;
+#            skipped when any path matches the `skipIfAny` glob.
+#   dir      the directory exists, holding a .gitkeep only while empty.
+#   symlink  a relative link to `target`.
+#   block    the Managed Block `block` in the file at `path`, its body rendered
+#            from `template`. Setup creates the file holding the block when it
+#            is absent, inserts the block after the file's earlier blocks (or
+#            at the top) when it is missing, and replaces it when it differs
+#            from the rendered Template. `createWith` names a Template written
+#            after the block only when the file is created.
+#   generated  when the Project has the roles file at `path`, one agent file
+#            per Role and Harness under .claude/agents, .codex/agents and
+#            .opencode/agents, replaced only when its content differs. A file
+#            there without Overlord's generated header is left untouched.
+#   labels   the GitHub labels in `labels` exist on the repo named by the
+#            origin remote; Setup creates only the missing ones through `gh`
+#            and never edits existing ones. `path` is only the name Setup
+#            prints. Without a GitHub origin, or when `gh` fails, the item is
+#            a warning and Setup still exits 0.
+#
+# `language` limits any item to Projects where that language is detected;
+# `any` means at least one language.
+#
+# Create items come before the dirs they live in, so docs/adr gets the starter
+# ADR rather than a .gitkeep.
+- path: AGENTS.md
+  strategy: block
+  block: agents
+  template: agents.md.tmpl
+- path: docs/coding-standards.md
+  strategy: block
+  block: general
+  template: standards-general.md.tmpl
+  createWith: standards-project.md.tmpl
+- path: docs/coding-standards.md
+  strategy: block
+  block: lang-go
+  language: Go
+  template: standards-go.md.tmpl
+- path: docs/coding-standards.md
+  strategy: block
+  block: lang-typescript
+  language: TypeScript
+  template: standards-typescript.md.tmpl
+- path: docs/coding-standards.md
+  strategy: block
+  block: lang-python
+  language: Python
+  template: standards-python.md.tmpl
+- path: docs/coding-standards.md
+  strategy: block
+  block: lang-rust
+  language: Rust
+  template: standards-rust.md.tmpl
+- path: GLOSSARY.md
+  strategy: create
+  template: GLOSSARY.md.tmpl
+- path: docs/adr/0001-lint-and-tests-must-pass-before-merge.md
+  strategy: create
+  template: adr-0001-lint-and-tests.md.tmpl
+  skipIfAny: docs/adr/*.md
+- path: docs/agents/issue-tracker.md
+  strategy: create
+  template: issue-tracker.md.tmpl
+- path: docs/agents/triage-labels.md
+  strategy: create
+  template: triage-labels.md.tmpl
+- path: docs/agents/domain.md
+  strategy: create
+  template: domain.md.tmpl
+- path: .github/workflows/ci.yml
+  strategy: create
+  template: ci.yml.tmpl
+  language: any
+- path: docs/adr
+  strategy: dir
+- path: .agents/skills
+  strategy: dir
+- path: .claude/skills
+  strategy: symlink
+  target: ../.agents/skills
+- path: .agents/roles.yaml
+  strategy: generated
+# Descriptions are the Pocock triage defaults (setup-matt-pocock-skills
+# triage-labels.md); the skills define no colours, so these are Overlord's.
+- path: triage labels
+  strategy: labels
+  labels:
+    - name: needs-triage
+      description: Maintainer needs to evaluate this issue
+      color: "e4e669"
+    - name: needs-info
+      description: Waiting on reporter for more information
+      color: "d876e3"
+    - name: ready-for-agent
+      description: Fully specified, ready for an AFK agent
+      color: "0e8a16"
+    - name: ready-for-human
+      description: Requires human implementation
+      color: "1d76db"
+    - name: wontfix
+      description: Will not be actioned
+      color: "ffffff"

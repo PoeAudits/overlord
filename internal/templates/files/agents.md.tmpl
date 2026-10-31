@@ -1,0 +1,19 @@
+## Project docs
+
+Read these before naming anything or changing behaviour an ADR has decided:
+
+- `GLOSSARY.md` defines this Project's terms. Use them as defined.
+- `docs/adr/` holds the Architecture Decision Records. Accepted ADRs are binding.
+- `docs/coding-standards.md` holds the coding standards that reviews check.
+
+## Skills
+
+Project skills live in `.agents/skills`. `.claude/skills` links to it, so every Harness finds them.
+
+## Issues
+
+Issues are GitHub Issues{{if .Repo}} on `{{.Owner}}/{{.Repo}}`{{end}}, handled with the `gh` CLI and triaged with the default labels `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human` and `wontfix`. See `docs/agents/issue-tracker.md` and `docs/agents/triage-labels.md`.
+
+## This block
+
+Overlord manages this block and replaces it whenever its Template changes. Write Project rules outside it.
