@@ -41,7 +41,13 @@ func newSetupCommand(sys system.System) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printPlan(sys, plan, asJSON, "Setup applied to", applyWords)
+			if err := printPlan(sys, plan, asJSON, "Setup applied to", applyWords); err != nil {
+				return err
+			}
+			if plan.HasFailures() {
+				return errors.New("setup could not set up every item; see the failed lines above")
+			}
+			return nil
 		},
 	}
 	command.Flags().BoolVar(&check, "check", false, "print the plan without changing anything; exit 1 if any item is missing, stale or conflict")

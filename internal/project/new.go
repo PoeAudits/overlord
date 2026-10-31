@@ -25,7 +25,8 @@ type NewProject struct {
 
 // Create creates the GitHub repository Owner/Name, clones it into Root/Name,
 // runs Setup there, commits and pushes the result, and registers the clone
-// with T3 Code. It stops at the first step that fails. The plan is Setup's,
+// with T3 Code. It stops at the first step that fails, and Setup fails when
+// any item failed, so nothing incomplete is committed. The plan is Setup's,
 // empty when Setup did not run.
 func Create(ctx context.Context, runner system.Runner, p NewProject) (Plan, error) {
 	if p.Name != filepath.Base(p.Name) || p.Name == "." || p.Name == ".." {
@@ -52,6 +53,9 @@ func Create(ctx context.Context, runner system.Runner, p NewProject) (Plan, erro
 	plan, err := Apply(ctx, runner, path, path)
 	if err != nil {
 		return plan, fmt.Errorf("setup in %s: %w", path, err)
+	}
+	if plan.HasFailures() {
+		return plan, fmt.Errorf("setup in %s could not set up every item; see the failed lines above", path)
 	}
 	for _, args := range [][]string{
 		{"add", "-A"},

@@ -12,11 +12,12 @@ import (
 	"github.com/PoeAudits/overlord/internal/templates"
 )
 
-// Apply checks the Project at root, then creates or refreshes every missing
-// or stale item. It returns the plan as it was before the repairs, except that
-// a labels item whose creation failed becomes a warning; conflict items are
-// left untouched. An error means a Template failed to render or a path could
-// not be written.
+// Apply checks the Project at root, then tries to create or refresh every
+// missing or stale item, carrying on past any that fail. It returns the plan
+// as it was before the repairs, except that an item that could not be written
+// becomes failed with its error as the detail, and a labels item whose
+// creation failed becomes a warning; conflict items are left untouched. An
+// error means the Project could not be checked at all.
 func Apply(ctx context.Context, runner system.Runner, root, projectRoot string) (Plan, error) {
 	items, data, plan, err := check(ctx, runner, root, projectRoot)
 	if err != nil {
@@ -31,7 +32,7 @@ func Apply(ctx context.Context, runner system.Runner, root, projectRoot string) 
 			continue
 		}
 		if err := repair(filepath.Join(root, item.Path), item, data, earlierBlocks(items[:i], item.Path)); err != nil {
-			return plan, fmt.Errorf("set up %s: %w", item.Path, err)
+			plan.Items[i].Status, plan.Items[i].Detail = Failed, err.Error()
 		}
 	}
 	return plan, nil

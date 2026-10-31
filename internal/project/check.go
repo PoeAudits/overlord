@@ -29,6 +29,9 @@ const (
 	// Warning means Setup could not check or repair the item for a reason
 	// outside the Project (no GitHub origin, gh failing) and moved on.
 	Warning Status = "warning"
+	// Failed means Setup tried to create or refresh the item and could not;
+	// the item's Detail holds the error. Only Apply reports it.
+	Failed Status = "failed"
 )
 
 // Plan is the result of checking a Project.
@@ -49,6 +52,11 @@ func (p Plan) NeedsWork() bool {
 	return false
 }
 
+// HasFailures reports whether Setup could not create or refresh any item.
+func (p Plan) HasFailures() bool {
+	return slices.ContainsFunc(p.Items, func(item Item) bool { return item.Status == Failed })
+}
+
 // Item is one guaranteed path and its current status.
 type Item struct {
 	Path string `json:"path"`
@@ -56,8 +64,8 @@ type Item struct {
 	Block    string             `json:"block,omitempty"`
 	Strategy templates.Strategy `json:"strategy"`
 	Status   Status             `json:"status"`
-	// Detail says why an item is in conflict or a warning, or which labels
-	// are missing.
+	// Detail says why an item is in conflict, a warning or failed, or which
+	// labels are missing.
 	Detail string `json:"detail,omitempty"`
 	// MissingLabels names the labels Setup creates for the labels strategy.
 	MissingLabels []string `json:"missingLabels,omitempty"`

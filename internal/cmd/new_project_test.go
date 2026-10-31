@@ -2,6 +2,7 @@ package cmd_test
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -17,8 +18,10 @@ import (
 type cloneRunner struct {
 	fakeRunner
 	clonePath string
-	committed map[string]string
-	t         *testing.T
+	// afterClone, when set, runs once the clone directory exists.
+	afterClone func()
+	committed  map[string]string
+	t          *testing.T
 }
 
 func (r *cloneRunner) Run(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
@@ -29,6 +32,9 @@ func (r *cloneRunner) Run(ctx context.Context, dir, name string, args ...string)
 	command := strings.Join(append([]string{name}, args...), " ")
 	if strings.HasPrefix(command, "gh repo clone ") {
 		mustMkdir(r.t, r.clonePath)
+		if r.afterClone != nil {
+			r.afterClone()
+		}
 	}
 	if strings.HasPrefix(command, "git commit ") {
 		r.committed = tree(r.t, r.clonePath)
@@ -121,6 +127,35 @@ func TestNewProjectStopsAtTheFirstFailingRemoteStep(t *testing.T) {
 	want := "overlord: git push -u origin HEAD failed: fake: command failed\n"
 	if stderr.String() != want {
 		t.Fatalf("stderr = %q, want %q", stderr.String(), want)
+	}
+}
+
+func TestNewProjectStopsBeforeCommittingWhenSetupFailsAnItem(t *testing.T) {
+	sys := newSystem(t, t.TempDir())
+	runner := newProjectRunner(t, sys.Home, "sample")
+	agents := filepath.Join(runner.clonePath, ".agents")
+	runner.afterClone = func() {
+		mustMkdir(t, agents)
+		if err := os.Chmod(agents, 0o555); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { os.Chmod(agents, 0o755) })
+	}
+	sys.Runner = runner
+
+	stdout, stderr, code := runCapturing(sys, "new-project", "sample")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
+	}
+	if last := runner.calls[len(runner.calls)-1]; !strings.HasSuffix(last, ": "+labelList) {
+		t.Fatalf("last command = %q, want Setup's label list; nothing may be committed", last)
+	}
+	if want := "  failed     .agents/skills (mkdir " + filepath.Join(agents, "skills") + ": permission denied)\n"; !strings.Contains(stdout, want) {
+		t.Fatalf("stdout lacks %q:\n%s", want, stdout)
+	}
+	if want := "overlord: setup in " + runner.clonePath + " could not set up every item; see the failed lines above\n"; stderr != want {
+		t.Fatalf("stderr = %q, want %q", stderr, want)
 	}
 }
 
