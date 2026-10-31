@@ -301,6 +301,6 @@ func TestSetupLeavesAFileWhereADirectoryBelongsUntouched(t *testing.T) {
 
 func (r *fakeRunner) Launch(dir, logPath, name string, args ...string) error {
 	command := strings.Join(append([]string{name}, args...), " ")
-	r.calls = append(r.calls, "launch "+logPath+": "+command)
+	r.calls = append(r.calls, dir+": launch "+logPath+": "+command)
 	return nil
 }

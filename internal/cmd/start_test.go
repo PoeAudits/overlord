@@ -140,9 +140,9 @@ func TestStartLaunchesAnUnhealthyServiceOnceAndWaitsForHealth(t *testing.T) {
 	}
 	logs := filepath.Join(sys.Home, ".local", "state", "overlord")
 	assertCalls(t, runner,
-		"launch "+filepath.Join(logs, "sleev.log")+": sh -c sleev gateway start",
+		sys.Home+": launch "+filepath.Join(logs, "sleev.log")+": sh -c sleev gateway start",
 		sys.Home+": "+appRunningCheck,
-		"launch "+filepath.Join(logs, "t3-app.log")+": gtk-launch t3code",
+		sys.Home+": launch "+filepath.Join(logs, "t3-app.log")+": gtk-launch t3code",
 	)
 	if info, err := os.Stat(logs); err != nil || !info.IsDir() {
 		t.Fatalf("log directory %s was not created: %v", logs, err)
@@ -178,8 +178,8 @@ func TestStartReportsAServiceThatNeverBecomesHealthyAndStillStartsTheRest(t *tes
 	}
 	logs := filepath.Join(sys.Home, ".local", "state", "overlord")
 	assertCalls(t, runner,
-		"launch "+filepath.Join(logs, "t3.log")+": sh -c ~/.t3/bin/t3 service install",
-		"launch "+filepath.Join(logs, "sleev.log")+": sh -c sleev gateway start",
+		sys.Home+": launch "+filepath.Join(logs, "t3.log")+": sh -c ~/.t3/bin/t3 service install",
+		sys.Home+": launch "+filepath.Join(logs, "sleev.log")+": sh -c sleev gateway start",
 		sys.Home+": "+appRunningCheck,
 	)
 }
