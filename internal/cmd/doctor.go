@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -51,7 +50,7 @@ Doctor exits 1 when it finds drift and 0 otherwise.`,
 			printFindings(sys, "Doctor found drift", diagnosis.Findings)
 			printFindings(sys, "Not checked", diagnosis.Notes)
 			if len(diagnosis.Findings) > 0 {
-				return errors.New("doctor found drift")
+				return errReported
 			}
 			return nil
 		},

@@ -166,10 +166,13 @@ func TestDoctorReportsEachDriftConditionAndWritesNothing(t *testing.T) {
 			c.drift(t, sys.Home)
 			before := homeFiles(t, sys.Home)
 
-			stdout, code := run(t, sys.System, "doctor")
+			stdout, stderr, code := runCapturing(sys.System, "doctor")
 
 			if code != 1 {
 				t.Errorf("exit code = %d, want 1", code)
+			}
+			if stderr != "" {
+				t.Errorf("stderr = %q, want the drift reported once, on stdout", stderr)
 			}
 			if stdout != "Doctor found drift\n"+c.want {
 				t.Errorf("stdout:\n%s\nwant:\nDoctor found drift\n%s", stdout, c.want)
