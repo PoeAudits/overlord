@@ -152,11 +152,9 @@ func TestSetupWarnsAboutTriageLabelsAndStillAppliesEverythingElse(t *testing.T) 
 			detail:  "no GitHub origin remote",
 		},
 		{
-			// The fake runner fails every command it has no output for, the
-			// way gh does when it is not logged in or offline.
 			name:    "gh fails",
 			outputs: map[string]string{"git remote get-url origin": "git@github.com:PoeAudits/sample.git\n"},
-			detail:  "gh label list failed: error: No such remote 'origin'",
+			detail:  "gh label list failed: fake: command failed",
 		},
 	}
 	for _, tt := range tests {
@@ -199,7 +197,7 @@ func TestSetupWarnsWhenCreatingATriageLabelFails(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
-	if want := "  warning    triage labels (gh label create wontfix failed: error: No such remote 'origin')\n"; !strings.HasSuffix(stdout, want) {
+	if want := "  warning    triage labels (gh label create wontfix failed: fake: command failed)\n"; !strings.HasSuffix(stdout, want) {
 		t.Fatalf("stdout does not end with %q:\n%s", want, stdout)
 	}
 }

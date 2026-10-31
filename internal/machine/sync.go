@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/PoeAudits/overlord/internal/catalog"
+	"github.com/PoeAudits/overlord/internal/harness"
 	"github.com/PoeAudits/overlord/internal/system"
 	"github.com/PoeAudits/overlord/internal/t3"
 )
@@ -31,9 +33,20 @@ const (
 	Shadowed Action = "shadowed"
 )
 
+// Step names one ordered part of Sync.
+type Step string
+
+const (
+	SkillsStep       Step = "skills"
+	InstructionsStep Step = "instructions"
+	RolesStep        Step = "roles"
+	HooksStep        Step = "hooks"
+	T3Step           Step = "t3"
+)
+
 // Result is the outcome of one Sync step for one path.
 type Result struct {
-	Step   string
+	Step   Step
 	Path   string
 	Action Action
 	Detail string
@@ -62,19 +75,18 @@ type syncRun struct {
 	check bool
 }
 
-// step is one ordered part of Sync. Later steps (Roles, Models, hooks, T3)
-// are added by appending to steps.
+// step is one ordered part of Sync; steps run in the order listed.
 type step struct {
-	name string
+	name Step
 	run  func(syncRun) ([]Result, error)
 }
 
 var steps = []step{
-	{name: "skills", run: syncSkills},
-	{name: "instructions", run: syncInstructions},
-	{name: "roles", run: syncRoles},
-	{name: "hooks", run: syncHooks},
-	{name: "t3", run: syncT3},
+	{name: SkillsStep, run: syncSkills},
+	{name: InstructionsStep, run: syncInstructions},
+	{name: RolesStep, run: syncRoles},
+	{name: HooksStep, run: syncHooks},
+	{name: T3Step, run: syncT3},
 }
 
 // Sync applies agentsDir to every Harness under sys.Home. With check it only
@@ -100,7 +112,7 @@ func syncSkills(run syncRun) ([]Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	linksDir := filepath.Join(run.sys.Home, ".claude", "skills")
+	linksDir := harness.SkillsDir(run.sys.Home)
 	var results []Result
 	for _, skill := range skills {
 		if protectedSkillEntries[skill.Name] {
@@ -179,12 +191,12 @@ var protectedSkillEntries = map[string]bool{"synced": true, ".trash": true}
 
 func syncInstructions(run syncRun) ([]Result, error) {
 	source := catalog.InstructionsPath(run.agentsDir)
+	if _, err := os.Stat(source); errors.Is(err, os.ErrNotExist) {
+		// Linking now would leave every Harness with a dangling link.
+		return []Result{{Path: source, Action: Conflict, Detail: missingInstructions}}, nil
+	}
 	var results []Result
-	for _, path := range []string{
-		filepath.Join(run.sys.Home, ".claude", "CLAUDE.md"),
-		filepath.Join(run.sys.Home, ".codex", "AGENTS.md"),
-		filepath.Join(run.sys.Home, ".config", "opencode", "AGENTS.md"),
-	} {
+	for _, path := range harness.InstructionPaths(run.sys.Home) {
 		info, err := os.Lstat(path)
 		switch {
 		case errors.Is(err, os.ErrNotExist):
@@ -208,6 +220,8 @@ func syncInstructions(run syncRun) ([]Result, error) {
 	}
 	return results, nil
 }
+
+const missingInstructions = "missing, so no Harness gets global instructions; create it"
 
 // replaceIdenticalFile replaces the regular file at path with a link to
 // source when both have the same content. A differing file holds rules the
@@ -261,3 +275,12 @@ func syncT3(run syncRun) ([]Result, error) {
 }
 
 var t3Actions = map[t3.Status]Action{t3.Missing: Create, t3.Stale: Replace, t3.OK: OK}
+
+// DisplayPath shortens paths under home to ~/... for readable reports.
+func DisplayPath(home, path string) string {
+	rel, err := filepath.Rel(home, path)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return path
+	}
+	return "~/" + rel
+}

@@ -5,6 +5,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+
+	"github.com/PoeAudits/overlord/internal/jsonedit"
 )
 
 // SyncCommand is what every session hook runs.
@@ -39,34 +41,34 @@ type commandHook struct {
 // otherwise the hook is added in place and every other byte is kept. Empty
 // content stands for an absent file.
 func EnsureSessionStartHook(content []byte) ([]byte, error) {
-	doc, err := jsonObjectDocument(content)
+	doc, err := jsonedit.Document(content)
 	if err != nil {
 		return nil, err
 	}
-	root, err := topLevelObject(doc)
+	root, err := jsonedit.Object(doc)
 	if err != nil {
 		return nil, err
 	}
 	group := sessionStartGroup{Hooks: []commandHook{{Type: "command", Command: SyncCommand}}}
-	hooks, found, err := member(doc, root, "hooks")
+	hooks, found, err := jsonedit.Member(doc, root, "hooks")
 	if err != nil {
 		return nil, err
 	}
 	if !found {
-		return insertMember(doc, root, "hooks", map[string]any{"SessionStart": []sessionStartGroup{group}}), nil
+		return jsonedit.InsertMember(doc, root, "hooks", map[string]any{"SessionStart": []sessionStartGroup{group}}), nil
 	}
-	if doc[hooks.start] != '{' {
+	if doc[hooks.Start] != '{' {
 		return nil, fmt.Errorf(`"hooks" is not an object`)
 	}
-	sessionStart, found, err := member(doc, hooks, "SessionStart")
+	sessionStart, found, err := jsonedit.Member(doc, hooks, "SessionStart")
 	if err != nil {
 		return nil, err
 	}
 	if !found {
-		return insertMember(doc, hooks, "SessionStart", []sessionStartGroup{group}), nil
+		return jsonedit.InsertMember(doc, hooks, "SessionStart", []sessionStartGroup{group}), nil
 	}
 	var groups []sessionStartGroup
-	if err := json.Unmarshal(doc[sessionStart.start:sessionStart.end], &groups); err != nil {
+	if err := json.Unmarshal(doc[sessionStart.Start:sessionStart.End], &groups); err != nil {
 		return nil, fmt.Errorf(`"hooks.SessionStart": %w`, err)
 	}
 	for _, existing := range groups {
@@ -76,5 +78,5 @@ func EnsureSessionStartHook(content []byte) ([]byte, error) {
 			}
 		}
 	}
-	return appendElement(doc, sessionStart, group), nil
+	return jsonedit.AppendElement(doc, sessionStart, group), nil
 }

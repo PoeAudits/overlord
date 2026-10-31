@@ -45,6 +45,8 @@ things or changing decided behaviour.
 - `internal/catalog`: reads `~/.agents` (skills, Roles, global instructions).
 - `internal/harness`: one adapter per Harness (paths, agent file format, model
   config writer, hook installer).
+- `internal/jsonedit`: in-place JSON edits that keep every other byte, shared
+  by `internal/harness` and `internal/t3`.
 - `internal/machine`: Sync and Start.
 - `internal/t3`: edits T3 Code's settings.
 - `skills/`: the `new-project` and `project-setup` skills, laid out like

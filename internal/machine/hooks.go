@@ -1,8 +1,6 @@
 package machine
 
 import (
-	"path/filepath"
-
 	"github.com/PoeAudits/overlord/internal/harness"
 )
 
@@ -11,8 +9,8 @@ import (
 func syncHooks(run syncRun) ([]Result, error) {
 	var results []Result
 	for _, path := range []string{
-		filepath.Join(run.sys.Home, ".claude", "settings.json"),
-		filepath.Join(run.sys.Home, ".codex", "hooks.json"),
+		harness.ClaudeSettingsPath(run.sys.Home),
+		harness.CodexHooksPath(run.sys.Home),
 	} {
 		result, err := run.editFile(path, "SessionStart hook", harness.EnsureSessionStartHook)
 		if err != nil {
@@ -20,7 +18,7 @@ func syncHooks(run syncRun) ([]Result, error) {
 		}
 		results = append(results, result)
 	}
-	plugin, err := run.writeGeneratedFile(filepath.Join(run.sys.Home, ".config", "opencode", "plugins", "overlord-sync.js"), harness.OpenCodePlugin, harness.IsGeneratedPlugin, "hand-written plugin")
+	plugin, err := run.writeGeneratedFile(harness.OpenCodePluginPath(run.sys.Home), harness.OpenCodePlugin, harness.IsGeneratedPlugin, "hand-written plugin")
 	if err != nil {
 		return nil, err
 	}

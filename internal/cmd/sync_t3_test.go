@@ -73,6 +73,9 @@ func TestSyncAddsTheSetupScriptAndKeepsEveryOtherSettingByteForByte(t *testing.T
 		t.Fatalf("exit code = %d\n%s", code, stdout)
 	}
 	assertFile(t, t3Settings(sys.Home), `{
+  "defaultProjectScripts": [
+    `+setupScriptJSON+`
+  ],
   "favorites": [
     {
       "provider": "opencode",
@@ -80,10 +83,7 @@ func TestSyncAddsTheSetupScriptAndKeepsEveryOtherSettingByteForByte(t *testing.T
     }
   ],
   "projectSettingsFolded": true,
-  "storageCleanup": {"worktreeOnMerge": true},
-  "defaultProjectScripts": [
-    `+setupScriptJSON+`
-  ]
+  "storageCleanup": {"worktreeOnMerge": true}
 }
 `)
 	assertContains(t, stdout, "  created   ~/.t3/userdata/settings.json: overlord-setup script\n")

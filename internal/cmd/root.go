@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -27,9 +28,15 @@ func Execute(sys system.System, args []string) int {
 	root.AddCommand(newDoctorCommand(sys))
 	root.AddCommand(newStartCommand(sys))
 	root.AddCommand(newNewProjectCommand(sys))
-	if err := root.ExecuteContext(context.Background()); err != nil {
-		fmt.Fprintln(sys.Stderr, "overlord:", err)
-		return 1
+	err := root.ExecuteContext(context.Background())
+	if err == nil {
+		return 0
 	}
-	return 0
+	if !errors.Is(err, errReported) {
+		fmt.Fprintln(sys.Stderr, "overlord:", err)
+	}
+	return 1
 }
+
+// errReported fails a command whose output already says why.
+var errReported = errors.New("failure already reported")

@@ -12,13 +12,6 @@ import (
 	"github.com/PoeAudits/overlord/internal/templates"
 )
 
-// agentDirs are where each Harness reads a Project's agent files.
-var agentDirs = map[harness.Harness]string{
-	harness.Claude:   ".claude/agents",
-	harness.Codex:    ".codex/agents",
-	harness.OpenCode: ".opencode/agents",
-}
-
 // agentFiles expands a generated item into one item per rendered agent file,
 // or none when the Project has no roles file. Prompt paths are relative to the
 // roles file's directory, as in ~/.agents.
@@ -35,7 +28,7 @@ func agentFiles(root string, item templates.Item) ([]templates.Item, error) {
 	for _, role := range roles {
 		for _, file := range harness.RenderRole(role, filepath.ToSlash(filepath.Join(dir, "roles"))) {
 			items = append(items, templates.Item{
-				Path:     agentDirs[file.Harness] + "/" + file.Name,
+				Path:     harness.ProjectAgentDir(file.Harness) + "/" + file.Name,
 				Strategy: templates.Generated,
 				Content:  file.Content,
 			})

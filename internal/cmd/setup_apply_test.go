@@ -95,8 +95,13 @@ func (r *fakeRunner) Run(_ context.Context, dir, name string, args ...string) ([
 	command := strings.Join(append([]string{name}, args...), " ")
 	r.calls = append(r.calls, dir+": "+command)
 	output, ok := r.outputs[command]
-	if !ok {
+	if !ok && command == "git remote get-url origin" {
 		return []byte("error: No such remote 'origin'\n"), errors.New("exit status 2")
+	}
+	if !ok {
+		// Any command without an output fails, the way gh does when it is
+		// not logged in or offline.
+		return []byte("fake: command failed\n"), errors.New("exit status 1")
 	}
 	return []byte(output), nil
 }
@@ -301,6 +306,6 @@ func TestSetupLeavesAFileWhereADirectoryBelongsUntouched(t *testing.T) {
 
 func (r *fakeRunner) Launch(dir, logPath, name string, args ...string) error {
 	command := strings.Join(append([]string{name}, args...), " ")
-	r.calls = append(r.calls, "launch "+logPath+": "+command)
+	r.calls = append(r.calls, dir+": launch "+logPath+": "+command)
 	return nil
 }

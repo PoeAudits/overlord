@@ -15,6 +15,7 @@ import (
 	"github.com/PoeAudits/overlord/internal/config"
 	"github.com/PoeAudits/overlord/internal/project"
 	"github.com/PoeAudits/overlord/internal/system"
+	"github.com/PoeAudits/overlord/internal/t3"
 )
 
 // githubOwner is the account every new Project is created under.
@@ -76,9 +77,7 @@ clone it into <projectsRoot>/<name>, run Setup in the clone, commit
 					return err
 				}
 			}
-			// The t3 launcher is installed under ~/.t3/bin, which is not on PATH.
-			t3 := filepath.Join(sys.Home, ".t3", "bin", "t3")
-			if err := step(ctx, sys, path, t3, "project", "add", "--title", name, path); err != nil {
+			if err := step(ctx, sys, path, t3.LauncherPath(sys.Home), "project", "add", "--title", name, path); err != nil {
 				return err
 			}
 			fmt.Fprintf(sys.Stdout, "Created %s at %s and registered it with T3 Code\n", repo, path)

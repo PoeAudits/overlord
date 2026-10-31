@@ -16,14 +16,14 @@ description: Create a brand-new Project with `overlord new-project`, a GitHub re
    overlord new-project <name> [--description "<text>"] [--public]
    ```
 
-   It runs these steps in order and stops at the first failure:
+   `<projectsRoot>` is `projectsRoot` in `~/.config/overlord/config.yaml` (default `~/projects`). It runs these steps in order and stops at the first failure:
 
-   1. Refuses if `~/projects/<name>` already exists, before touching GitHub.
+   1. Refuses if `<projectsRoot>/<name>` already exists, before touching GitHub.
    2. `gh repo create PoeAudits/<name> --private` (or `--public`, plus `--description`).
-   3. `gh repo clone PoeAudits/<name> ~/projects/<name>`.
+   3. `gh repo clone PoeAudits/<name> <projectsRoot>/<name>`.
    4. Setup in the clone, printing the plan as `overlord setup` does (`Setup applied to ...`, then `created` / `ok` / `warning` lines; see the `project-setup` skill for each word).
    5. `git add -A`, `git commit -m "Initial project setup"`, `git push -u origin HEAD`.
-   6. `~/.t3/bin/t3 project add --title <name> ~/projects/<name>`.
+   6. `~/.t3/bin/t3 project add --title <name> <projectsRoot>/<name>`.
 
    Done when it exits 0 and its last line is `Created PoeAudits/<name> at <path> and registered it with T3 Code`.
 3. **Tell the user.** The repo `PoeAudits/<name>` exists on GitHub with the first commit pushed, and `<name>` is now a T3 Code project: open a new thread in it to start work. Mention that Go, TypeScript, Python or Rust standards and the CI workflow appear on a later Setup, once the Project has its `go.mod`, `package.json`, `pyproject.toml` or `Cargo.toml`, since a new repo has no language yet.
@@ -33,7 +33,7 @@ description: Create a brand-new Project with `overlord new-project`, a GitHub re
 A failure prints one line to stderr, `overlord: <command> failed: <first line of its output> (<exit status>)`, or `overlord: <path> already exists; choose another name or remove it`. Report it, then go by the failed command, because the earlier steps have already happened and rerunning `new-project` would stop at the existing repo or directory:
 
 - **Refused, or `gh repo create` failed**: nothing was created. Fix the cause (another name, `gh auth login`) and rerun.
-- **A later step failed**: the GitHub repo exists. Fix the cause and finish the remaining steps above by hand, in order, in `~/projects/<name>` (run `overlord setup` there for step 4).
+- **A later step failed**: the GitHub repo exists. Fix the cause and finish the remaining steps above by hand, in order, in `<projectsRoot>/<name>` (run `overlord setup` there for step 4).
 
 ## What Setup guarantees
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/PoeAudits/overlord/internal/catalog"
@@ -39,11 +40,16 @@ func Doctor(ctx context.Context, sys system.System, agentsDir string) (Diagnosis
 	for _, result := range report.Results {
 		// Hand-written agent files are found by findHandWrittenAgents, along
 		// with those no Role names.
-		if result.Action == OK || result.Step == "roles" && result.Action == Conflict {
+		if result.Action == OK || result.Step == RolesStep && result.Action == Conflict {
 			continue
 		}
 		diagnosis.Findings = append(diagnosis.Findings, Finding{Path: result.Path, Problem: syncProblem(result)})
 	}
+	dangling, err := findDanglingLinks(sys.Home, diagnosis.Findings)
+	if err != nil {
+		return Diagnosis{}, err
+	}
+	diagnosis.Findings = append(diagnosis.Findings, dangling...)
 	diagnosis.Findings = append(diagnosis.Findings, findStaleSkillCopies(sys.Home, agentsDir)...)
 	agents, err := findHandWrittenAgents(sys.Home)
 	if err != nil {
@@ -101,7 +107,9 @@ func findMovedUpstreams(ctx context.Context, runner system.Runner, agentsDir str
 	for _, entry := range entries {
 		head, asked := heads[entry.URL]
 		if !asked {
-			output, err := runner.Run(ctx, "", "git", "ls-remote", entry.URL, "HEAD")
+			// A private remote must fail instead of waiting on a password
+			// prompt nobody sees.
+			output, err := runner.Run(ctx, "", "env", "GIT_TERMINAL_PROMPT=0", "git", "ls-remote", entry.URL, "HEAD")
 			if err == nil {
 				head, _, _ = strings.Cut(string(output), "\t")
 			}
@@ -118,11 +126,38 @@ func findMovedUpstreams(ctx context.Context, runner system.Runner, agentsDir str
 	return moved, unreachable, nil
 }
 
+// findDanglingLinks reports global instruction links and skill links whose
+// target is gone, except paths already found.
+func findDanglingLinks(home string, found []Finding) ([]Finding, error) {
+	paths := harness.InstructionPaths(home)
+	linksDir := harness.SkillsDir(home)
+	entries, err := os.ReadDir(linksDir)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	for _, entry := range entries {
+		if !protectedSkillEntries[entry.Name()] {
+			paths = append(paths, filepath.Join(linksDir, entry.Name()))
+		}
+	}
+	var findings []Finding
+	for _, path := range paths {
+		target, err := os.Readlink(path)
+		if err != nil || slices.ContainsFunc(found, func(f Finding) bool { return f.Path == path }) {
+			continue
+		}
+		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+			findings = append(findings, Finding{Path: path, Problem: "dangling link to " + DisplayPath(home, target)})
+		}
+	}
+	return findings, nil
+}
+
 // findStaleSkillCopies reports skill directories left from before the agents
 // directory became a git checkout that every Harness reads through links.
 func findStaleSkillCopies(home, agentsDir string) []Finding {
 	var findings []Finding
-	opencode := filepath.Join(home, ".config", "opencode", "skills")
+	opencode := harness.OpenCodeSkillsDir(home)
 	if _, err := os.Lstat(opencode); err == nil {
 		findings = append(findings, Finding{Path: opencode, Problem: "stale skill copy; OpenCode reads ~/.claude/skills, so remove it"})
 	}
@@ -139,7 +174,7 @@ func findStaleSkillCopies(home, agentsDir string) []Finding {
 func findHandWrittenAgents(home string) ([]Finding, error) {
 	var findings []Finding
 	for _, h := range []harness.Harness{harness.Claude, harness.Codex, harness.OpenCode} {
-		dir := globalAgentDirs(home)[h]
+		dir := harness.GlobalAgentDir(h, home)
 		entries, err := os.ReadDir(dir)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
@@ -166,7 +201,10 @@ func findHandWrittenAgents(home string) ([]Finding, error) {
 
 // syncProblem describes, as drift, what a Sync check would change at a path.
 func syncProblem(result Result) string {
-	if result.Step == "instructions" {
+	if result.Detail == missingInstructions {
+		return result.Detail
+	}
+	if result.Step == InstructionsStep {
 		return instructionsProblem[result.Action]
 	}
 	thing := result.Detail
@@ -180,7 +218,7 @@ func syncProblem(result Result) string {
 		return "dangling " + thing
 	case Update:
 		// Hooks are only ever added; the main Model can differ.
-		if result.Step == "hooks" {
+		if result.Step == HooksStep {
 			return thing + " missing"
 		}
 		return thing + " differs from the catalog"
@@ -191,10 +229,10 @@ func syncProblem(result Result) string {
 }
 
 // syncedThing names what a step puts at a path when its result has no detail.
-var syncedThing = map[string]string{
-	"skills": "skill link",
-	"roles":  "agent file",
-	"hooks":  "session sync plugin",
+var syncedThing = map[Step]string{
+	SkillsStep: "skill link",
+	RolesStep:  "agent file",
+	HooksStep:  "session sync plugin",
 }
 
 var instructionsProblem = map[Action]string{

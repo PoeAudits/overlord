@@ -185,14 +185,20 @@ func newSystem(t *testing.T, workdir string) system.System {
 
 func run(t *testing.T, sys system.System, args ...string) (string, int) {
 	t.Helper()
-	var stdout, stderr bytes.Buffer
-	sys.Stdout = &stdout
-	sys.Stderr = &stderr
-	code := cmd.Execute(sys, args)
-	if stderr.Len() > 0 {
-		t.Logf("stderr: %s", stderr.String())
+	stdout, stderr, code := runCapturing(sys, args...)
+	if stderr != "" {
+		t.Logf("stderr: %s", stderr)
 	}
-	return stdout.String(), code
+	return stdout, code
+}
+
+// runCapturing runs overlord and returns its stdout, stderr and exit code.
+func runCapturing(sys system.System, args ...string) (stdout, stderr string, code int) {
+	var out, errOut bytes.Buffer
+	sys.Stdout = &out
+	sys.Stderr = &errOut
+	code = cmd.Execute(sys, args)
+	return out.String(), errOut.String(), code
 }
 
 func mustMkdir(t *testing.T, path string) {
