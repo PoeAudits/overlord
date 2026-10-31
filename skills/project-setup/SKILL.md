@@ -11,7 +11,7 @@ Run every command in the checkout you are working in. In a T3 thread that is the
 
 ## Steps
 
-1. **Check.** Run `overlord setup --check`. It changes nothing and exits 0. Done when you have the plan: one line per item, read with [the plan](#the-plan) below.
+1. **Check.** Run `overlord setup --check`. It changes nothing. It exits 1 when any item is `missing`, `stale` or `conflict` (stderr says `overlord: setup --check found items that need work`) and 0 otherwise; a `warning` alone does not fail it. Either exit still prints the plan. Done when you have the plan: one line per item, read with [the plan](#the-plan) below.
 2. **Show the plan.** Tell the user which items are `missing` or `stale`, and name every `conflict` and `warning` with its reason. When every line is `ok`, say the Project is already set up and stop here.
    Items missing in a T3 worktree mean T3 did not run Setup when it created it: run `overlord doctor` (read-only) and pass on any `scripts override without overlord-setup, so Setup does not run there` finding for this Project.
 3. **Apply.** Run `overlord setup`. Done when it exits 0 and prints `Setup applied to <path>`. A non-zero exit is a real failure (a Template failed to render or a path could not be written): report the `overlord: ...` line from stderr and stop.
@@ -39,6 +39,6 @@ A `#name` suffix is a Managed Block inside that file. `triage labels` is the fiv
 | `stale` | `refreshed` | A Managed Block differs from its Template, a directory's `.gitkeep` is wrong, a symlink points elsewhere, or a generated agent file is out of date. Setup replaces the block wholesale, so edits made inside it are lost; text outside the block is kept. |
 | `ok` | `ok` | Already as guaranteed. |
 | `conflict` | `conflict` | Something Overlord does not own sits at the path (a real directory where the symlink goes, a hand-written agent file, a block with no end marker). Left untouched. |
-| `warning` | `warning` | Setup could not check or create the triage labels: no GitHub `origin`, or `gh` failed. Setup carries on and exits 0. |
+| `warning` | `warning` | Setup could not check or create the triage labels: no GitHub `origin`, or `gh` failed. Setup carries on and exits 0, with or without `--check`. |
 
-`overlord setup --check --json` prints the same plan as JSON, `{"root": ..., "items": [{"path", "block", "strategy", "status", "detail", "missingLabels"}]}`, with `block`, `detail` and `missingLabels` present only when set. The JSON always uses the `--check` words, even without `--check`.
+`overlord setup --check --json` prints the same plan as JSON, with the same exit code, `{"root": ..., "items": [{"path", "block", "strategy", "status", "detail", "missingLabels"}]}`, with `block`, `detail` and `missingLabels` present only when set. The JSON always uses the `--check` words, even without `--check`.

@@ -101,8 +101,8 @@ func TestSetupCheckReportsTheMissingTriageLabelsWithoutCreatingAny(t *testing.T)
 
 	stdout, code := run(t, sys, "setup", "--check")
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0", code)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
 	}
 	if got, want := ghCalls(runner), []string{project + ": " + labelList}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("gh commands = %q, want only the list", got)
@@ -122,8 +122,8 @@ func TestSetupCheckJSONListsTheMissingTriageLabels(t *testing.T) {
 
 	stdout, code := run(t, sys, "setup", "--check", "--json")
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0", code)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
 	}
 	want := `{"path":"triage labels","strategy":"labels","status":"missing","detail":"ready-for-human, wontfix","missingLabels":["ready-for-human","wontfix"]}`
 	var compact bytes.Buffer
@@ -211,4 +211,21 @@ func ghCalls(runner *fakeRunner) []string {
 		}
 	}
 	return calls
+}
+
+func TestSetupCheckPassesWhenOnlyTheTriageLabelsWarn(t *testing.T) {
+	project := completeProject(t)
+	sys := newSystem(t, project)
+	sys.Runner = &fakeRunner{outputs: map[string]string{
+		"git remote get-url origin": "git@github.com:PoeAudits/sample.git\n",
+	}}
+
+	stdout, code := run(t, sys, "setup", "--check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0: a labels warning is not a Project problem\n%s", code, stdout)
+	}
+	if want := "  warning    triage labels (gh label list failed: fake: command failed)\n"; !strings.HasSuffix(stdout, want) {
+		t.Fatalf("stdout does not end with %q:\n%s", want, stdout)
+	}
 }

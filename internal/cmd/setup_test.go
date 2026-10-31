@@ -12,13 +12,13 @@ import (
 	"github.com/PoeAudits/overlord/internal/system"
 )
 
-func TestSetupCheckOnEmptyProjectListsEveryItemMissingAndWritesNothing(t *testing.T) {
+func TestSetupCheckOnEmptyProjectListsEveryItemMissingFailsAndWritesNothing(t *testing.T) {
 	project := t.TempDir()
 
 	stdout, code := run(t, newSystem(t, project), "setup", "--check")
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0", code)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1: --check fails when anything needs work", code)
 	}
 	want := "Setup plan for " + project + "\n" +
 		"  missing    AGENTS.md#agents\n" +
@@ -76,8 +76,8 @@ func TestSetupCheckJSONEmitsThePlan(t *testing.T) {
 
 	stdout, code := run(t, newSystem(t, project), "setup", "--check", "--json")
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0", code)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
 	}
 	var got any
 	if err := json.Unmarshal([]byte(stdout), &got); err != nil {

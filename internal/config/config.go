@@ -20,8 +20,11 @@ type Config struct {
 	// AgentsDir is the catalog Sync applies (skills, Roles, instructions).
 	AgentsDir string `yaml:"agentsDir"`
 	// ProjectsRoot is where new-project clones new Projects.
-	ProjectsRoot string    `yaml:"projectsRoot"`
-	Services     []Service `yaml:"services"`
+	ProjectsRoot string `yaml:"projectsRoot"`
+	// GitHubOwner is the GitHub account or organisation new-project creates
+	// repositories under.
+	GitHubOwner string    `yaml:"githubOwner"`
+	Services    []Service `yaml:"services"`
 }
 
 // Service is one process start keeps running.
@@ -86,6 +89,9 @@ func (c Config) resolve(home string) (Config, error) {
 	if c.ProjectsRoot == "" {
 		c.ProjectsRoot = "~/projects"
 	}
+	if c.GitHubOwner == "" {
+		c.GitHubOwner = "PoeAudits"
+	}
 	c.AgentsDir = expandHome(home, c.AgentsDir)
 	c.ProjectsRoot = expandHome(home, c.ProjectsRoot)
 	for i, service := range c.Services {
@@ -123,6 +129,8 @@ func defaultFile() string {
 #
 # agentsDir: the source of skills, Roles and global instructions for Sync.
 # projectsRoot: where new-project clones new Projects.
+# githubOwner: the GitHub account or organisation new-project creates
+# repositories under.
 # services: what start brings up, in order. A service is healthy when its
 # health URL answers with any HTTP status below 500. When it is not, start
 # runs command with sh -c, detached, output appended to
@@ -133,6 +141,7 @@ func defaultFile() string {
 # ~/.t3/userdata/server-runtime.json; http://127.0.0.1:3773 when absent).
 agentsDir: ~/.agents
 projectsRoot: ~/projects
+githubOwner: PoeAudits
 services:
   - name: t3
     command: ~/.t3/bin/t3 service install

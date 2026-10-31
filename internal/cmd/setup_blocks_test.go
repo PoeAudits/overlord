@@ -160,8 +160,8 @@ func TestSetupCheckReportsBlocksAsMissingStaleOrOKWithoutWriting(t *testing.T) {
 
 	stdout, code := run(t, newSystem(t, project), "setup", "--check")
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0", code)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
 	}
 	for _, line := range []string{
 		"  stale      AGENTS.md#agents\n",

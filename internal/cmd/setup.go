@@ -3,6 +3,7 @@ package cmd
 import (
 	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -28,7 +29,17 @@ func newSetupCommand(sys system.System) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				return printPlan(sys, plan, asJSON, "Setup plan for", checkWords)
+				if err := printPlan(sys, plan, asJSON, "Setup plan for", checkWords); err != nil {
+					return err
+				}
+				// A labels warning is not a Project problem (no origin, or gh
+				// failed), so it does not fail the check.
+				for _, item := range plan.Items {
+					if item.Status != project.OK && item.Status != project.Warning {
+						return errors.New("setup --check found items that need work")
+					}
+				}
+				return nil
 			}
 			plan, err := project.Apply(command.Context(), sys.Runner, root, projectRoot)
 			if err != nil {
@@ -37,7 +48,7 @@ func newSetupCommand(sys system.System) *cobra.Command {
 			return printPlan(sys, plan, asJSON, "Setup applied to", applyWords)
 		},
 	}
-	command.Flags().BoolVar(&check, "check", false, "print the plan without changing anything")
+	command.Flags().BoolVar(&check, "check", false, "print the plan without changing anything; exit 1 if any item is missing, stale or conflict")
 	command.Flags().BoolVar(&asJSON, "json", false, "print the plan as JSON")
 	return command
 }

@@ -18,19 +18,18 @@ import (
 	"github.com/PoeAudits/overlord/internal/t3"
 )
 
-// githubOwner is the account every new Project is created under.
-const githubOwner = "PoeAudits"
-
 func newNewProjectCommand(sys system.System) *cobra.Command {
 	var description string
 	var public bool
 	command := &cobra.Command{
 		Use:   "new-project <name>",
 		Short: "Create a GitHub Project, clone it, set it up and register it with T3 Code",
-		Long: `Create the GitHub repository PoeAudits/<name> (private unless --public),
+		Long: `Create the GitHub repository <githubOwner>/<name> (private unless --public),
 clone it into <projectsRoot>/<name>, run Setup in the clone, commit
 "Initial project setup", push it, and register the clone with T3 Code
-(t3 project add). The command stops at the first step that fails.`,
+(t3 project add). The command stops at the first step that fails.
+githubOwner and projectsRoot come from ~/.config/overlord/config.yaml
+(defaults PoeAudits and ~/projects).`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(command *cobra.Command, args []string) error {
 			name := args[0]
@@ -50,7 +49,7 @@ clone it into <projectsRoot>/<name>, run Setup in the clone, commit
 				return err
 			}
 			ctx := command.Context()
-			repo := githubOwner + "/" + name
+			repo := cfg.GitHubOwner + "/" + name
 			create := []string{"repo", "create", repo, visibility(public)}
 			if description != "" {
 				create = append(create, "--description", description)

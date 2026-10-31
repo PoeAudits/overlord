@@ -165,3 +165,29 @@ func TestNewProjectClonesUnderTheProjectsRootFromOverlordsConfig(t *testing.T) {
 		t.Fatalf("second command = %q, want %q", runner.calls[1], want)
 	}
 }
+
+func TestNewProjectCreatesTheRepoUnderTheGitHubOwnerFromOverlordsConfig(t *testing.T) {
+	sys := newSystem(t, t.TempDir())
+	mustWrite(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), "githubOwner: acme\n")
+	path := filepath.Join(sys.Home, "projects", "sample")
+	runner := newProjectRunner(t, sys.Home, "sample")
+	runner.outputs["gh repo create acme/sample --private"] = ""
+	runner.outputs["gh repo clone acme/sample "+path] = ""
+	sys.Runner = runner
+
+	stdout, code := run(t, sys, "new-project", "sample")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
+	}
+	root := filepath.Join(sys.Home, "projects")
+	if got, want := runner.calls[:2], []string{
+		root + ": gh repo create acme/sample --private",
+		root + ": gh repo clone acme/sample " + path,
+	}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("first commands = %q, want %q", got, want)
+	}
+	if want := "Created acme/sample at " + path + " and registered it with T3 Code\n"; !strings.HasSuffix(stdout, want) {
+		t.Fatalf("stdout does not end with %q:\n%s", want, stdout)
+	}
+}

@@ -122,8 +122,8 @@ func TestSetupCheckListsAgentFilesAsMissingStaleOrOKWithoutWriting(t *testing.T)
 	project := rolesProject(t)
 	sys := newSystem(t, project)
 	stdout, code := run(t, sys, "setup", "--check")
-	if code != 0 {
-		t.Fatalf("check exit code = %d, want 0: --check reports, it never fails on a plan", code)
+	if code != 1 {
+		t.Fatalf("check exit code = %d, want 1: --check fails while files are missing", code)
 	}
 	wantTail := "  missing    .claude/agents/reviewer.md\n" +
 		"  missing    .codex/agents/reviewer.toml\n" +
@@ -141,8 +141,8 @@ func TestSetupCheckListsAgentFilesAsMissingStaleOrOKWithoutWriting(t *testing.T)
 
 	stdout, code = run(t, sys, "setup", "--check")
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0", code)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
 	}
 	if !reflect.DeepEqual(tree(t, project), before) {
 		t.Fatal("setup --check wrote into the project")
