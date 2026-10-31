@@ -221,3 +221,28 @@ func TestStartFirstRunTakesT3HealthFromT3ServerRuntimeFile(t *testing.T) {
 
 	assertFile(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), defaultConfig("http://127.0.0.1:3801"))
 }
+
+func TestStartStillStartsServicesWhenSyncFails(t *testing.T) {
+	sys, runner := startSystem(t, func(url string, calls int) bool {
+		return url != sleevHealth || calls >= 2
+	})
+	runner.outputs = map[string]string{appRunningCheck: "381421\n"}
+	mustWrite(t, t3Settings(sys.Home), "not json\n")
+
+	stdout, stderr, code := runCapturing(sys, "start")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1\n%s", code, stdout)
+	}
+	want := "Start\n" +
+		"  ok        t3: healthy\n" +
+		"  started   sleev: healthy\n" +
+		"  ok        opencode: healthy\n" +
+		"  ok        T3 Code app: running\n"
+	if stdout != want {
+		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
+	}
+	if !strings.Contains(stderr, "sync t3: "+t3Settings(sys.Home)) {
+		t.Fatalf("stderr does not report the Sync error:\n%s", stderr)
+	}
+}
