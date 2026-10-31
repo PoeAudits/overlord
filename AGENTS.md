@@ -42,6 +42,9 @@ things or changing decided behaviour.
   `Check(ctx, runner, root, projectRoot)` returns a `Plan` with a `missing`,
   `stale`, `ok`, `conflict` or `warning` status per manifest item; languages
   are detected in `projectRoot`, files are written under `root`.
+  `Apply` tries every item and marks each one it cannot write `failed`, with
+  the error as its detail; `setup` prints the whole plan, then exits 1 when
+  `Plan.HasFailures`, and `Create` stops before committing.
   `setup --check` exits 1 when `Plan.NeedsWork` (anything but `ok` or
   `warning`); `sync --check` likewise exits 1 when Sync would change anything
   or finds a conflict, but not for a `shadowed` skill.

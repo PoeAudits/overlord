@@ -21,7 +21,7 @@ description: Create a brand-new Project with `overlord new-project`, a GitHub re
    1. Refuses if `<projectsRoot>/<name>` already exists, before touching GitHub.
    2. `gh repo create <owner>/<name> --private` (or `--public`, plus `--description`).
    3. `gh repo clone <owner>/<name> <projectsRoot>/<name>`.
-   4. Setup in the clone, printing the plan as `overlord setup` does (`Setup applied to ...`, then `created` / `ok` / `warning` lines; see the `project-setup` skill for each word).
+   4. Setup in the clone, printing the plan as `overlord setup` does (`Setup applied to ...`, then `created` / `ok` / `warning` lines; see the `project-setup` skill for each word). If any item is `failed`, it stops here, before committing.
    5. `git add -A`, `git commit -m "Initial project setup"`, `git push -u origin HEAD`.
    6. `~/.t3/bin/t3 project add --title <name> <projectsRoot>/<name>`.
 
@@ -30,7 +30,7 @@ description: Create a brand-new Project with `overlord new-project`, a GitHub re
 
 ## When it fails
 
-A failure prints one line to stderr, `overlord: <command> failed: <first line of its output> (<exit status>)`, or `overlord: <path> already exists; choose another name or remove it`. Report it, then go by the failed command, because the earlier steps have already happened and rerunning `new-project` would stop at the existing repo or directory:
+A failure prints one line to stderr, `overlord: <command> failed: <first line of its output> (<exit status>)`, `overlord: setup in <path> could not set up every item; see the failed lines above` (the plan above it has a `failed` line, with its error, for each item), or `overlord: <path> already exists; choose another name or remove it`. Report it, then go by the failed command, because the earlier steps have already happened and rerunning `new-project` would stop at the existing repo or directory:
 
 - **Refused, or `gh repo create` failed**: nothing was created. Fix the cause (another name, `gh auth login`) and rerun.
 - **A later step failed**: the GitHub repo exists. Fix the cause and finish the remaining steps above by hand, in order, in `<projectsRoot>/<name>` (run `overlord setup` there for step 4).

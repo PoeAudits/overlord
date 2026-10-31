@@ -269,7 +269,7 @@ func TestSetupWithoutAGitHubRemoteNamesTheProjectAfterItsDirectory(t *testing.T)
 	}
 }
 
-func TestSetupExitsNonZeroNamingTheFileItCannotWriteAfterSettingUpTheItemsBefore(t *testing.T) {
+func TestSetupReportsAnItemItCannotWriteAsFailedAndStillSetsUpEveryOtherItem(t *testing.T) {
 	project := t.TempDir()
 	agents := filepath.Join(project, ".agents")
 	mustMkdir(t, agents)
@@ -280,20 +280,31 @@ func TestSetupExitsNonZeroNamingTheFileItCannotWriteAfterSettingUpTheItemsBefore
 	sys := newSystem(t, project)
 	sys.Runner = &fakeRunner{}
 
-	_, stderr, code := runCapturing(sys, "setup")
+	stdout, stderr, code := runCapturing(sys, "setup")
 
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
 	}
-	want := "overlord: set up .agents/skills: mkdir " + filepath.Join(agents, "skills") + ": permission denied\n"
-	if stderr != want {
+	want := "Setup applied to " + project + "\n" +
+		"  created    AGENTS.md#agents\n" +
+		"  created    docs/coding-standards.md#general\n" +
+		"  created    GLOSSARY.md\n" +
+		"  created    docs/adr/0001-lint-and-tests-must-pass-before-merge.md\n" +
+		"  created    docs/agents/issue-tracker.md\n" +
+		"  created    docs/agents/triage-labels.md\n" +
+		"  created    docs/agents/domain.md\n" +
+		"  created    docs/adr\n" +
+		"  failed     .agents/skills (mkdir " + filepath.Join(agents, "skills") + ": permission denied)\n" +
+		"  created    .claude/skills\n" +
+		"  warning    triage labels (no GitHub origin remote)\n"
+	if stdout != want {
+		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
+	}
+	if want := "overlord: setup could not set up every item; see the failed lines above\n"; stderr != want {
 		t.Fatalf("stderr = %q, want %q", stderr, want)
 	}
-	files := tree(t, project)
-	for _, path := range []string{"AGENTS.md", "GLOSSARY.md", "docs/agents/domain.md"} {
-		if _, ok := files[path]; !ok {
-			t.Errorf("%s was not written before the failing item", path)
-		}
+	if got := tree(t, project)[".claude/skills"]; got != "-> ../.agents/skills" {
+		t.Fatalf(".claude/skills = %q, want the symlink created after the failed item", got)
 	}
 }
 
