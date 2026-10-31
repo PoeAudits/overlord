@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 
 	"github.com/PoeAudits/overlord/internal/system"
@@ -61,8 +60,7 @@ type Project struct {
 // Projects reads T3's projects from its state database with the sqlite3 CLI,
 // read-only. T3 has no command that lists projects.
 func Projects(ctx context.Context, runner system.Runner, home string) ([]Project, error) {
-	database := filepath.Join(home, ".t3", "userdata", "statev2.sqlite")
-	output, err := runner.Run(ctx, "", "sqlite3", "-readonly", "-json", database,
+	output, err := runner.Run(ctx, "", "sqlite3", "-readonly", "-json", stateDatabasePath(home),
 		"SELECT project_id, title, workspace_root FROM projection_projects WHERE deleted_at IS NULL")
 	if err != nil {
 		return nil, fmt.Errorf("read T3 projects: %w: %s", err, output)

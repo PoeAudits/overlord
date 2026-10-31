@@ -21,7 +21,9 @@ finally the T3 Code desktop app if it is not running.
 
 A service whose health URL answers is left alone. Otherwise its command is
 launched detached, with output appended to ~/.local/state/overlord/<name>.log,
-and start waits up to the service's timeout for health. A service that does
+and start waits up to the service's timeout for health. {t3Origin} in a
+health URL stands for the origin T3 Code's server last ran on, read from
+~/.t3/userdata/server-runtime.json each time start runs. A service that does
 not become healthy is reported and the rest still start; start then exits
 non-zero. A Sync failure is reported first and does not stop the services
 from starting; start then exits non-zero too.`,

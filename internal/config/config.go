@@ -3,7 +3,6 @@
 package config
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/PoeAudits/overlord/internal/t3"
 )
 
 // Config is Overlord's config with every path absolute.
@@ -53,7 +54,7 @@ func Path(home string) string {
 func Load(home string) (Config, error) {
 	data, err := os.ReadFile(Path(home))
 	if errors.Is(err, os.ErrNotExist) {
-		data = []byte(defaultFile(home))
+		data = []byte(defaultFile())
 	} else if err != nil {
 		return Config{}, err
 	}
@@ -74,7 +75,7 @@ func WriteDefault(home string) (bool, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return false, err
 	}
-	return true, os.WriteFile(path, []byte(defaultFile(home)), 0o644)
+	return true, os.WriteFile(path, []byte(defaultFile()), 0o644)
 }
 
 func (c Config) resolve(home string) (Config, error) {
@@ -93,6 +94,9 @@ func (c Config) resolve(home string) (Config, error) {
 		if service.Timeout <= 0 {
 			c.Services[i].Timeout = defaultTimeout
 		}
+		if strings.Contains(service.Health, t3OriginPlaceholder) {
+			c.Services[i].Health = strings.ReplaceAll(service.Health, t3OriginPlaceholder, t3.Origin(home))
+		}
 	}
 	return c, nil
 }
@@ -108,9 +112,12 @@ func expandHome(home, path string) string {
 	return path
 }
 
-// defaultFile is the config written on first run. T3 Code's health URL uses
-// the origin in its server-runtime file, so a non-default port is picked up.
-func defaultFile(home string) string {
+// t3OriginPlaceholder in a health URL stands for T3 Code's current origin, so
+// the default t3 service follows T3 to another port without a config edit.
+const t3OriginPlaceholder = "{t3Origin}"
+
+// defaultFile is the config written on first run.
+func defaultFile() string {
 	return `# Overlord's config. Written once with defaults; Overlord never rewrites it.
 #
 # agentsDir: the source of skills, Roles and global instructions for Sync.
@@ -120,12 +127,15 @@ func defaultFile(home string) string {
 # runs command with sh -c, detached, output appended to
 # ~/.local/state/overlord/<name>.log, and waits up to timeout for health.
 # Set enabled: false to skip a service.
+# {t3Origin} in a health URL is replaced, each time start runs, with the
+# origin T3 Code's server last ran on (from
+# ~/.t3/userdata/server-runtime.json; http://127.0.0.1:3773 when absent).
 agentsDir: ~/.agents
 projectsRoot: ~/projects
 services:
   - name: t3
     command: ~/.t3/bin/t3 service install
-    health: ` + t3Origin(home) + `/.well-known/t3/environment
+    health: "` + t3OriginPlaceholder + `/.well-known/t3/environment"
     timeout: 30s
   - name: sleev
     command: sleev gateway start
@@ -138,19 +148,4 @@ services:
     health: http://127.0.0.1:4096/api/info
     timeout: 30s
 `
-}
-
-// t3Origin is the origin T3 Code's server last ran on, or its default.
-func t3Origin(home string) string {
-	data, err := os.ReadFile(filepath.Join(home, ".t3", "userdata", "server-runtime.json"))
-	if err != nil {
-		return "http://127.0.0.1:3773"
-	}
-	var runtime struct {
-		Origin string `json:"origin"`
-	}
-	if json.Unmarshal(data, &runtime) != nil || runtime.Origin == "" {
-		return "http://127.0.0.1:3773"
-	}
-	return runtime.Origin
 }

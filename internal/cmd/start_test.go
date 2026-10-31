@@ -19,7 +19,7 @@ func TestStartFirstRunWritesTheDefaultConfigAndNeverRewritesIt(t *testing.T) {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
 
-	assertFile(t, configPath, defaultConfig("http://127.0.0.1:3773"))
+	assertFile(t, configPath, defaultConfig)
 	mustWrite(t, configPath, "# edited by hand\nservices: []\n")
 	if _, code := run(t, sys, "start"); code != 0 {
 		t.Fatalf("second run exit code = %d, want 0", code)
@@ -27,10 +27,8 @@ func TestStartFirstRunWritesTheDefaultConfigAndNeverRewritesIt(t *testing.T) {
 	assertFile(t, configPath, "# edited by hand\nservices: []\n")
 }
 
-// defaultConfig is the config file a first run writes when T3 Code's server
-// is reachable at t3Origin.
-func defaultConfig(t3Origin string) string {
-	return `# Overlord's config. Written once with defaults; Overlord never rewrites it.
+// defaultConfig is the config file a first run writes.
+const defaultConfig = `# Overlord's config. Written once with defaults; Overlord never rewrites it.
 #
 # agentsDir: the source of skills, Roles and global instructions for Sync.
 # projectsRoot: where new-project clones new Projects.
@@ -39,12 +37,15 @@ func defaultConfig(t3Origin string) string {
 # runs command with sh -c, detached, output appended to
 # ~/.local/state/overlord/<name>.log, and waits up to timeout for health.
 # Set enabled: false to skip a service.
+# {t3Origin} in a health URL is replaced, each time start runs, with the
+# origin T3 Code's server last ran on (from
+# ~/.t3/userdata/server-runtime.json; http://127.0.0.1:3773 when absent).
 agentsDir: ~/.agents
 projectsRoot: ~/projects
 services:
   - name: t3
     command: ~/.t3/bin/t3 service install
-    health: ` + t3Origin + `/.well-known/t3/environment
+    health: "{t3Origin}/.well-known/t3/environment"
     timeout: 30s
   - name: sleev
     command: sleev gateway start
@@ -57,7 +58,6 @@ services:
     health: http://127.0.0.1:4096/api/info
     timeout: 30s
 `
-}
 
 // startSystem is a System for start with a catalog in its HOME, a fake runner
 // and a health checker that answers with healthy.
@@ -210,8 +210,11 @@ func TestStartSkipsADisabledService(t *testing.T) {
 	assertCalls(t, runner, sys.Home+": "+appRunningCheck)
 }
 
-func TestStartFirstRunTakesT3HealthFromT3ServerRuntimeFile(t *testing.T) {
+func TestStartChecksT3HealthOnThePortInT3ServerRuntimeFileAtStartTime(t *testing.T) {
 	sys, _ := startSystem(t, allHealthy)
+	if _, code := run(t, sys, "start"); code != 0 {
+		t.Fatalf("first run exit code = %d, want 0", code)
+	}
 	mustWrite(t, filepath.Join(sys.Home, ".t3", "userdata", "server-runtime.json"),
 		`{"version":1,"pid":381664,"host":"127.0.0.1","port":3801,"origin":"http://127.0.0.1:3801"}`)
 
@@ -219,7 +222,10 @@ func TestStartFirstRunTakesT3HealthFromT3ServerRuntimeFile(t *testing.T) {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
 
-	assertFile(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), defaultConfig("http://127.0.0.1:3801"))
+	health := sys.Health.(*fakeHealth)
+	if health.calls["http://127.0.0.1:3801/.well-known/t3/environment"] != 1 {
+		t.Fatalf("health checks = %v, want one of T3 on port 3801", health.calls)
+	}
 }
 
 func TestStartStillStartsServicesWhenSyncFails(t *testing.T) {

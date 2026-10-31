@@ -43,11 +43,6 @@ const (
 	OK    Status = "ok"
 )
 
-// SettingsPath is T3 Code's global settings file under home.
-func SettingsPath(home string) string {
-	return filepath.Join(home, ".t3", "userdata", "settings.json")
-}
-
 // EnsureSetupScript makes defaultProjectScripts in the settings file under
 // home contain exactly one setup script entry with the expected fields, and
 // returns the status it found. With check it only reports.
