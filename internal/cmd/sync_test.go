@@ -22,6 +22,7 @@ func TestSyncOnFreshHomeLinksEverySkillAndInstructionFile(t *testing.T) {
 	for _, path := range instructionPaths(sys.Home) {
 		assertLink(t, path, filepath.Join(agents, "AGENTS.md"))
 	}
+	assertFile(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), defaultConfig)
 	want := "Sync\n" +
 		"  created   ~/.claude/skills/grill\n" +
 		"  created   ~/.claude/skills/tdd\n" +
@@ -64,8 +65,8 @@ func TestSyncCheckOnFreshHomeReportsWhatItWouldCreateAndWritesNothing(t *testing
 
 	stdout, code := run(t, sys, "sync", "--check")
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0", code)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 because Sync would create links", code)
 	}
 	want := "Sync check (nothing changed)\n" +
 		"  create    ~/.claude/skills/tdd\n" +
@@ -122,6 +123,10 @@ func TestSyncLeavesSyncedTrashAndRealSkillDirectoriesAloneAndReportsTheShadow(t 
 	if !strings.HasPrefix(stdout, want) {
 		t.Fatalf("stdout:\n%s\nwant prefix:\n%s", stdout, want)
 	}
+	// The user's own skill is not Sync's to fix, so it does not fail a check.
+	if stdout, code := run(t, sys, "sync", "--check"); code != 0 || !strings.Contains(stdout, "  shadowed  ~/.claude/skills/tdd") {
+		t.Fatalf("sync --check exit code = %d, want 0\n%s", code, stdout)
+	}
 }
 
 func TestSyncRemovesDanglingLinksIntoTheCatalogAndLeavesOtherLinksAlone(t *testing.T) {
@@ -171,8 +176,8 @@ func TestSyncCheckReportsDanglingLinksWithoutRemovingThem(t *testing.T) {
 
 	stdout, code := run(t, sys, "sync", "--check")
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0", code)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 because Sync would remove a link", code)
 	}
 	if !strings.Contains(stdout, "  remove    ~/.claude/skills/deleted\n") {
 		t.Fatalf("stdout:\n%s", stdout)
@@ -220,7 +225,7 @@ func TestSyncReplacesAnIdenticalInstructionFileWithTheLink(t *testing.T) {
 	mustWrite(t, claudeMD, "# Global rules\n")
 
 	stdout, code := run(t, sys, "sync", "--check")
-	if code != 0 || !strings.Contains(stdout, "  replace   ~/.claude/CLAUDE.md\n") {
+	if code != 1 || !strings.Contains(stdout, "  replace   ~/.claude/CLAUDE.md\n") {
 		t.Fatalf("sync --check exit code = %d, stdout:\n%s", code, stdout)
 	}
 	if info, err := os.Lstat(claudeMD); err != nil || !info.Mode().IsRegular() {
@@ -329,5 +334,27 @@ func TestSyncWithoutCatalogInstructionsReportsAConflictAndLinksNothing(t *testin
 	assertContains(t, stdout, "  conflict  ~/.agents/AGENTS.md: missing, so no Harness gets global instructions; create it\n")
 	if _, code := run(t, sys, "sync", "--check"); code != 1 {
 		t.Fatalf("sync --check exit code = %d, want 1", code)
+	}
+}
+
+func TestSyncAndStartRejectAMalformedConfigNamingTheFile(t *testing.T) {
+	for _, command := range []string{"sync", "start"} {
+		t.Run(command, func(t *testing.T) {
+			sys, _ := startSystem(t, allHealthy)
+			configPath := filepath.Join(sys.Home, ".config", "overlord", "config.yaml")
+			mustWrite(t, configPath, "services: [\n")
+
+			stdout, stderr, code := runCapturing(sys, command)
+
+			if code != 1 {
+				t.Fatalf("exit code = %d, want 1\n%s", code, stdout)
+			}
+			if !strings.HasPrefix(stderr, "overlord: "+configPath+": yaml: ") {
+				t.Fatalf("stderr does not name the config file and the YAML error:\n%s", stderr)
+			}
+			if _, err := os.Lstat(filepath.Join(sys.Home, ".claude")); err == nil {
+				t.Fatalf("%s changed the home despite the bad config", command)
+			}
+		})
 	}
 }

@@ -191,8 +191,8 @@ func TestSyncCheckWithAFullCatalogWritesNothing(t *testing.T) {
 
 	stdout, code := run(t, sys, "sync", "--check")
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 because Sync would create files\n%s", code, stdout)
 	}
 	for _, line := range []string{
 		"  create    ~/.claude/agents/explorer.md\n",

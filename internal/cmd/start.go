@@ -29,7 +29,7 @@ non-zero. A Sync failure is reported first and does not stop the services
 from starting; start then exits non-zero too.`,
 		Args: cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
-			if _, err := config.WriteDefault(sys.Home); err != nil {
+			if err := config.WriteDefault(sys.Home); err != nil {
 				return err
 			}
 			cfg, err := config.Load(sys.Home)
@@ -44,7 +44,7 @@ from starting; start then exits non-zero too.`,
 			}
 			// Start runs at login: show only what needs the user.
 			for _, result := range report.Results {
-				if result.Action == machine.Conflict || result.Action == machine.Shadowed {
+				if result.NeedsUser() {
 					fmt.Fprintln(sys.Stdout, resultLine(sys.Home, result, false))
 				}
 			}

@@ -63,15 +63,15 @@ func (run syncRun) writeMainModels(models catalog.Models) ([]Result, error) {
 // not generate is already there; generated says which is which and
 // handWritten names such a file in the report.
 func (run syncRun) writeGeneratedFile(path string, content []byte, generated func([]byte) bool, handWritten string) (Result, error) {
-	current, err := os.ReadFile(path)
+	state, err := harness.CompareGenerated(path, content, generated)
 	switch {
-	case errors.Is(err, os.ErrNotExist):
-		return Result{Path: path, Action: Create}, run.writeFile(path, content)
 	case err != nil:
 		return Result{}, err
-	case bytes.Equal(current, content):
+	case state == harness.FileMissing:
+		return Result{Path: path, Action: Create}, run.writeFile(path, content)
+	case state == harness.FileCurrent:
 		return Result{Path: path, Action: OK}, nil
-	case !generated(current):
+	case state == harness.FileHandWritten:
 		return Result{Path: path, Action: Conflict, Detail: handWritten + "; left in place"}, nil
 	}
 	return Result{Path: path, Action: Replace}, run.writeFile(path, content)

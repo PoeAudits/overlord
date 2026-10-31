@@ -129,8 +129,8 @@ func TestSyncCorrectsASetupScriptWithDifferentFields(t *testing.T) {
 ]}`)
 
 	stdout, code := run(t, sys, "sync", "--check")
-	if code != 0 {
-		t.Fatalf("check exit code = %d\n%s", code, stdout)
+	if code != 1 {
+		t.Fatalf("check exit code = %d, want 1\n%s", code, stdout)
 	}
 	assertContains(t, stdout, "  replace   ~/.t3/userdata/settings.json: overlord-setup script\n")
 
@@ -160,8 +160,8 @@ func TestSyncCheckReportsAMissingSetupScriptAndLeavesTheSettingsAlone(t *testing
 
 	stdout, code := run(t, sys, "sync", "--check")
 
-	if code != 0 {
-		t.Fatalf("exit code = %d\n%s", code, stdout)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1\n%s", code, stdout)
 	}
 	assertContains(t, stdout, "  create    ~/.t3/userdata/settings.json: overlord-setup script\n")
 	assertFile(t, t3Settings(sys.Home), settings)

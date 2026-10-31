@@ -57,14 +57,20 @@ type Report struct {
 	Results []Result
 }
 
-// Conflicted reports whether any path is in conflict.
-func (r Report) Conflicted() bool {
+// NeedsWork reports whether Sync would change any path or found a conflict.
+// A shadowed skill is the user's own, so it does not count.
+func (r Report) NeedsWork() bool {
 	for _, result := range r.Results {
-		if result.Action == Conflict {
+		if result.Action != OK && result.Action != Shadowed {
 			return true
 		}
 	}
 	return false
+}
+
+// NeedsUser reports whether Sync left the path for the user to sort out.
+func (r Result) NeedsUser() bool {
+	return r.Action == Conflict || r.Action == Shadowed
 }
 
 // syncRun is the state every step receives.

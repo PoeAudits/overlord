@@ -62,6 +62,7 @@ func TestNewProjectCreatesClonesSetsUpCommitsPushesAndRegistersInOrder(t *testin
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
 	}
+	assertFile(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), defaultConfig)
 	root := filepath.Join(sys.Home, "projects")
 	path := filepath.Join(root, "sample")
 	want := []string{
@@ -117,7 +118,7 @@ func TestNewProjectStopsAtTheFirstFailingRemoteStep(t *testing.T) {
 	if last := runner.calls[len(runner.calls)-1]; !strings.HasSuffix(last, ": git push -u origin HEAD") {
 		t.Fatalf("last command = %q, want the push; t3 registration must not run", last)
 	}
-	want := "overlord: git push -u origin HEAD failed: fake: command failed (exit status 1)\n"
+	want := "overlord: git push -u origin HEAD failed: fake: command failed\n"
 	if stderr.String() != want {
 		t.Fatalf("stderr = %q, want %q", stderr.String(), want)
 	}

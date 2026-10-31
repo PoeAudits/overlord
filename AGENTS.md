@@ -38,10 +38,13 @@ things or changing decided behaviour.
   `doctor`, `new-project`.
 - `internal/templates`: embedded Templates and the Setup manifest
   (`Manifest()` returns the guaranteed items and their strategy).
-- `internal/project`: Setup for one Project. `Check(ctx, runner, root,
-  projectRoot)` returns a `Plan` with a `missing`, `stale`, `ok` or `conflict`
-  status per manifest item; languages are detected in `projectRoot`, files are
-  written under `root`.
+- `internal/project`: Setup for one Project, and `Create` for `new-project`.
+  `Check(ctx, runner, root, projectRoot)` returns a `Plan` with a `missing`,
+  `stale`, `ok`, `conflict` or `warning` status per manifest item; languages
+  are detected in `projectRoot`, files are written under `root`.
+  `setup --check` exits 1 when `Plan.NeedsWork` (anything but `ok` or
+  `warning`); `sync --check` likewise exits 1 when Sync would change anything
+  or finds a conflict, but not for a `shadowed` skill.
 - `internal/catalog`: reads `~/.agents` (skills, Roles, global instructions).
 - `internal/harness`: one adapter per Harness (paths, agent file format, model
   config writer, hook installer).
