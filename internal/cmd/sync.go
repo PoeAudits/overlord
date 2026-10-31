@@ -19,6 +19,11 @@ func newSyncCommand(sys system.System) *cobra.Command {
 		Long: `Apply skills and global instructions from the agents directory to every
 Harness, and register "overlord setup" with T3 Code.
 
+"sync --check" changes nothing and exits 1 when Sync would create, remove,
+replace or update anything, or finds a conflict. A shadowed skill (a skill
+directory of your own in the way of a catalog skill) is reported but does not
+fail the check.
+
 When the agents directory has no AGENTS.md, Sync links no global instruction
 file and reports the missing file as a conflict, so "sync --check" fails.
 
@@ -45,18 +50,18 @@ Project unless the override includes the overlord-setup entry.`,
 				fmt.Fprintln(sys.Stdout, syncHeader(check))
 			}
 			for _, result := range report.Results {
-				if quiet && result.Action != machine.Conflict && result.Action != machine.Shadowed {
+				if quiet && !result.NeedsUser() {
 					continue
 				}
 				fmt.Fprintln(sys.Stdout, resultLine(sys.Home, result, check))
 			}
-			if check && report.Conflicted() {
-				return errors.New("sync --check found conflicts")
+			if check && report.NeedsWork() {
+				return errors.New("sync --check found paths that need work")
 			}
 			return nil
 		},
 	}
-	command.Flags().BoolVar(&check, "check", false, "report what Sync would change without changing anything")
+	command.Flags().BoolVar(&check, "check", false, "report what Sync would change without changing anything; exit 1 if anything would change or conflicts")
 	command.Flags().BoolVar(&quiet, "quiet", false, "print only conflicts and shadowed skills")
 	return command
 }

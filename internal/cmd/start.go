@@ -44,7 +44,7 @@ from starting; start then exits non-zero too.`,
 			}
 			// Start runs at login: show only what needs the user.
 			for _, result := range report.Results {
-				if result.Action == machine.Conflict || result.Action == machine.Shadowed {
+				if result.NeedsUser() {
 					fmt.Fprintln(sys.Stdout, resultLine(sys.Home, result, false))
 				}
 			}

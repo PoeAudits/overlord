@@ -64,8 +64,8 @@ func TestSyncCheckOnFreshHomeReportsWhatItWouldCreateAndWritesNothing(t *testing
 
 	stdout, code := run(t, sys, "sync", "--check")
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0", code)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 because Sync would create links", code)
 	}
 	want := "Sync check (nothing changed)\n" +
 		"  create    ~/.claude/skills/tdd\n" +
@@ -122,6 +122,10 @@ func TestSyncLeavesSyncedTrashAndRealSkillDirectoriesAloneAndReportsTheShadow(t 
 	if !strings.HasPrefix(stdout, want) {
 		t.Fatalf("stdout:\n%s\nwant prefix:\n%s", stdout, want)
 	}
+	// The user's own skill is not Sync's to fix, so it does not fail a check.
+	if stdout, code := run(t, sys, "sync", "--check"); code != 0 || !strings.Contains(stdout, "  shadowed  ~/.claude/skills/tdd") {
+		t.Fatalf("sync --check exit code = %d, want 0\n%s", code, stdout)
+	}
 }
 
 func TestSyncRemovesDanglingLinksIntoTheCatalogAndLeavesOtherLinksAlone(t *testing.T) {
@@ -171,8 +175,8 @@ func TestSyncCheckReportsDanglingLinksWithoutRemovingThem(t *testing.T) {
 
 	stdout, code := run(t, sys, "sync", "--check")
 
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0", code)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 because Sync would remove a link", code)
 	}
 	if !strings.Contains(stdout, "  remove    ~/.claude/skills/deleted\n") {
 		t.Fatalf("stdout:\n%s", stdout)
@@ -220,7 +224,7 @@ func TestSyncReplacesAnIdenticalInstructionFileWithTheLink(t *testing.T) {
 	mustWrite(t, claudeMD, "# Global rules\n")
 
 	stdout, code := run(t, sys, "sync", "--check")
-	if code != 0 || !strings.Contains(stdout, "  replace   ~/.claude/CLAUDE.md\n") {
+	if code != 1 || !strings.Contains(stdout, "  replace   ~/.claude/CLAUDE.md\n") {
 		t.Fatalf("sync --check exit code = %d, stdout:\n%s", code, stdout)
 	}
 	if info, err := os.Lstat(claudeMD); err != nil || !info.Mode().IsRegular() {
