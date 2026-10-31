@@ -54,8 +54,9 @@ func EnsureSetupScript(home string, check bool) (Status, error) {
 	path := SettingsPath(home)
 	current, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		current = []byte("{}\n")
-	} else if err != nil {
+		current, err = []byte("{}\n"), nil
+	}
+	if err != nil {
 		return "", err
 	}
 	updated, status, err := withSetupScript(current)

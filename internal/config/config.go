@@ -54,8 +54,9 @@ func Path(home string) string {
 func Load(home string) (Config, error) {
 	data, err := os.ReadFile(Path(home))
 	if errors.Is(err, os.ErrNotExist) {
-		data = []byte(defaultFile())
-	} else if err != nil {
+		data, err = []byte(defaultFile()), nil
+	}
+	if err != nil {
 		return Config{}, err
 	}
 	var config Config
