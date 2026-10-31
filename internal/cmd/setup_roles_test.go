@@ -121,7 +121,10 @@ func TestSetupRefreshesOnlyTheAgentFilesAnEditedRoleChanges(t *testing.T) {
 func TestSetupCheckListsAgentFilesAsMissingStaleOrOKWithoutWriting(t *testing.T) {
 	project := rolesProject(t)
 	sys := newSystem(t, project)
-	stdout, _ := run(t, sys, "setup", "--check")
+	stdout, code := run(t, sys, "setup", "--check")
+	if code != 0 {
+		t.Fatalf("check exit code = %d, want 0: --check reports, it never fails on a plan", code)
+	}
 	wantTail := "  missing    .claude/agents/reviewer.md\n" +
 		"  missing    .codex/agents/reviewer.toml\n" +
 		"  missing    .opencode/agents/reviewer.md\n" +
@@ -136,7 +139,7 @@ func TestSetupCheckListsAgentFilesAsMissingStaleOrOKWithoutWriting(t *testing.T)
 	mustWrite(t, prompt, "Review the diff carefully.\n")
 	before := tree(t, project)
 
-	stdout, code := run(t, sys, "setup", "--check")
+	stdout, code = run(t, sys, "setup", "--check")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
