@@ -20,11 +20,10 @@ func syncRoles(run syncRun) ([]Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	agentDirs := globalAgentDirs(run.sys.Home)
 	var results []Result
 	for _, role := range roles {
 		for _, file := range harness.RenderRole(role, DisplayPath(run.sys.Home, filepath.Join(run.agentsDir, "roles"))) {
-			result, err := run.writeGeneratedFile(filepath.Join(agentDirs[file.Harness], file.Name), file.Content, harness.IsGenerated, "hand-written agent file")
+			result, err := run.writeGeneratedFile(filepath.Join(harness.GlobalAgentDir(file.Harness, run.sys.Home), file.Name), file.Content, harness.IsGenerated, "hand-written agent file")
 			if err != nil {
 				return nil, err
 			}
@@ -42,25 +41,16 @@ func syncRoles(run syncRun) ([]Result, error) {
 	return append(results, models...), nil
 }
 
-// globalAgentDirs is where each Harness reads global agent files.
-func globalAgentDirs(home string) map[harness.Harness]string {
-	return map[harness.Harness]string{
-		harness.Claude:   filepath.Join(home, ".claude", "agents"),
-		harness.Codex:    filepath.Join(home, ".codex", "agents"),
-		harness.OpenCode: filepath.Join(home, ".config", "opencode", "agents"),
-	}
-}
-
 // writeMainModels sets the main Model for Claude Code and Codex. OpenCode's is
 // not written: T3 Code picks the Model per thread.
 func (run syncRun) writeMainModels(models catalog.Models) ([]Result, error) {
-	claude, err := run.editFile(filepath.Join(run.sys.Home, ".claude", "settings.json"), "main Model", func(settings []byte) ([]byte, error) {
+	claude, err := run.editFile(harness.ClaudeSettingsPath(run.sys.Home), "main Model", func(settings []byte) ([]byte, error) {
 		return harness.SetClaudeModel(settings, models.Claude)
 	})
 	if err != nil {
 		return nil, err
 	}
-	codex, err := run.editFile(filepath.Join(run.sys.Home, ".codex", "config.toml"), "main Model", func(config []byte) ([]byte, error) {
+	codex, err := run.editFile(harness.CodexConfigPath(run.sys.Home), "main Model", func(config []byte) ([]byte, error) {
 		return harness.SetCodexModel(config, models.Codex), nil
 	})
 	if err != nil {

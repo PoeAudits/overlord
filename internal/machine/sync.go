@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/PoeAudits/overlord/internal/catalog"
+	"github.com/PoeAudits/overlord/internal/harness"
 	"github.com/PoeAudits/overlord/internal/system"
 	"github.com/PoeAudits/overlord/internal/t3"
 )
@@ -101,7 +102,7 @@ func syncSkills(run syncRun) ([]Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	linksDir := filepath.Join(run.sys.Home, ".claude", "skills")
+	linksDir := harness.SkillsDir(run.sys.Home)
 	var results []Result
 	for _, skill := range skills {
 		if protectedSkillEntries[skill.Name] {
@@ -185,7 +186,7 @@ func syncInstructions(run syncRun) ([]Result, error) {
 		return []Result{{Path: source, Action: Conflict, Detail: missingInstructions}}, nil
 	}
 	var results []Result
-	for _, path := range instructionPaths(run.sys.Home) {
+	for _, path := range harness.InstructionPaths(run.sys.Home) {
 		info, err := os.Lstat(path)
 		switch {
 		case errors.Is(err, os.ErrNotExist):
@@ -211,15 +212,6 @@ func syncInstructions(run syncRun) ([]Result, error) {
 }
 
 const missingInstructions = "missing, so no Harness gets global instructions; create it"
-
-// instructionPaths are where each Harness reads global instructions.
-func instructionPaths(home string) []string {
-	return []string{
-		filepath.Join(home, ".claude", "CLAUDE.md"),
-		filepath.Join(home, ".codex", "AGENTS.md"),
-		filepath.Join(home, ".config", "opencode", "AGENTS.md"),
-	}
-}
 
 // replaceIdenticalFile replaces the regular file at path with a link to
 // source when both have the same content. A differing file holds rules the

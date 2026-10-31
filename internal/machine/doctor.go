@@ -129,8 +129,8 @@ func findMovedUpstreams(ctx context.Context, runner system.Runner, agentsDir str
 // findDanglingLinks reports global instruction links and skill links whose
 // target is gone, except paths already found.
 func findDanglingLinks(home string, found []Finding) ([]Finding, error) {
-	paths := instructionPaths(home)
-	linksDir := filepath.Join(home, ".claude", "skills")
+	paths := harness.InstructionPaths(home)
+	linksDir := harness.SkillsDir(home)
 	entries, err := os.ReadDir(linksDir)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -157,7 +157,7 @@ func findDanglingLinks(home string, found []Finding) ([]Finding, error) {
 // directory became a git checkout that every Harness reads through links.
 func findStaleSkillCopies(home, agentsDir string) []Finding {
 	var findings []Finding
-	opencode := filepath.Join(home, ".config", "opencode", "skills")
+	opencode := harness.OpenCodeSkillsDir(home)
 	if _, err := os.Lstat(opencode); err == nil {
 		findings = append(findings, Finding{Path: opencode, Problem: "stale skill copy; OpenCode reads ~/.claude/skills, so remove it"})
 	}
@@ -174,7 +174,7 @@ func findStaleSkillCopies(home, agentsDir string) []Finding {
 func findHandWrittenAgents(home string) ([]Finding, error) {
 	var findings []Finding
 	for _, h := range []harness.Harness{harness.Claude, harness.Codex, harness.OpenCode} {
-		dir := globalAgentDirs(home)[h]
+		dir := harness.GlobalAgentDir(h, home)
 		entries, err := os.ReadDir(dir)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
