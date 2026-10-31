@@ -12,9 +12,6 @@ import (
 	"github.com/PoeAudits/overlord/internal/harness"
 )
 
-// rolesSource is where generated agent files tell the user to edit a Role.
-const rolesSource = "~/.agents/roles"
-
 func syncRoles(run syncRun) ([]Result, error) {
 	if _, err := os.Stat(filepath.Join(run.agentsDir, "roles.yaml")); errors.Is(err, os.ErrNotExist) {
 		return nil, nil
@@ -26,7 +23,7 @@ func syncRoles(run syncRun) ([]Result, error) {
 	agentDirs := globalAgentDirs(run.sys.Home)
 	var results []Result
 	for _, role := range roles {
-		for _, file := range harness.RenderRole(role, rolesSource) {
+		for _, file := range harness.RenderRole(role, DisplayPath(run.sys.Home, filepath.Join(run.agentsDir, "roles"))) {
 			result, err := run.writeGeneratedFile(filepath.Join(agentDirs[file.Harness], file.Name), file.Content, harness.IsGenerated, "hand-written agent file")
 			if err != nil {
 				return nil, err
