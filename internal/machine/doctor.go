@@ -40,7 +40,7 @@ func Doctor(ctx context.Context, sys system.System, agentsDir string) (Diagnosis
 	for _, result := range report.Results {
 		// Hand-written agent files are found by findHandWrittenAgents, along
 		// with those no Role names.
-		if result.Action == OK || result.Step == "roles" && result.Action == Conflict {
+		if result.Action == OK || result.Step == RolesStep && result.Action == Conflict {
 			continue
 		}
 		diagnosis.Findings = append(diagnosis.Findings, Finding{Path: result.Path, Problem: syncProblem(result)})
@@ -204,7 +204,7 @@ func syncProblem(result Result) string {
 	if result.Detail == missingInstructions {
 		return result.Detail
 	}
-	if result.Step == "instructions" {
+	if result.Step == InstructionsStep {
 		return instructionsProblem[result.Action]
 	}
 	thing := result.Detail
@@ -218,7 +218,7 @@ func syncProblem(result Result) string {
 		return "dangling " + thing
 	case Update:
 		// Hooks are only ever added; the main Model can differ.
-		if result.Step == "hooks" {
+		if result.Step == HooksStep {
 			return thing + " missing"
 		}
 		return thing + " differs from the catalog"
@@ -229,10 +229,10 @@ func syncProblem(result Result) string {
 }
 
 // syncedThing names what a step puts at a path when its result has no detail.
-var syncedThing = map[string]string{
-	"skills": "skill link",
-	"roles":  "agent file",
-	"hooks":  "session sync plugin",
+var syncedThing = map[Step]string{
+	SkillsStep: "skill link",
+	RolesStep:  "agent file",
+	HooksStep:  "session sync plugin",
 }
 
 var instructionsProblem = map[Action]string{

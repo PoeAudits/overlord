@@ -33,9 +33,20 @@ const (
 	Shadowed Action = "shadowed"
 )
 
+// Step names one ordered part of Sync.
+type Step string
+
+const (
+	SkillsStep       Step = "skills"
+	InstructionsStep Step = "instructions"
+	RolesStep        Step = "roles"
+	HooksStep        Step = "hooks"
+	T3Step           Step = "t3"
+)
+
 // Result is the outcome of one Sync step for one path.
 type Result struct {
-	Step   string
+	Step   Step
 	Path   string
 	Action Action
 	Detail string
@@ -64,19 +75,18 @@ type syncRun struct {
 	check bool
 }
 
-// step is one ordered part of Sync. Later steps (Roles, Models, hooks, T3)
-// are added by appending to steps.
+// step is one ordered part of Sync; steps run in the order listed.
 type step struct {
-	name string
+	name Step
 	run  func(syncRun) ([]Result, error)
 }
 
 var steps = []step{
-	{name: "skills", run: syncSkills},
-	{name: "instructions", run: syncInstructions},
-	{name: "roles", run: syncRoles},
-	{name: "hooks", run: syncHooks},
-	{name: "t3", run: syncT3},
+	{name: SkillsStep, run: syncSkills},
+	{name: InstructionsStep, run: syncInstructions},
+	{name: RolesStep, run: syncRoles},
+	{name: HooksStep, run: syncHooks},
+	{name: T3Step, run: syncT3},
 }
 
 // Sync applies agentsDir to every Harness under sys.Home. With check it only
