@@ -62,6 +62,7 @@ func TestNewProjectCreatesClonesSetsUpCommitsPushesAndRegistersInOrder(t *testin
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
 	}
+	assertFile(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), defaultConfig)
 	root := filepath.Join(sys.Home, "projects")
 	path := filepath.Join(root, "sample")
 	want := []string{

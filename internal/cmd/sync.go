@@ -38,6 +38,12 @@ override replaces the global list entirely, so Setup does not run for that
 Project unless the override includes the overlord-setup entry.`,
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
+			// A check never writes, so it reads the defaults without saving them.
+			if !check {
+				if err := config.WriteDefault(sys.Home); err != nil {
+					return err
+				}
+			}
 			cfg, err := config.Load(sys.Home)
 			if err != nil {
 				return err

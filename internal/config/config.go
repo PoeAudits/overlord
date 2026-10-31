@@ -3,6 +3,7 @@
 package config
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"os"
@@ -57,43 +58,41 @@ func Path(home string) string {
 func Load(home string) (Config, error) {
 	data, err := os.ReadFile(Path(home))
 	if errors.Is(err, os.ErrNotExist) {
-		data, err = []byte(defaultFile()), nil
+		data, err = []byte(defaultFile), nil
 	}
 	if err != nil {
 		return Config{}, err
 	}
-	var config Config
+	// defaultFile is the one source of default values.
+	var defaults, config Config
+	if err := yaml.Unmarshal([]byte(defaultFile), &defaults); err != nil {
+		return Config{}, fmt.Errorf("default config: %w", err)
+	}
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return Config{}, fmt.Errorf("%s: %w", Path(home), err)
 	}
-	return config.resolve(home)
+	return config.resolve(home, defaults)
 }
 
-// WriteDefault writes the default config when there is no config file and
-// reports whether it did. An existing file is never rewritten.
-func WriteDefault(home string) (bool, error) {
+// WriteDefault writes the default config when there is no config file. An
+// existing file is never rewritten.
+func WriteDefault(home string) error {
 	path := Path(home)
 	if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
-		return false, err
+		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return false, err
+		return err
 	}
-	return true, os.WriteFile(path, []byte(defaultFile()), 0o644)
+	return os.WriteFile(path, []byte(defaultFile), 0o644)
 }
 
-func (c Config) resolve(home string) (Config, error) {
-	if c.AgentsDir == "" {
-		c.AgentsDir = "~/.agents"
-	}
-	if c.ProjectsRoot == "" {
-		c.ProjectsRoot = "~/projects"
-	}
-	if c.GitHubOwner == "" {
-		c.GitHubOwner = "PoeAudits"
-	}
-	c.AgentsDir = expandHome(home, c.AgentsDir)
-	c.ProjectsRoot = expandHome(home, c.ProjectsRoot)
+// resolve fills keys the file left out from defaults and makes paths
+// absolute. Services are not defaulted: a file without them starts none.
+func (c Config) resolve(home string, defaults Config) (Config, error) {
+	c.AgentsDir = expandHome(home, cmp.Or(c.AgentsDir, defaults.AgentsDir))
+	c.ProjectsRoot = expandHome(home, cmp.Or(c.ProjectsRoot, defaults.ProjectsRoot))
+	c.GitHubOwner = cmp.Or(c.GitHubOwner, defaults.GitHubOwner)
 	for i, service := range c.Services {
 		if service.Name == "" || service.Command == "" || service.Health == "" {
 			return Config{}, fmt.Errorf("%s: service %d needs a name, a command and a health URL", Path(home), i+1)
@@ -124,8 +123,7 @@ func expandHome(home, path string) string {
 const t3OriginPlaceholder = "{t3Origin}"
 
 // defaultFile is the config written on first run.
-func defaultFile() string {
-	return `# Overlord's config. Written once with defaults; Overlord never rewrites it.
+const defaultFile = `# Overlord's config. Written once with defaults; Overlord never rewrites it.
 #
 # agentsDir: the source of skills, Roles and global instructions for Sync.
 # projectsRoot: where new-project clones new Projects.
@@ -158,4 +156,3 @@ services:
     health: http://127.0.0.1:4096/api/info
     timeout: 30s
 `
-}

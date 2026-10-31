@@ -36,6 +36,9 @@ githubOwner and projectsRoot come from ~/.config/overlord/config.yaml
 			if name != filepath.Base(name) || name == "." || name == ".." {
 				return fmt.Errorf("project name %q must be a single directory name", name)
 			}
+			if err := config.WriteDefault(sys.Home); err != nil {
+				return err
+			}
 			cfg, err := config.Load(sys.Home)
 			if err != nil {
 				return err

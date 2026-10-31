@@ -22,6 +22,7 @@ func TestSyncOnFreshHomeLinksEverySkillAndInstructionFile(t *testing.T) {
 	for _, path := range instructionPaths(sys.Home) {
 		assertLink(t, path, filepath.Join(agents, "AGENTS.md"))
 	}
+	assertFile(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), defaultConfig)
 	want := "Sync\n" +
 		"  created   ~/.claude/skills/grill\n" +
 		"  created   ~/.claude/skills/tdd\n" +
@@ -333,5 +334,27 @@ func TestSyncWithoutCatalogInstructionsReportsAConflictAndLinksNothing(t *testin
 	assertContains(t, stdout, "  conflict  ~/.agents/AGENTS.md: missing, so no Harness gets global instructions; create it\n")
 	if _, code := run(t, sys, "sync", "--check"); code != 1 {
 		t.Fatalf("sync --check exit code = %d, want 1", code)
+	}
+}
+
+func TestSyncAndStartRejectAMalformedConfigNamingTheFile(t *testing.T) {
+	for _, command := range []string{"sync", "start"} {
+		t.Run(command, func(t *testing.T) {
+			sys, _ := startSystem(t, allHealthy)
+			configPath := filepath.Join(sys.Home, ".config", "overlord", "config.yaml")
+			mustWrite(t, configPath, "services: [\n")
+
+			stdout, stderr, code := runCapturing(sys, command)
+
+			if code != 1 {
+				t.Fatalf("exit code = %d, want 1\n%s", code, stdout)
+			}
+			if !strings.HasPrefix(stderr, "overlord: "+configPath+": yaml: ") {
+				t.Fatalf("stderr does not name the config file and the YAML error:\n%s", stderr)
+			}
+			if _, err := os.Lstat(filepath.Join(sys.Home, ".claude")); err == nil {
+				t.Fatalf("%s changed the home despite the bad config", command)
+			}
+		})
 	}
 }
