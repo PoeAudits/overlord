@@ -3,6 +3,7 @@ package harness_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/PoeAudits/overlord/internal/catalog"
@@ -18,8 +19,12 @@ func TestRenderRoleMatchesTheGoldenFileForEveryHarness(t *testing.T) {
 	for _, name := range []string{"explorer", "restricted"} {
 		files := harness.RenderRole(roles[name], source)
 
-		if len(files) != 3 {
-			t.Fatalf("%s rendered %d files, want one per Harness", name, len(files))
+		var harnesses []harness.Harness
+		for _, file := range files {
+			harnesses = append(harnesses, file.Harness)
+		}
+		if want := []harness.Harness{harness.Claude, harness.Codex, harness.OpenCode}; !slices.Equal(harnesses, want) {
+			t.Fatalf("%s rendered files for %v, want one each for %v", name, harnesses, want)
 		}
 		for _, file := range files {
 			if file.Name != name+extension[file.Harness] {

@@ -240,9 +240,10 @@ func TestDoctorNamesT3ProjectsWhoseScriptsOverrideOmitsTheSetupScript(t *testing
 	assertUnchanged(t, before, homeFiles(t, sys.Home))
 }
 
-func TestDoctorNamesAnUnknownT3ProjectByItsID(t *testing.T) {
+func TestDoctorNamesT3ProjectsByIDWhenT3sDatabaseCannotBeRead(t *testing.T) {
 	sys := syncedHome(t)
 	addProjectOverrides(t, sys.Home)
+	// The fake runner fails the sqlite3 query, as when sqlite3 is missing.
 
 	stdout, code := run(t, sys.System, "doctor")
 
@@ -250,6 +251,23 @@ func TestDoctorNamesAnUnknownT3ProjectByItsID(t *testing.T) {
 		"  ~/.t3/userdata/settings.json: T3 project p-dropped has a scripts override without overlord-setup, so Setup does not run there\n"
 	if code != 1 || stdout != want {
 		t.Fatalf("exit code = %d, stdout:\n%s\nwant:\n%s", code, stdout, want)
+	}
+}
+
+func TestDoctorNamesAT3ProjectByIDWhenT3sDatabaseDoesNotListIt(t *testing.T) {
+	sys := syncedHome(t)
+	addProjectOverrides(t, sys.Home)
+	sys.runner.outputs[t3ProjectsQuery(sys.Home)] = `[{"project_id":"p-kept","title":"overlord","workspace_root":"/src/overlord"}]` + "\n"
+
+	stdout, code := run(t, sys.System, "doctor")
+
+	want := "Doctor found drift\n" +
+		"  ~/.t3/userdata/settings.json: T3 project p-dropped has a scripts override without overlord-setup, so Setup does not run there\n"
+	if code != 1 || stdout != want {
+		t.Fatalf("exit code = %d, stdout:\n%s\nwant:\n%s", code, stdout, want)
+	}
+	if !slices.Contains(sys.runner.calls, ": "+t3ProjectsQuery(sys.Home)) {
+		t.Fatalf("doctor did not query T3's projects: %v", sys.runner.calls)
 	}
 }
 

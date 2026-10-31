@@ -269,19 +269,31 @@ func TestSetupWithoutAGitHubRemoteNamesTheProjectAfterItsDirectory(t *testing.T)
 	}
 }
 
-func TestSetupExitsNonZeroWhenAFileCannotBeWritten(t *testing.T) {
+func TestSetupExitsNonZeroNamingTheFileItCannotWriteAfterSettingUpTheItemsBefore(t *testing.T) {
 	project := t.TempDir()
-	if err := os.Chmod(project, 0o555); err != nil {
+	agents := filepath.Join(project, ".agents")
+	mustMkdir(t, agents)
+	if err := os.Chmod(agents, 0o555); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chmod(project, 0o755) })
+	t.Cleanup(func() { os.Chmod(agents, 0o755) })
 	sys := newSystem(t, project)
 	sys.Runner = &fakeRunner{}
 
-	_, code := run(t, sys, "setup")
+	_, stderr, code := runCapturing(sys, "setup")
 
-	if code == 0 {
-		t.Fatal("exit code = 0, want non-zero")
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
+	}
+	want := "overlord: set up .agents/skills: mkdir " + filepath.Join(agents, "skills") + ": permission denied\n"
+	if stderr != want {
+		t.Fatalf("stderr = %q, want %q", stderr, want)
+	}
+	files := tree(t, project)
+	for _, path := range []string{"AGENTS.md", "GLOSSARY.md", "docs/agents/domain.md"} {
+		if _, ok := files[path]; !ok {
+			t.Errorf("%s was not written before the failing item", path)
+		}
 	}
 }
 
