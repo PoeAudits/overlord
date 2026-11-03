@@ -31,8 +31,8 @@ func TestStartFirstRunWritesTheDefaultConfigAndNeverRewritesIt(t *testing.T) {
 const defaultConfig = `# Overlord's config. Written once with defaults; Overlord never rewrites it.
 #
 # agentsDir: the source of skills, Roles and global instructions for Sync.
-# projectsRoot: where new-project clones new Projects.
-# githubOwner: the GitHub account or organisation new-project creates
+# projectsRoot: where overlord new clones new Projects.
+# githubOwner: the GitHub account or organisation overlord new creates
 # repositories under.
 # services: what start brings up, in order. A service is healthy when its
 # health URL answers with any HTTP status below 500. When it is not, start

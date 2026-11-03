@@ -8,6 +8,7 @@ import (
 
 	"github.com/PoeAudits/overlord/internal/config"
 	"github.com/PoeAudits/overlord/internal/machine"
+	"github.com/PoeAudits/overlord/internal/revert"
 	"github.com/PoeAudits/overlord/internal/system"
 )
 
@@ -29,6 +30,9 @@ non-zero. A Sync failure is reported first and does not stop the services
 from starting; start then exits non-zero too.`,
 		Args: cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
+			if _, err := revert.Save(sys); err != nil {
+				return err
+			}
 			if err := config.WriteDefault(sys.Home); err != nil {
 				return err
 			}

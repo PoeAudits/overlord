@@ -120,6 +120,15 @@ main:
 			want: `role main: codexReasoningEffort "extreme" is not low, medium or high`,
 		},
 		{
+			name: "negative max turns",
+			rolesYAML: `
+main:
+  models: {claude: opus, codex: gpt-6, opencode: openai/gpt-6}
+  maxTurns: -1
+`,
+			want: `role main: maxTurns -1 is negative`,
+		},
+		{
 			name: "misspelled field",
 			rolesYAML: `
 main:

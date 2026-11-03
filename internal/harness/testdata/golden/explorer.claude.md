@@ -4,6 +4,7 @@ name: explorer
 description: 'Read-only research: return evidence without editing files.'
 model: haiku
 tools: Read, Grep, Glob, Bash, WebFetch, WebSearch
+maxTurns: 40
 ---
 
 Explore and research without changing files.

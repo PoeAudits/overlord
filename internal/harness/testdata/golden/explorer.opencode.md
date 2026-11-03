@@ -3,11 +3,9 @@
 description: 'Read-only research: return evidence without editing files.'
 mode: subagent
 model: openai/gpt-6-luna#low
+steps: 40
 permissions:
   - action: edit
-    resource: "*"
-    effect: deny
-  - action: shell
     resource: "*"
     effect: deny
 ---

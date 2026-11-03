@@ -35,10 +35,10 @@ things or changing decided behaviour.
   `Load(home)` returns it with paths absolute (defaults when the file is
   absent, never writes); `WriteDefault(home)` writes the defaults once.
 - `internal/cmd`: thin Cobra wiring. Commands: `setup`, `sync`, `start`,
-  `doctor`, `new-project`.
+  `doctor`, `new`.
 - `internal/templates`: embedded Templates and the Setup manifest
   (`Manifest()` returns the guaranteed items and their strategy).
-- `internal/project`: Setup for one Project, and `Create` for `new-project`.
+- `internal/project`: Setup for one Project, and `Create` for `new`.
   `Check(ctx, runner, root, projectRoot)` returns a `Plan` with a `missing`,
   `stale`, `ok`, `conflict` or `warning` status per manifest item; languages
   are detected in `projectRoot`, files are written under `root`.
@@ -54,6 +54,9 @@ things or changing decided behaviour.
 - `internal/jsonedit`: in-place JSON edits that keep every other byte, shared
   by `internal/harness` and `internal/t3`.
 - `internal/machine`: Sync and Start.
+- `internal/revert` (temporary, with the `revert` and `snapshot` commands): saves
+  every path Sync or Start can change before the first change, and restores
+  them. Its package comment lists how to remove it once v2 has proven itself.
 - `internal/t3`: edits T3 Code's settings.
 - `skills/`: the `new-project` and `project-setup` skills, laid out like
   `~/.agents/skills`; the test checks their frontmatter and that every

@@ -1,11 +1,11 @@
 ---
 name: new-project
-description: Create a brand-new Project with `overlord new-project`, a GitHub repo that arrives cloned, set up, committed and registered in T3 Code. Use when the user asks to create, start or make a new project or repository.
+description: Create a brand-new Project with `overlord new`, a GitHub repo that arrives cloned, set up, committed and registered in T3 Code. Use when the user asks to create, start or make a new project or repository.
 ---
 
 # New project
 
-`overlord new-project <name>` turns one sentence ("create a new project called X") into a working Project. Run it from any directory.
+`overlord new <name>` turns one sentence ("create a new project called X") into a working Project. Run it from any directory.
 
 ## Steps
 
@@ -13,7 +13,7 @@ description: Create a brand-new Project with `overlord new-project`, a GitHub re
 2. **Run it.**
 
    ```sh
-   overlord new-project <name> [--description "<text>"] [--public]
+   overlord new <name> [--description "<text>"] [--public]
    ```
 
    `<projectsRoot>` is `projectsRoot` and `<owner>` is `githubOwner` in `~/.config/overlord/config.yaml` (defaults `~/Overlord/projects` and `PoeAudits`). It runs these steps in order and stops at the first failure:
@@ -30,7 +30,7 @@ description: Create a brand-new Project with `overlord new-project`, a GitHub re
 
 ## When it fails
 
-A failure prints one line to stderr, `overlord: <command> failed: <first line of its output> (<exit status>)`, `overlord: setup in <path> could not set up every item; see the failed lines above` (the plan above it has a `failed` line, with its error, for each item), or `overlord: <path> already exists; choose another name or remove it`. Report it, then go by the failed command, because the earlier steps have already happened and rerunning `new-project` would stop at the existing repo or directory:
+A failure prints one line to stderr, `overlord: <command> failed: <first line of its output> (<exit status>)`, `overlord: setup in <path> could not set up every item; see the failed lines above` (the plan above it has a `failed` line, with its error, for each item), or `overlord: <path> already exists; choose another name or remove it`. Report it, then go by the failed command, because the earlier steps have already happened and rerunning `overlord new` would stop at the existing repo or directory:
 
 - **Refused, or `gh repo create` failed**: nothing was created. Fix the cause (another name, `gh auth login`) and rerun.
 - **A later step failed**: the GitHub repo exists. Fix the cause and finish the remaining steps above by hand, in order, in `<projectsRoot>/<name>` (run `overlord setup` there for step 4).

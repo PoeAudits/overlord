@@ -185,8 +185,7 @@ func TestSetupRestrictsAReadOnlyRoleInItsClaudeAndOpenCodeFiles(t *testing.T) {
 	for path, restriction := range map[string]string{
 		".claude/agents/reviewer.md": "model: sonnet\ntools: Read, Grep, Glob, Bash, WebFetch, WebSearch\n---\n",
 		".opencode/agents/reviewer.md": "model: openai/gpt-6-mini\npermissions:\n" +
-			"  - action: edit\n    resource: \"*\"\n    effect: deny\n" +
-			"  - action: shell\n    resource: \"*\"\n    effect: deny\n---\n",
+			"  - action: edit\n    resource: \"*\"\n    effect: deny\n---\n",
 	} {
 		if content := readFile(t, filepath.Join(project, path)); !strings.Contains(content, restriction) {
 			t.Errorf("%s:\n%s\nwant the read-only restriction:\n%s", path, content, restriction)

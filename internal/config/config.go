@@ -20,9 +20,9 @@ import (
 type Config struct {
 	// AgentsDir is the catalog Sync applies (skills, Roles, instructions).
 	AgentsDir string `yaml:"agentsDir"`
-	// ProjectsRoot is where new-project clones new Projects.
+	// ProjectsRoot is where `overlord new` clones new Projects.
 	ProjectsRoot string `yaml:"projectsRoot"`
-	// GitHubOwner is the GitHub account or organisation new-project creates
+	// GitHubOwner is the GitHub account or organisation `overlord new` creates
 	// repositories under.
 	GitHubOwner string    `yaml:"githubOwner"`
 	Services    []Service `yaml:"services"`
@@ -126,8 +126,8 @@ const t3OriginPlaceholder = "{t3Origin}"
 const defaultFile = `# Overlord's config. Written once with defaults; Overlord never rewrites it.
 #
 # agentsDir: the source of skills, Roles and global instructions for Sync.
-# projectsRoot: where new-project clones new Projects.
-# githubOwner: the GitHub account or organisation new-project creates
+# projectsRoot: where overlord new clones new Projects.
+# githubOwner: the GitHub account or organisation overlord new creates
 # repositories under.
 # services: what start brings up, in order. A service is healthy when its
 # health URL answers with any HTTP status below 500. When it is not, start
