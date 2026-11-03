@@ -23,11 +23,15 @@ func Execute(sys system.System, args []string) int {
 	root.SetArgs(args)
 	root.SetOut(sys.Stdout)
 	root.SetErr(sys.Stderr)
-	root.AddCommand(newSetupCommand(sys))
-	root.AddCommand(newSyncCommand(sys))
-	root.AddCommand(newDoctorCommand(sys))
+	// Help lists commands in this order, most used first.
+	cobra.EnableCommandSorting = false
 	root.AddCommand(newStartCommand(sys))
+	root.AddCommand(newSyncCommand(sys))
 	root.AddCommand(newNewProjectCommand(sys))
+	root.AddCommand(newSetupCommand(sys))
+	root.AddCommand(newDoctorCommand(sys))
+	root.AddCommand(newRevertCommand(sys))
+	root.AddCommand(newSnapshotCommand(sys))
 	err := root.ExecuteContext(context.Background())
 	if err == nil {
 		return 0

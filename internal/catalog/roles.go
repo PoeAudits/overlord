@@ -26,6 +26,9 @@ type Role struct {
 	Models          Models
 	// CodexReasoningEffort is low, medium, high or empty when unset.
 	CodexReasoningEffort string
+	// MaxTurns caps the agent's turns in Claude Code (maxTurns) and OpenCode
+	// (steps); 0 means no cap. Codex has no such setting.
+	MaxTurns int
 	// Prompt is the content of the Role's prompt file; empty for main.
 	Prompt string
 }
@@ -68,6 +71,7 @@ type roleEntry struct {
 	ReadOnly             bool              `yaml:"readOnly"`
 	Models               map[string]string `yaml:"models"`
 	CodexReasoningEffort string            `yaml:"codexReasoningEffort"`
+	MaxTurns             int               `yaml:"maxTurns"`
 	Prompt               string            `yaml:"prompt"`
 }
 
@@ -78,6 +82,9 @@ func readRole(dir, name string, entry roleEntry) (Role, error) {
 	models, err := readModels(entry.Models)
 	if err != nil {
 		return Role{}, err
+	}
+	if entry.MaxTurns < 0 {
+		return Role{}, fmt.Errorf("maxTurns %d is negative", entry.MaxTurns)
 	}
 	switch entry.CodexReasoningEffort {
 	case "", "low", "medium", "high":
@@ -91,6 +98,7 @@ func readRole(dir, name string, entry roleEntry) (Role, error) {
 		ReadOnly:             entry.ReadOnly,
 		Models:               models,
 		CodexReasoningEffort: entry.CodexReasoningEffort,
+		MaxTurns:             entry.MaxTurns,
 	}
 	if name == MainRole {
 		return role, nil

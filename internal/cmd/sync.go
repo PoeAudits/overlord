@@ -8,6 +8,7 @@ import (
 
 	"github.com/PoeAudits/overlord/internal/config"
 	"github.com/PoeAudits/overlord/internal/machine"
+	"github.com/PoeAudits/overlord/internal/revert"
 	"github.com/PoeAudits/overlord/internal/system"
 )
 
@@ -40,6 +41,9 @@ Project unless the override includes the overlord-setup entry.`,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// A check never writes, so it reads the defaults without saving them.
 			if !check {
+				if _, err := revert.Save(sys); err != nil {
+					return err
+				}
 				if err := config.WriteDefault(sys.Home); err != nil {
 					return err
 				}

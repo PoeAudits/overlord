@@ -50,13 +50,18 @@ func RenderRole(role catalog.Role, source string) []AgentFile {
 	if role.ReadOnly {
 		claude = append(claude, "tools: Read, Grep, Glob, Bash, WebFetch, WebSearch")
 	}
+	if role.MaxTurns > 0 {
+		claude = append(claude, fmt.Sprintf("maxTurns: %d", role.MaxTurns))
+	}
 	opencode := []string{"description: " + yamlScalar(description), "mode: subagent", "model: " + yamlScalar(role.Models.OpenCode)}
+	if role.MaxTurns > 0 {
+		opencode = append(opencode, fmt.Sprintf("steps: %d", role.MaxTurns))
+	}
 	if role.ReadOnly {
-		// OpenCode v2 ignores the v1 `tools:` map; permission rules are what
-		// block file edits and shell commands.
+		// OpenCode v2 ignores the v1 `tools:` map; a permission rule is what
+		// blocks file edits. Shell stays allowed, as for Claude's tool list.
 		opencode = append(opencode, "permissions:",
-			"  - action: edit", `    resource: "*"`, "    effect: deny",
-			"  - action: shell", `    resource: "*"`, "    effect: deny")
+			"  - action: edit", `    resource: "*"`, "    effect: deny")
 	}
 	codex := []string{
 		"# " + header,

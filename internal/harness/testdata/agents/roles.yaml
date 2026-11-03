@@ -6,6 +6,7 @@ explorer:
   readOnly: true
   models: {claude: haiku, codex: gpt-6-luna, opencode: "openai/gpt-6-luna#low"}
   codexReasoningEffort: low
+  maxTurns: 40
   prompt: roles/explorer.md
 restricted:
   description: Highest-intelligence agent for exceptional tasks.

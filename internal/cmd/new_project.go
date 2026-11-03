@@ -15,7 +15,7 @@ func newNewProjectCommand(sys system.System) *cobra.Command {
 	var description string
 	var public bool
 	command := &cobra.Command{
-		Use:   "new-project <name>",
+		Use:   "new <name>",
 		Short: "Create a GitHub Project, clone it, set it up and register it with T3 Code",
 		Long: `Create the GitHub repository <githubOwner>/<name> (private unless --public),
 clone it into <projectsRoot>/<name>, run Setup in the clone, commit

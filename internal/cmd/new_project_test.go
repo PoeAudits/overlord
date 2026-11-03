@@ -63,7 +63,7 @@ func TestNewProjectCreatesClonesSetsUpCommitsPushesAndRegistersInOrder(t *testin
 	runner := newProjectRunner(t, sys.Home, "sample")
 	sys.Runner = runner
 
-	stdout, code := run(t, sys, "new-project", "sample")
+	stdout, code := run(t, sys, "new", "sample")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
@@ -96,7 +96,7 @@ func TestNewProjectRefusesAnExistingDirectoryBeforeAnyRemoteCall(t *testing.T) {
 	mustMkdir(t, runner.clonePath)
 	var stderr strings.Builder
 
-	code := cmdExecute(sys, &stderr, "new-project", "sample")
+	code := cmdExecute(sys, &stderr, "new", "sample")
 
 	if code == 0 {
 		t.Fatal("exit code = 0, want non-zero")
@@ -116,7 +116,7 @@ func TestNewProjectStopsAtTheFirstFailingRemoteStep(t *testing.T) {
 	sys.Runner = runner
 	var stderr strings.Builder
 
-	code := cmdExecute(sys, &stderr, "new-project", "sample")
+	code := cmdExecute(sys, &stderr, "new", "sample")
 
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
@@ -143,7 +143,7 @@ func TestNewProjectStopsBeforeCommittingWhenSetupFailsAnItem(t *testing.T) {
 	}
 	sys.Runner = runner
 
-	stdout, stderr, code := runCapturing(sys, "new-project", "sample")
+	stdout, stderr, code := runCapturing(sys, "new", "sample")
 
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
@@ -164,7 +164,7 @@ func TestNewProjectPublicWithDescriptionPassesBothToGitHub(t *testing.T) {
 	runner := newProjectRunner(t, sys.Home, "sample")
 	sys.Runner = runner
 
-	_, code := run(t, sys, "new-project", "sample", "--public", "--description", "A small tool")
+	_, code := run(t, sys, "new", "sample", "--public", "--description", "A small tool")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
@@ -193,7 +193,7 @@ func TestNewProjectClonesUnderTheProjectsRootFromOverlordsConfig(t *testing.T) {
 	runner.outputs[filepath.Join(sys.Home, ".t3", "bin", "t3")+" project add --title sample "+path] = ""
 	sys.Runner = runner
 
-	if stdout, code := run(t, sys, "new-project", "sample"); code != 0 {
+	if stdout, code := run(t, sys, "new", "sample"); code != 0 {
 		t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
 	}
 
@@ -211,7 +211,7 @@ func TestNewProjectCreatesTheRepoUnderTheGitHubOwnerFromOverlordsConfig(t *testi
 	runner.outputs["gh repo clone acme/sample "+path] = ""
 	sys.Runner = runner
 
-	stdout, code := run(t, sys, "new-project", "sample")
+	stdout, code := run(t, sys, "new", "sample")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
