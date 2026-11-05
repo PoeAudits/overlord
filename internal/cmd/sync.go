@@ -18,7 +18,7 @@ func newSyncCommand(sys system.System) *cobra.Command {
 		Use:   "sync",
 		Short: "Apply skills and global instructions from the agents directory to every Harness",
 		Long: `Apply skills and global instructions from the agents directory to every
-Harness, and register "overlord setup" with T3 Code.
+Harness.
 
 "sync --check" changes nothing and exits 1 when Sync would create, remove,
 replace or update anything, or finds a conflict. A shadowed skill (a skill
@@ -28,15 +28,10 @@ fail the check.
 When the agents directory has no AGENTS.md, Sync links no global instruction
 file and reports the missing file as a conflict, so "sync --check" fails.
 
-The T3 step ensures ~/.t3/userdata/settings.json has a defaultProjectScripts
-entry with id overlord-setup that runs "overlord setup" on every new
-worktree. Every other setting is kept as it is.
-
-T3 runs only the first script marked to run on worktree creation, so chain
-Project-specific post-clone commands behind "overlord setup" instead of adding
-a second script. If a Project has its own scripts override in T3, that
-override replaces the global list entirely, so Setup does not run for that
-Project unless the override includes the overlord-setup entry.`,
+Earlier versions registered "overlord setup" as a T3 Code script that ran on
+every new worktree. Setup now runs only when you invoke it, so Sync removes
+any defaultProjectScripts entry with id overlord-setup from
+~/.t3/userdata/settings.json and keeps every other setting as it is.`,
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// A check never writes, so it reads the defaults without saving them.
