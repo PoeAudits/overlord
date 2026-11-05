@@ -39,14 +39,20 @@ things or changing decided behaviour.
 - `internal/templates`: embedded Templates and the Setup manifest
   (`Manifest()` returns the guaranteed items and their strategy).
 - `internal/project`: Setup for one Project, and `Create` for `new`.
-  `Check(ctx, runner, root, projectRoot)` returns a `Plan` with a `missing`,
-  `stale`, `ok`, `conflict` or `warning` status per manifest item; languages
-  are detected in `projectRoot`, files are written under `root`.
+  `Check(ctx, runner, root, projectRoot, owner)` returns a `Plan` with a
+  `missing`, `stale`, `ok`, `conflict` or `warning` status per manifest item;
+  languages are detected in `projectRoot`, files are written under `root`, and
+  a Project without an origin is checked against `owner/<projectRoot's
+  directory name>` (ADR 0006). The `repo` item is the only one that runs
+  `git init`, `gh repo create` or `git push`; a repo `conflict` (Secret in
+  history, name taken on GitHub, inside another repository) becomes `failed`
+  in `Apply`. A `.gitignore` block row warns, listing the tracked files its
+  patterns ignore.
   `Apply` tries every item and marks each one it cannot write `failed`, with
   the error as its detail; `setup` prints the whole plan, then exits 1 when
   `Plan.HasFailures`, and `Create` stops before committing. `Create` also
-  stops on a `warning` (only the triage labels warn), since it has just
-  created the origin; it passes `Apply` a sleep so a failing label lookup is
+  stops on a `warning` (in a fresh clone only the triage labels can warn),
+  since it has just created the origin; it passes `Apply` a sleep so a failing label lookup is
   retried while GitHub finishes creating the repository, where `setup` passes
   nil and warns at once. Before Setup, `Create` writes the `--lang` marker
   file so the language is detected by `DetectLanguages`, the only detector.

@@ -10,11 +10,22 @@
 #            is absent, inserts the block after the file's earlier blocks (or
 #            at the top) when it is missing, and replaces it when it differs
 #            from the rendered Template. `createWith` names a Template written
-#            after the block only when the file is created.
+#            after the block only when the file is created. Markers are HTML
+#            comments in Markdown files and # comments in every other file.
+#            For a block in .gitignore, Setup also lists the tracked files the
+#            block's patterns ignore, as a warning, and leaves them tracked.
 #   generated  when the Project has the roles file at `path`, one agent file
 #            per Role and Harness under .claude/agents, .codex/agents and
 #            .opencode/agents, replaced only when its content differs. A file
 #            there without Overlord's generated header is left untouched.
+#   repo     the Project has an origin remote. Without one, Setup runs git
+#            init if needed, creates the private GitHub repository
+#            <githubOwner>/<directory name> (or uses it when it already exists
+#            and is empty) and pushes every branch and tag there. It refuses,
+#            failing the item, when the name exists and is not empty, or when
+#            any branch's or tag's history tracks a file matching the Secrets
+#            in templates.go. An existing origin is never touched. `path` is
+#            only the name Setup prints.
 #   labels   the GitHub labels in `labels` exist on the repo named by the
 #            origin remote; Setup creates only the missing ones through `gh`
 #            and never edits existing ones. `path` is only the name Setup
@@ -55,6 +66,25 @@
   block: lang-rust
   language: Rust
   template: standards-rust.md.tmpl
+- path: .gitignore
+  strategy: block
+  block: general
+  template: gitignore-general.tmpl
+- path: .gitignore
+  strategy: block
+  block: lang-typescript
+  language: TypeScript
+  template: gitignore-typescript.tmpl
+- path: .gitignore
+  strategy: block
+  block: lang-python
+  language: Python
+  template: gitignore-python.tmpl
+- path: .gitignore
+  strategy: block
+  block: lang-rust
+  language: Rust
+  template: gitignore-rust.tmpl
 - path: GLOSSARY.md
   strategy: create
   template: GLOSSARY.md.tmpl
@@ -84,6 +114,9 @@
   target: ../.agents/skills
 - path: .agents/roles.yaml
   strategy: generated
+# Before the labels, which need the GitHub origin it creates.
+- path: GitHub repository
+  strategy: repo
 # Descriptions are the Pocock triage defaults (setup-matt-pocock-skills
 # triage-labels.md); the skills define no colours, so these are Overlord's.
 - path: triage labels

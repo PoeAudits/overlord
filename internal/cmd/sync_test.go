@@ -36,6 +36,22 @@ func TestSyncOnFreshHomeLinksEverySkillAndInstructionFile(t *testing.T) {
 	}
 }
 
+func TestSyncLinksASkillWhoseCatalogEntryIsASymlinkToADirectory(t *testing.T) {
+	sys := newSystem(t, t.TempDir())
+	agents := newAgentsDir(t, sys.Home, "tdd")
+	elsewhere := filepath.Join(sys.Home, "omarchy-skills", "omarchy")
+	mustWrite(t, filepath.Join(elsewhere, "SKILL.md"), "# omarchy\n")
+	mustSymlink(t, elsewhere, filepath.Join(agents, "skills", "omarchy"))
+
+	stdout, code := run(t, sys, "sync")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
+	}
+	assertLink(t, filepath.Join(sys.Home, ".claude", "skills", "omarchy"), filepath.Join(agents, "skills", "omarchy"))
+	assertContains(t, stdout, "  created   ~/.claude/skills/omarchy\n")
+}
+
 func TestSyncSecondRunChangesNothingAndCheckReportsEverythingOK(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	newAgentsDir(t, sys.Home, "tdd")

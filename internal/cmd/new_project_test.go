@@ -85,6 +85,7 @@ func TestNewProjectCreatesClonesSetsUpCommitsPushesAndRegistersInOrder(t *testin
 		root + ": gh repo create PoeAudits/sample --private",
 		root + ": gh repo clone PoeAudits/sample " + path,
 		path + ": git remote get-url origin",
+		path + ": " + lsIgnored,
 		path + ": " + labelList,
 		path + ": git add -A",
 		path + ": git commit -m Initial project setup",

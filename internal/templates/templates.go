@@ -23,6 +23,9 @@ const (
 	Symlink Strategy = "symlink"
 	Block   Strategy = "block"
 	Labels  Strategy = "labels"
+	// Repo gives a Project without an origin remote a private GitHub
+	// repository and pushes its branches and tags there.
+	Repo Strategy = "repo"
 	// Generated renders each Role in the roles.yaml at Path into one agent
 	// file per Harness.
 	Generated Strategy = "generated"
@@ -74,9 +77,28 @@ var Languages = []struct {
 	{Name: "Rust", Markers: []string{"Cargo.toml"}},
 }
 
+// Secrets are the .gitignore patterns of files that hold credentials, matched
+// against each path's base name. The .gitignore block ignores them, and Setup
+// refuses to push a history that tracks one. A pattern starting with ! excepts
+// a file an earlier pattern matches. Templates list them with {{secrets}}.
+var Secrets = []string{
+	".env", ".env.*", "!.env.example", "!.env.sample",
+	"*.pass",
+	"*.pem", "*.key", "*.p12", "*.pfx", "*.jks", "*.keystore",
+	"id_rsa*", "id_ed25519*",
+	"credentials*.json", "service-account*.json",
+	// Not secrets.*, which would match source files such as secrets.go.
+	"secrets.json", "secrets.yaml", "secrets.yml", "secrets.toml",
+	"*.secret",
+	// Package manager configs that can hold registry tokens.
+	".npmrc", ".pypirc",
+}
+
 // Data is what every Template can refer to.
 type Data struct {
 	ProjectName string
+	// Origin is the origin remote's URL, empty without one.
+	Origin string
 	// Owner and Repo come from the GitHub origin remote and are empty without one.
 	Owner   string
 	Repo    string
@@ -100,9 +122,11 @@ func Manifest() ([]Item, error) {
 	return items, nil
 }
 
+var funcs = template.FuncMap{"secrets": func() []string { return Secrets }}
+
 // Render executes the named Template from files/ with data.
 func Render(name string, data Data) ([]byte, error) {
-	parsed, err := template.New(name).Option("missingkey=error").ParseFS(files, "files/"+name)
+	parsed, err := template.New(name).Option("missingkey=error").Funcs(funcs).ParseFS(files, "files/"+name)
 	if err != nil {
 		return nil, fmt.Errorf("parse template %s: %w", name, err)
 	}

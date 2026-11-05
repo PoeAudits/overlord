@@ -33,5 +33,9 @@ _Avoid_: Template section, generated part
 **Template**:
 A file or Managed Block body embedded in Overlord that Setup writes into Projects. Templates are the only content Overlord embeds; skills and Roles live in `~/.agents`.
 
+**Secret**:
+A file that holds a credential, recognised by its path alone (`.env`, `*.pem`, `id_rsa*` and the rest of `templates.Secrets`). Setup ignores Secrets and never pushes a history that tracks one.
+_Avoid_: Sensitive file, credential file
+
 **Sync**:
 The idempotent act of applying the canonical global config (skills, instructions, Roles) to every Harness on this machine.

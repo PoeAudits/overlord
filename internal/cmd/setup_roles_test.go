@@ -55,6 +55,7 @@ func TestSetupRendersEachProjectRoleForEveryHarness(t *testing.T) {
 		"  created    .claude/agents/reviewer.md\n" +
 		"  created    .codex/agents/reviewer.toml\n" +
 		"  created    .opencode/agents/reviewer.md\n" +
+		"  ok         GitHub repository\n" +
 		"  ok         triage labels\n"
 	if !strings.HasSuffix(stdout, wantTail) {
 		t.Fatalf("stdout:\n%s\nwant it to end with:\n%s", stdout, wantTail)
@@ -112,6 +113,7 @@ func TestSetupRefreshesOnlyTheAgentFilesAnEditedRoleChanges(t *testing.T) {
 	wantTail := "  ok         .claude/agents/reviewer.md\n" +
 		"  refreshed  .codex/agents/reviewer.toml\n" +
 		"  ok         .opencode/agents/reviewer.md\n" +
+		"  ok         GitHub repository\n" +
 		"  ok         triage labels\n"
 	if !strings.HasSuffix(stdout, wantTail) {
 		t.Fatalf("stdout:\n%s\nwant it to end with:\n%s", stdout, wantTail)
@@ -128,6 +130,7 @@ func TestSetupCheckListsAgentFilesAsMissingStaleOrOKWithoutWriting(t *testing.T)
 	wantTail := "  missing    .claude/agents/reviewer.md\n" +
 		"  missing    .codex/agents/reviewer.toml\n" +
 		"  missing    .opencode/agents/reviewer.md\n" +
+		"  ok         GitHub repository\n" +
 		"  ok         triage labels\n"
 	if !strings.HasSuffix(stdout, wantTail) {
 		t.Fatalf("stdout before setup:\n%s\nwant it to end with:\n%s", stdout, wantTail)
@@ -150,6 +153,7 @@ func TestSetupCheckListsAgentFilesAsMissingStaleOrOKWithoutWriting(t *testing.T)
 	wantTail = "  stale      .claude/agents/reviewer.md\n" +
 		"  stale      .codex/agents/reviewer.toml\n" +
 		"  stale      .opencode/agents/reviewer.md\n" +
+		"  ok         GitHub repository\n" +
 		"  ok         triage labels\n"
 	if !strings.HasSuffix(stdout, wantTail) {
 		t.Fatalf("stdout after editing the prompt:\n%s\nwant it to end with:\n%s", stdout, wantTail)

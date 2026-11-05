@@ -28,7 +28,9 @@ const (
 	// Setup reports it and leaves it untouched.
 	Conflict Status = "conflict"
 	// Warning means Setup could not check or repair the item for a reason
-	// outside the Project (no GitHub origin, gh failing) and moved on.
+	// outside the Project (no GitHub origin, gh failing) and moved on, or
+	// found something only the Project can decide on (tracked files its
+	// .gitignore block ignores).
 	Warning Status = "warning"
 	// Failed means Setup tried to create or refresh the item and could not;
 	// the item's Detail holds the error. Only Apply reports it.
@@ -70,20 +72,28 @@ type Item struct {
 	Detail string `json:"detail,omitempty"`
 	// MissingLabels names the labels Setup creates for the labels strategy.
 	MissingLabels []string `json:"missingLabels,omitempty"`
+	// repo, gitInit and existing are what Apply does for a missing repo item:
+	// the owner/name to push to, whether to git init first, and whether that
+	// repository already exists (empty) rather than needing creation.
+	repo     string
+	gitInit  bool
+	existing bool
 }
 
 // Check reports the status of every manifest item in the Project checkout at
 // root without changing anything. Languages are detected in projectRoot, the
-// Project's main checkout, which may differ from root when root is a worktree.
-func Check(ctx context.Context, runner system.Runner, root, projectRoot string) (Plan, error) {
-	_, _, plan, err := check(ctx, runner, nil, root, projectRoot)
+// Project's main checkout, which may differ from root when root is a worktree,
+// and a Project without an origin is checked against the GitHub repository
+// owner/<projectRoot's directory name>.
+func Check(ctx context.Context, runner system.Runner, root, projectRoot, owner string) (Plan, error) {
+	_, _, plan, err := check(ctx, runner, nil, root, projectRoot, owner)
 	return plan, err
 }
 
 // check returns the manifest items that apply to this Project, the Template
 // data and the plan, with the items and plan rows in the same order. A non-nil
 // sleep makes a failing label lookup retry; see labelsStatus.
-func check(ctx context.Context, runner system.Runner, sleep func(time.Duration), root, projectRoot string) ([]templates.Item, templates.Data, Plan, error) {
+func check(ctx context.Context, runner system.Runner, sleep func(time.Duration), root, projectRoot, owner string) ([]templates.Item, templates.Data, Plan, error) {
 	manifest, err := templates.Manifest()
 	if err != nil {
 		return nil, templates.Data{}, Plan{}, err
@@ -105,7 +115,7 @@ func check(ctx context.Context, runner system.Runner, sleep func(time.Duration),
 			}
 		}
 		for _, item := range expanded {
-			row, err := planRow(ctx, runner, sleep, root, item, data)
+			row, err := planRow(ctx, runner, sleep, root, owner+"/"+filepath.Base(projectRoot), item, data)
 			if err != nil {
 				return nil, templates.Data{}, Plan{}, fmt.Errorf("check %s: %w", item.Path, err)
 			}
@@ -128,15 +138,30 @@ func appliesTo(item templates.Item, languages []string) bool {
 	return slices.Contains(languages, item.Language)
 }
 
-func planRow(ctx context.Context, runner system.Runner, sleep func(time.Duration), root string, item templates.Item, data templates.Data) (Item, error) {
+// planRow checks one item; newRepo is the owner/name the repo item creates.
+func planRow(ctx context.Context, runner system.Runner, sleep func(time.Duration), root, newRepo string, item templates.Item, data templates.Data) (Item, error) {
 	row := Item{Path: item.Path, Block: item.Block, Strategy: item.Strategy}
-	if item.Strategy == templates.Labels {
+	switch item.Strategy {
+	case templates.Labels:
 		row.Status, row.Detail, row.MissingLabels = labelsStatus(ctx, runner, sleep, root, item, data)
 		return row, nil
+	case templates.Repo:
+		return repoRow(ctx, runner, root, newRepo, data, row), nil
 	}
 	var err error
 	row.Status, row.Detail, err = itemStatus(root, item, data)
-	return row, err
+	if err != nil || row.Status == Conflict || item.Strategy != templates.Block || filepath.Base(item.Path) != ".gitignore" {
+		return row, err
+	}
+	tracked, err := trackedIgnored(ctx, runner, root, item, data)
+	if tracked == "" {
+		return row, err
+	}
+	if row.Status == OK {
+		row.Status = Warning
+	}
+	row.Detail = tracked
+	return row, nil
 }
 
 func itemStatus(root string, item templates.Item, data templates.Data) (Status, string, error) {
@@ -245,7 +270,8 @@ func templateData(ctx context.Context, runner system.Runner, root, projectRoot s
 	if err != nil {
 		return data, nil
 	}
-	owner, repo, ok := parseGitHubRemote(strings.TrimSpace(string(output)))
+	data.Origin = strings.TrimSpace(string(output))
+	owner, repo, ok := parseGitHubRemote(data.Origin)
 	if !ok {
 		return data, nil
 	}

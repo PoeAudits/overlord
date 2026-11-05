@@ -31,6 +31,7 @@ func TestSetupOnEmptyProjectCreatesEveryItemFromTheGoldenFiles(t *testing.T) {
 	want := "Setup applied to " + project + "\n" +
 		"  created    AGENTS.md#agents\n" +
 		"  created    docs/coding-standards.md#general\n" +
+		"  created    .gitignore#general\n" +
 		"  created    GLOSSARY.md\n" +
 		"  created    docs/adr/0001-lint-and-tests-must-pass-before-merge.md\n" +
 		"  created    docs/agents/issue-tracker.md\n" +
@@ -39,11 +40,12 @@ func TestSetupOnEmptyProjectCreatesEveryItemFromTheGoldenFiles(t *testing.T) {
 		"  created    docs/adr\n" +
 		"  created    .agents/skills\n" +
 		"  created    .claude/skills\n" +
+		"  ok         GitHub repository\n" +
 		"  ok         triage labels\n"
 	if stdout != want {
 		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
 	}
-	if want := []string{project + ": git remote get-url origin", project + ": " + labelList}; !reflect.DeepEqual(runner.calls, want) {
+	if want := []string{project + ": git remote get-url origin", project + ": " + lsIgnored, project + ": " + labelList}; !reflect.DeepEqual(runner.calls, want) {
 		t.Fatalf("commands = %q, want %q", runner.calls, want)
 	}
 }
@@ -86,14 +88,25 @@ func keys(files map[string]string) []string {
 
 // fakeRunner records every command as "dir: name args" and answers from
 // outputs keyed by "name args"; unknown commands fail like a missing remote.
+// lsIgnored is the command Setup runs to find tracked files that the general
+// .gitignore block ignores. The fake fails it, as git does outside a
+// repository, unless a test gives it an output.
+const lsIgnored = "git ls-files --cached --ignored --exclude=.env --exclude=.env.* --exclude=!.env.example --exclude=!.env.sample --exclude=*.pass --exclude=*.pem --exclude=*.key --exclude=*.p12 --exclude=*.pfx --exclude=*.jks --exclude=*.keystore --exclude=id_rsa* --exclude=id_ed25519* --exclude=credentials*.json --exclude=service-account*.json --exclude=secrets.json --exclude=secrets.yaml --exclude=secrets.yml --exclude=secrets.toml --exclude=*.secret --exclude=.npmrc --exclude=.pypirc --exclude=node_modules/ --exclude=.venv/ --exclude=__pycache__/ --exclude=.DS_Store --exclude=*.log --exclude=.idea/ --exclude=.vscode/* --exclude=!.vscode/extensions.json --exclude=!.vscode/settings.json"
+
 type fakeRunner struct {
 	outputs map[string]string
-	calls   []string
+	// stderr makes a command fail with this stderr, carried in the error the
+	// way system.ExecRunner carries it.
+	stderr map[string]string
+	calls  []string
 }
 
 func (r *fakeRunner) Run(_ context.Context, dir, name string, args ...string) ([]byte, error) {
 	command := strings.Join(append([]string{name}, args...), " ")
 	r.calls = append(r.calls, dir+": "+command)
+	if stderr, ok := r.stderr[command]; ok {
+		return nil, errors.New("exit status 1: " + stderr)
+	}
 	output, ok := r.outputs[command]
 	if !ok && command == "git remote get-url origin" {
 		return []byte("error: No such remote 'origin'\n"), errors.New("exit status 2")
@@ -106,10 +119,16 @@ func (r *fakeRunner) Run(_ context.Context, dir, name string, args ...string) ([
 	return []byte(output), nil
 }
 
+// nonGitHubOrigin is a runner for a Project whose origin is not on GitHub, so
+// Setup leaves the remote alone and only the triage labels warn.
+func nonGitHubOrigin() *fakeRunner {
+	return &fakeRunner{outputs: map[string]string{"git remote get-url origin": "git@gitlab.com:PoeAudits/sample.git\n"}}
+}
+
 func TestSetupSecondRunChangesNothingAndReportsEveryItemOK(t *testing.T) {
 	project := t.TempDir()
 	sys := newSystem(t, project)
-	sys.Runner = &fakeRunner{}
+	sys.Runner = nonGitHubOrigin()
 	if _, code := run(t, sys, "setup"); code != 0 {
 		t.Fatalf("first run exit code = %d", code)
 	}
@@ -126,6 +145,7 @@ func TestSetupSecondRunChangesNothingAndReportsEveryItemOK(t *testing.T) {
 	want := "Setup applied to " + project + "\n" +
 		"  ok         AGENTS.md#agents\n" +
 		"  ok         docs/coding-standards.md#general\n" +
+		"  ok         .gitignore#general\n" +
 		"  ok         GLOSSARY.md\n" +
 		"  ok         docs/adr/0001-lint-and-tests-must-pass-before-merge.md\n" +
 		"  ok         docs/agents/issue-tracker.md\n" +
@@ -134,6 +154,7 @@ func TestSetupSecondRunChangesNothingAndReportsEveryItemOK(t *testing.T) {
 		"  ok         docs/adr\n" +
 		"  ok         .agents/skills\n" +
 		"  ok         .claude/skills\n" +
+		"  ok         GitHub repository\n" +
 		"  warning    triage labels (no GitHub origin remote)\n"
 	if stdout != want {
 		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
@@ -145,7 +166,7 @@ func TestSetupNeverRewritesAnExistingFile(t *testing.T) {
 	mustWrite(t, filepath.Join(project, "GLOSSARY.md"), "# Mine\n\nHand-written.\n")
 	mustWrite(t, filepath.Join(project, "docs", "agents", "domain.md"), "custom\n")
 	sys := newSystem(t, project)
-	sys.Runner = &fakeRunner{}
+	sys.Runner = nonGitHubOrigin()
 
 	stdout, code := run(t, sys, "setup")
 
@@ -167,7 +188,7 @@ func TestSetupLeavesARealClaudeSkillsDirectoryWithContentUntouched(t *testing.T)
 	project := t.TempDir()
 	mustWrite(t, filepath.Join(project, ".claude", "skills", "verify", "SKILL.md"), "# verify\n")
 	sys := newSystem(t, project)
-	sys.Runner = &fakeRunner{}
+	sys.Runner = nonGitHubOrigin()
 
 	stdout, code := run(t, sys, "setup")
 
@@ -191,7 +212,7 @@ func TestSetupReplacesAnEmptyRealClaudeSkillsDirectoryWithTheLink(t *testing.T) 
 	project := t.TempDir()
 	mustMkdir(t, filepath.Join(project, ".claude", "skills"))
 	sys := newSystem(t, project)
-	sys.Runner = &fakeRunner{}
+	sys.Runner = nonGitHubOrigin()
 
 	stdout, code := run(t, sys, "setup")
 
@@ -210,7 +231,7 @@ func TestSetupSkipsTheStarterADRWhenTheProjectHasAnADR(t *testing.T) {
 	project := t.TempDir()
 	mustWrite(t, filepath.Join(project, "docs", "adr", "0001-use-postgres.md"), "# Use Postgres\n")
 	sys := newSystem(t, project)
-	sys.Runner = &fakeRunner{}
+	sys.Runner = nonGitHubOrigin()
 
 	stdout, code := run(t, sys, "setup")
 
@@ -234,7 +255,7 @@ func TestSetupSkipsTheStarterADRWhenTheProjectHasAnADR(t *testing.T) {
 func TestSetupRemovesTheGitkeepOnceADirectoryHasContent(t *testing.T) {
 	project := t.TempDir()
 	sys := newSystem(t, project)
-	sys.Runner = &fakeRunner{}
+	sys.Runner = nonGitHubOrigin()
 	if _, code := run(t, sys, "setup"); code != 0 {
 		t.Fatalf("first run exit code = %d", code)
 	}
@@ -257,7 +278,7 @@ func TestSetupWithoutAGitHubRemoteNamesTheProjectAfterItsDirectory(t *testing.T)
 	project := filepath.Join(t.TempDir(), "my-tool")
 	mustMkdir(t, project)
 	sys := newSystem(t, project)
-	sys.Runner = &fakeRunner{}
+	sys.Runner = nonGitHubOrigin()
 
 	_, code := run(t, sys, "setup")
 
@@ -278,7 +299,7 @@ func TestSetupReportsAnItemItCannotWriteAsFailedAndStillSetsUpEveryOtherItem(t *
 	}
 	t.Cleanup(func() { os.Chmod(agents, 0o755) })
 	sys := newSystem(t, project)
-	sys.Runner = &fakeRunner{}
+	sys.Runner = nonGitHubOrigin()
 
 	stdout, stderr, code := runCapturing(sys, "setup")
 
@@ -288,6 +309,7 @@ func TestSetupReportsAnItemItCannotWriteAsFailedAndStillSetsUpEveryOtherItem(t *
 	want := "Setup applied to " + project + "\n" +
 		"  created    AGENTS.md#agents\n" +
 		"  created    docs/coding-standards.md#general\n" +
+		"  created    .gitignore#general\n" +
 		"  created    GLOSSARY.md\n" +
 		"  created    docs/adr/0001-lint-and-tests-must-pass-before-merge.md\n" +
 		"  created    docs/agents/issue-tracker.md\n" +
@@ -296,6 +318,7 @@ func TestSetupReportsAnItemItCannotWriteAsFailedAndStillSetsUpEveryOtherItem(t *
 		"  created    docs/adr\n" +
 		"  failed     .agents/skills (mkdir " + filepath.Join(agents, "skills") + ": permission denied)\n" +
 		"  created    .claude/skills\n" +
+		"  ok         GitHub repository\n" +
 		"  warning    triage labels (no GitHub origin remote)\n"
 	if stdout != want {
 		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
@@ -312,7 +335,7 @@ func TestSetupLeavesAFileWhereADirectoryBelongsUntouched(t *testing.T) {
 	project := t.TempDir()
 	mustWrite(t, filepath.Join(project, ".agents", "skills"), "not a directory\n")
 	sys := newSystem(t, project)
-	sys.Runner = &fakeRunner{}
+	sys.Runner = nonGitHubOrigin()
 
 	stdout, code := run(t, sys, "setup")
 
