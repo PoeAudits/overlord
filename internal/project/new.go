@@ -73,15 +73,16 @@ func Create(ctx context.Context, runner system.Runner, p NewProject) (Plan, erro
 			return Plan{}, err
 		}
 	}
-	plan, err := Apply(ctx, runner, p.Sleep, path, path)
+	plan, err := Apply(ctx, runner, p.Sleep, path, path, p.Owner)
 	if err != nil {
 		return plan, fmt.Errorf("setup in %s: %w", path, err)
 	}
 	if plan.HasFailures() {
 		return plan, fmt.Errorf("setup in %s could not set up every item; see the failed lines above", path)
 	}
-	// Only the triage labels warn, and the origin was created above, so a
-	// warning here means the new repository has no triage labels.
+	// The clone tracks nothing yet, so only the triage labels can warn, and
+	// the origin was created above: a warning here means the new repository
+	// has no triage labels.
 	if i := slices.IndexFunc(plan.Items, func(item Item) bool { return item.Status == Warning }); i >= 0 {
 		return plan, fmt.Errorf("setup in %s could not set up the triage labels: %s", path, plan.Items[i].Detail)
 	}

@@ -1,0 +1,38 @@
+# overlord:begin general v1
+# Files that hold credentials. Setup will not push a history that tracks one.
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pass
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+credentials*.json
+service-account*.json
+secrets.json
+secrets.yaml
+secrets.yml
+secrets.toml
+*.secret
+.npmrc
+.pypirc
+
+# Dependencies and caches no Project tracks.
+node_modules/
+.venv/
+__pycache__/
+
+# Operating system, editor and log files.
+.DS_Store
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+# overlord:end general

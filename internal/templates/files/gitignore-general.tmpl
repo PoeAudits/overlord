@@ -1,0 +1,15 @@
+# Files that hold credentials. Setup will not push a history that tracks one.
+{{range secrets}}{{.}}
+{{end}}
+# Dependencies and caches no Project tracks.
+node_modules/
+.venv/
+__pycache__/
+
+# Operating system, editor and log files.
+.DS_Store
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json

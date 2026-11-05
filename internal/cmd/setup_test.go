@@ -23,6 +23,7 @@ func TestSetupCheckOnEmptyProjectListsEveryItemMissingFailsAndWritesNothing(t *t
 	want := "Setup plan for " + project + "\n" +
 		"  missing    AGENTS.md#agents\n" +
 		"  missing    docs/coding-standards.md#general\n" +
+		"  missing    .gitignore#general\n" +
 		"  missing    GLOSSARY.md\n" +
 		"  missing    docs/adr/0001-lint-and-tests-must-pass-before-merge.md\n" +
 		"  missing    docs/agents/issue-tracker.md\n" +
@@ -31,6 +32,7 @@ func TestSetupCheckOnEmptyProjectListsEveryItemMissingFailsAndWritesNothing(t *t
 		"  missing    docs/adr\n" +
 		"  missing    .agents/skills\n" +
 		"  missing    .claude/skills\n" +
+		"  ok         GitHub repository\n" +
 		"  ok         triage labels\n"
 	if stdout != want {
 		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
@@ -55,6 +57,7 @@ func TestSetupCheckOnCompleteProjectReportsEveryItemOK(t *testing.T) {
 	want := "Setup plan for " + project + "\n" +
 		"  ok         AGENTS.md#agents\n" +
 		"  ok         docs/coding-standards.md#general\n" +
+		"  ok         .gitignore#general\n" +
 		"  ok         GLOSSARY.md\n" +
 		"  ok         docs/adr/0001-lint-and-tests-must-pass-before-merge.md\n" +
 		"  ok         docs/agents/issue-tracker.md\n" +
@@ -63,6 +66,7 @@ func TestSetupCheckOnCompleteProjectReportsEveryItemOK(t *testing.T) {
 		"  ok         docs/adr\n" +
 		"  ok         .agents/skills\n" +
 		"  ok         .claude/skills\n" +
+		"  ok         GitHub repository\n" +
 		"  ok         triage labels\n"
 	if stdout != want {
 		t.Fatalf("stdout:\n%s\nwant:\n%s", stdout, want)
@@ -89,6 +93,7 @@ func TestSetupCheckJSONEmitsThePlan(t *testing.T) {
 		"items": [
 			{"path": "AGENTS.md", "block": "agents", "strategy": "block", "status": "missing"},
 			{"path": "docs/coding-standards.md", "block": "general", "strategy": "block", "status": "missing"},
+			{"path": ".gitignore", "block": "general", "strategy": "block", "status": "missing"},
 			{"path": "GLOSSARY.md", "strategy": "create", "status": "missing"},
 			{"path": "docs/adr/0001-lint-and-tests-must-pass-before-merge.md", "strategy": "create", "status": "missing"},
 			{"path": "docs/agents/issue-tracker.md", "strategy": "create", "status": "missing"},
@@ -97,6 +102,7 @@ func TestSetupCheckJSONEmitsThePlan(t *testing.T) {
 			{"path": "docs/adr", "strategy": "dir", "status": "ok"},
 			{"path": ".agents/skills", "strategy": "dir", "status": "missing"},
 			{"path": ".claude/skills", "strategy": "symlink", "status": "missing"},
+			{"path": "GitHub repository", "strategy": "repo", "status": "ok"},
 			{"path": "triage labels", "strategy": "labels", "status": "ok"}
 		]
 	}`), &want); err != nil {

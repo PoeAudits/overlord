@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/PoeAudits/overlord/internal/system"
@@ -16,21 +17,39 @@ import (
 // Apply checks the Project at root, then tries to create or refresh every
 // missing or stale item, carrying on past any that fail. It returns the plan
 // as it was before the repairs, except that an item that could not be written
-// becomes failed with its error as the detail, and a labels item whose
-// creation failed becomes a warning; conflict items are left untouched. An
-// error means the Project could not be checked at all. A non-nil sleep makes
-// a failing label lookup retry, for a repository GitHub has only just created.
-func Apply(ctx context.Context, runner system.Runner, sleep func(time.Duration), root, projectRoot string) (Plan, error) {
-	items, data, plan, err := check(ctx, runner, sleep, root, projectRoot)
+// becomes failed with its error as the detail, a labels item whose creation
+// failed becomes a warning, and a repo item in conflict becomes failed, since
+// the Project is left without an origin. Other conflict items are left
+// untouched. Once the repo item has created the origin, the labels are checked
+// again against it. An error means the Project could not be checked at all. A
+// non-nil sleep makes a failing label lookup retry, for a repository GitHub
+// has only just created. owner is as for Check.
+func Apply(ctx context.Context, runner system.Runner, sleep func(time.Duration), root, projectRoot, owner string) (Plan, error) {
+	items, data, plan, err := check(ctx, runner, sleep, root, projectRoot, owner)
 	if err != nil {
 		return Plan{}, err
 	}
+	created := false
 	for i, item := range items {
-		if status := plan.Items[i].Status; status != Missing && status != Stale {
+		if item.Strategy == templates.Labels && created {
+			plan.Items[i].Status, plan.Items[i].Detail, plan.Items[i].MissingLabels = labelsStatus(ctx, runner, sleep, root, item, data)
+		}
+		status := plan.Items[i].Status
+		if item.Strategy == templates.Repo && status == Conflict {
+			plan.Items[i].Status = Failed
+		}
+		if status != Missing && status != Stale {
 			continue
 		}
-		if item.Strategy == templates.Labels {
+		switch item.Strategy {
+		case templates.Labels:
 			plan.Items[i] = createLabels(ctx, runner, root, item, data, plan.Items[i])
+			continue
+		case templates.Repo:
+			plan.Items[i] = createRepo(ctx, runner, root, plan.Items[i])
+			if created = plan.Items[i].Status != Failed; created {
+				data.Owner, data.Repo, _ = strings.Cut(plan.Items[i].repo, "/")
+			}
 			continue
 		}
 		if err := repair(filepath.Join(root, item.Path), item, data, earlierBlocks(items[:i], item.Path)); err != nil {

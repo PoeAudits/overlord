@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/PoeAudits/overlord/internal/config"
 	"github.com/PoeAudits/overlord/internal/project"
 	"github.com/PoeAudits/overlord/internal/system"
 )
@@ -18,14 +19,32 @@ func newSetupCommand(sys system.System) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "setup [path]",
 		Short: "Create or refresh the files Overlord guarantees in a Project",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Check the Project at path (default: T3CODE_WORKTREE_PATH, else the working
+directory) for the files Overlord guarantees, then create what is missing and
+refresh Overlord's Managed Blocks, including the .gitignore block that ignores
+secret files. Tracked files that block ignores are listed, never untracked.
+
+A Project without an origin remote gets one: Setup runs git init if needed,
+creates the private GitHub repository <githubOwner>/<directory name> (or uses
+it when it already exists and is empty) and pushes every branch and tag. It
+refuses, pushing nothing, when that name exists on GitHub with content, or
+when any branch's or tag's history tracks a secret file such as .env or
+*.pem. An existing origin is never touched. githubOwner comes from
+~/.config/overlord/config.yaml. Then the triage labels are created on GitHub.
+
+With --check nothing is changed, on disk or on GitHub.`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(command *cobra.Command, args []string) error {
 			root := setupTarget(sys, args)
 			// T3 points T3CODE_PROJECT_ROOT at the main checkout, where
 			// languages are detected; without it the target is the Project.
 			projectRoot := cmp.Or(sys.Getenv("T3CODE_PROJECT_ROOT"), root)
+			cfg, err := config.Load(sys.Home)
+			if err != nil {
+				return err
+			}
 			if check {
-				plan, err := project.Check(command.Context(), sys.Runner, root, projectRoot)
+				plan, err := project.Check(command.Context(), sys.Runner, root, projectRoot, cfg.GitHubOwner)
 				if err != nil {
 					return err
 				}
@@ -37,7 +56,7 @@ func newSetupCommand(sys system.System) *cobra.Command {
 				}
 				return nil
 			}
-			plan, err := project.Apply(command.Context(), sys.Runner, nil, root, projectRoot)
+			plan, err := project.Apply(command.Context(), sys.Runner, nil, root, projectRoot, cfg.GitHubOwner)
 			if err != nil {
 				return err
 			}

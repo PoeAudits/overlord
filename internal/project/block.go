@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/PoeAudits/overlord/internal/templates"
 )
@@ -29,7 +30,7 @@ func blockStatus(path string, item templates.Item, data templates.Data) (Status,
 		}
 		return "", "", err
 	}
-	start, end, err := findBlock(content, item.Block)
+	start, end, err := findBlock(content, item.Path, item.Block)
 	if errors.Is(err, errNoEndMarker) {
 		return Conflict, err.Error(), nil
 	}
@@ -62,7 +63,7 @@ func repairBlock(path string, item templates.Item, data templates.Data, earlier 
 	if err != nil {
 		return err
 	}
-	start, end, err := findBlock(content, item.Block)
+	start, end, err := findBlock(content, item.Path, item.Block)
 	if err != nil {
 		return err
 	}
@@ -70,7 +71,7 @@ func repairBlock(path string, item templates.Item, data templates.Data, earlier 
 		return writeSpliced(path, content, start, end, rendered)
 	}
 	for i := len(earlier) - 1; i >= 0; i-- {
-		if _, end, err := findBlock(content, earlier[i]); err == nil && end >= 0 {
+		if _, end, err := findBlock(content, item.Path, earlier[i]); err == nil && end >= 0 {
 			return writeSpliced(path, content, end, end, append([]byte("\n"), rendered...))
 		}
 	}
@@ -106,21 +107,33 @@ func renderBlock(item templates.Item, data templates.Data) ([]byte, error) {
 	if len(body) > 0 && body[len(body)-1] != '\n' {
 		body = append(body, '\n')
 	}
-	block := fmt.Appendf(nil, "<!-- overlord:begin %s v%d -->\n", item.Block, data.Version)
+	prefix, suffix := commentMarks(item.Path)
+	block := fmt.Appendf(nil, "%soverlord:begin %s v%d%s\n", prefix, item.Block, data.Version, suffix)
 	block = append(block, body...)
-	return fmt.Appendf(block, "<!-- overlord:end %s -->\n", item.Block), nil
+	return fmt.Appendf(block, "%soverlord:end %s%s\n", prefix, item.Block, suffix), nil
+}
+
+// commentMarks are what a marker line in the file at path starts and ends
+// with: an HTML comment in Markdown, a # comment in any other file.
+func commentMarks(path string) (prefix, suffix string) {
+	if strings.HasSuffix(path, ".md") {
+		return "<!-- ", " -->"
+	}
+	return "# ", ""
 }
 
 // findBlock returns the byte range of the named block, from the start of its
 // begin marker line (any version) through the newline ending its end marker
 // line, or -1, -1 when the file has no begin marker.
-func findBlock(content []byte, name string) (start, end int, err error) {
+func findBlock(content []byte, path, name string) (start, end int, err error) {
 	quoted := regexp.QuoteMeta(name)
-	begin := regexp.MustCompile(`(?m)^<!-- overlord:begin ` + quoted + ` v\d+ -->$`).FindIndex(content)
+	prefix, suffix := commentMarks(path)
+	prefix, suffix = regexp.QuoteMeta(prefix), regexp.QuoteMeta(suffix)
+	begin := regexp.MustCompile(`(?m)^` + prefix + `overlord:begin ` + quoted + ` v\d+` + suffix + `$`).FindIndex(content)
 	if begin == nil {
 		return -1, -1, nil
 	}
-	finish := regexp.MustCompile(`(?m)^<!-- overlord:end ` + quoted + ` -->(\n|$)`).FindIndex(content[begin[1]:])
+	finish := regexp.MustCompile(`(?m)^` + prefix + `overlord:end ` + quoted + suffix + `(\n|$)`).FindIndex(content[begin[1]:])
 	if finish == nil {
 		return -1, -1, errNoEndMarker
 	}
