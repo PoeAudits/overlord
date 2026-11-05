@@ -5,6 +5,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -309,6 +310,27 @@ func TestDoctorSkipsUpstreamChecksWithANoteWhenOffline(t *testing.T) {
 	}
 	if !slices.Contains(sys.runner.calls, ": env GIT_TERMINAL_PROMPT=0 git ls-remote https://github.com/mattpocock/skills HEAD") {
 		t.Errorf("recorded commands lack the remote lookup: %v", sys.runner.calls)
+	}
+}
+
+func TestDoctorReportsProjectsWithALanguageButNoCIWorkflow(t *testing.T) {
+	sys := syncedHome(t)
+	projects := filepath.Join(sys.Home, "Overlord", "projects")
+	mustWrite(t, filepath.Join(projects, "scribe", "go.mod"), "module github.com/PoeAudits/scribe\n")
+	mustWrite(t, filepath.Join(projects, "done", "go.mod"), "module github.com/PoeAudits/done\n")
+	mustWrite(t, filepath.Join(projects, "done", ".github", "workflows", "ci.yml"), "name: CI\n")
+	mustWrite(t, filepath.Join(projects, "notes", "README.md"), "# Notes\n")
+	before := tree(t, projects)
+
+	stdout, code := run(t, sys.System, "doctor")
+
+	want := "Doctor found drift\n" +
+		"  ~/Overlord/projects/scribe/.github/workflows/ci.yml: missing although Go is detected; run overlord setup in that Project\n"
+	if code != 1 || stdout != want {
+		t.Fatalf("exit code = %d, stdout:\n%s\nwant:\n%s", code, stdout, want)
+	}
+	if after := tree(t, projects); !reflect.DeepEqual(after, before) {
+		t.Fatalf("doctor changed the projects: %v", keys(after))
 	}
 }
 

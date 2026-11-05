@@ -44,7 +44,12 @@ things or changing decided behaviour.
   are detected in `projectRoot`, files are written under `root`.
   `Apply` tries every item and marks each one it cannot write `failed`, with
   the error as its detail; `setup` prints the whole plan, then exits 1 when
-  `Plan.HasFailures`, and `Create` stops before committing.
+  `Plan.HasFailures`, and `Create` stops before committing. `Create` also
+  stops on a `warning` (only the triage labels warn), since it has just
+  created the origin; it passes `Apply` a sleep so a failing label lookup is
+  retried while GitHub finishes creating the repository, where `setup` passes
+  nil and warns at once. Before Setup, `Create` writes the `--lang` marker
+  file so the language is detected by `DetectLanguages`, the only detector.
   `setup --check` exits 1 when `Plan.NeedsWork` (anything but `ok` or
   `warning`); `sync --check` likewise exits 1 when Sync would change anything
   or finds a conflict, but not for a `shadowed` skill.

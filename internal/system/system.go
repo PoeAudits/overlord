@@ -6,7 +6,10 @@
 package system
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -31,7 +34,9 @@ type System struct {
 
 // Runner executes external programs.
 type Runner interface {
-	// Run executes name in dir, waits for it and returns its combined output.
+	// Run executes name in dir, waits for it and returns its standard output.
+	// When it fails, the error ends with what it printed to standard error,
+	// which therefore can never corrupt the output a caller parses.
 	Run(ctx context.Context, dir, name string, args ...string) ([]byte, error)
 	// Launch starts name in dir detached from Overlord, with stdout and
 	// stderr appended to logPath, and returns without waiting for it.
@@ -71,7 +76,12 @@ type ExecRunner struct{}
 func (ExecRunner) Run(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
 	command := exec.CommandContext(ctx, name, args...)
 	command.Dir = dir
-	return command.CombinedOutput()
+	output, err := command.Output()
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && len(bytes.TrimSpace(exit.Stderr)) > 0 {
+		return output, fmt.Errorf("%w: %s", err, bytes.TrimSpace(exit.Stderr))
+	}
+	return output, err
 }
 
 func (ExecRunner) Launch(dir, logPath, name string, args ...string) error {

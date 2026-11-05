@@ -154,7 +154,7 @@ func TestSetupWarnsAboutTriageLabelsAndStillAppliesEverythingElse(t *testing.T) 
 		{
 			name:    "gh fails",
 			outputs: map[string]string{"git remote get-url origin": "git@github.com:PoeAudits/sample.git\n"},
-			detail:  "gh label list failed: fake: command failed",
+			detail:  "gh label list failed: fake: command failed; triage labels not checked and may be missing, so the issue triage workflow may not work until overlord setup is re-run",
 		},
 	}
 	for _, tt := range tests {
@@ -197,7 +197,7 @@ func TestSetupWarnsWhenCreatingATriageLabelFails(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
-	if want := "  warning    triage labels (gh label create wontfix failed: fake: command failed)\n"; !strings.HasSuffix(stdout, want) {
+	if want := "  warning    triage labels (gh label create wontfix failed: fake: command failed; triage labels are missing, so the issue triage workflow will not work until overlord setup is re-run)\n"; !strings.HasSuffix(stdout, want) {
 		t.Fatalf("stdout does not end with %q:\n%s", want, stdout)
 	}
 }
@@ -225,7 +225,7 @@ func TestSetupCheckPassesWhenOnlyTheTriageLabelsWarn(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0: a labels warning is not a Project problem\n%s", code, stdout)
 	}
-	if want := "  warning    triage labels (gh label list failed: fake: command failed)\n"; !strings.HasSuffix(stdout, want) {
+	if want := "  warning    triage labels (gh label list failed: fake: command failed; triage labels not checked and may be missing, so the issue triage workflow may not work until overlord setup is re-run)\n"; !strings.HasSuffix(stdout, want) {
 		t.Fatalf("stdout does not end with %q:\n%s", want, stdout)
 	}
 }

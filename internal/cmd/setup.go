@@ -37,7 +37,7 @@ func newSetupCommand(sys system.System) *cobra.Command {
 				}
 				return nil
 			}
-			plan, err := project.Apply(command.Context(), sys.Runner, root, projectRoot)
+			plan, err := project.Apply(command.Context(), sys.Runner, nil, root, projectRoot)
 			if err != nil {
 				return err
 			}

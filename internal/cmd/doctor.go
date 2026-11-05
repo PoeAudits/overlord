@@ -26,6 +26,9 @@ overlord-setup script), plus:
   - T3 projects whose own scripts override lacks overlord-setup, which
     replaces the global list so Setup does not run there
   - UPSTREAM.md sources whose remote HEAD differs from the recorded commit
+  - Projects under projectsRoot (~/.config/overlord/config.yaml, default
+    ~/Overlord/projects) with a detected language but no
+    .github/workflows/ci.yml; "overlord setup" there adds it
 
 UPSTREAM.md in the agents directory is Markdown kept by hand. Doctor reads only
 list items of three fields; every other line is prose:
@@ -40,7 +43,7 @@ Doctor exits 1 when it finds drift and 0 otherwise.`,
 			if err != nil {
 				return err
 			}
-			diagnosis, err := machine.Doctor(command.Context(), sys, cfg.AgentsDir)
+			diagnosis, err := machine.Doctor(command.Context(), sys, cfg.AgentsDir, cfg.ProjectsRoot)
 			if err != nil {
 				return err
 			}

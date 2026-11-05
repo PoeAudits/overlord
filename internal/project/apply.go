@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/PoeAudits/overlord/internal/system"
 	"github.com/PoeAudits/overlord/internal/templates"
@@ -17,9 +18,10 @@ import (
 // as it was before the repairs, except that an item that could not be written
 // becomes failed with its error as the detail, and a labels item whose
 // creation failed becomes a warning; conflict items are left untouched. An
-// error means the Project could not be checked at all.
-func Apply(ctx context.Context, runner system.Runner, root, projectRoot string) (Plan, error) {
-	items, data, plan, err := check(ctx, runner, root, projectRoot)
+// error means the Project could not be checked at all. A non-nil sleep makes
+// a failing label lookup retry, for a repository GitHub has only just created.
+func Apply(ctx context.Context, runner system.Runner, sleep func(time.Duration), root, projectRoot string) (Plan, error) {
+	items, data, plan, err := check(ctx, runner, sleep, root, projectRoot)
 	if err != nil {
 		return Plan{}, err
 	}

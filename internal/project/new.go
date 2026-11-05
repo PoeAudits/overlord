@@ -7,7 +7,10 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/PoeAudits/overlord/internal/system"
 )
@@ -19,18 +22,29 @@ type NewProject struct {
 	Root        string
 	Description string
 	Public      bool
+	// Language is go, typescript, python or rust. Create writes that
+	// language's marker file into the clone so Setup detects it.
+	Language string
 	// Launcher is the t3 command that registers the clone with T3 Code.
 	Launcher string
+	// Sleep pauses between label lookups while GitHub finishes creating the
+	// repository.
+	Sleep func(time.Duration)
 }
 
 // Create creates the GitHub repository Owner/Name, clones it into Root/Name,
-// runs Setup there, commits and pushes the result, and registers the clone
-// with T3 Code. It stops at the first step that fails, and Setup fails when
-// any item failed, so nothing incomplete is committed. The plan is Setup's,
+// writes the Language's marker file, runs Setup there, commits and pushes the
+// result, and registers the clone with T3 Code. It stops at the first step
+// that fails, and Setup fails when any item failed or the triage labels could
+// not be set up, so nothing incomplete is committed. The plan is Setup's,
 // empty when Setup did not run.
 func Create(ctx context.Context, runner system.Runner, p NewProject) (Plan, error) {
 	if p.Name != filepath.Base(p.Name) || p.Name == "." || p.Name == ".." {
 		return Plan{}, fmt.Errorf("project name %q must be a single directory name", p.Name)
+	}
+	markers := markerFiles(p)
+	if markers == nil {
+		return Plan{}, fmt.Errorf("unknown language %q; use go, typescript, python or rust", p.Language)
 	}
 	path := filepath.Join(p.Root, p.Name)
 	if _, err := os.Lstat(path); !errors.Is(err, fs.ErrNotExist) {
@@ -50,12 +64,26 @@ func Create(ctx context.Context, runner system.Runner, p NewProject) (Plan, erro
 	if err := step(ctx, runner, p.Root, "gh", "repo", "clone", repo, path); err != nil {
 		return Plan{}, err
 	}
-	plan, err := Apply(ctx, runner, path, path)
+	for name, content := range markers {
+		file := filepath.Join(path, name)
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			return Plan{}, err
+		}
+		if err := os.WriteFile(file, []byte(content), 0o644); err != nil {
+			return Plan{}, err
+		}
+	}
+	plan, err := Apply(ctx, runner, p.Sleep, path, path)
 	if err != nil {
 		return plan, fmt.Errorf("setup in %s: %w", path, err)
 	}
 	if plan.HasFailures() {
 		return plan, fmt.Errorf("setup in %s could not set up every item; see the failed lines above", path)
+	}
+	// Only the triage labels warn, and the origin was created above, so a
+	// warning here means the new repository has no triage labels.
+	if i := slices.IndexFunc(plan.Items, func(item Item) bool { return item.Status == Warning }); i >= 0 {
+		return plan, fmt.Errorf("setup in %s could not set up the triage labels: %s", path, plan.Items[i].Detail)
 	}
 	for _, args := range [][]string{
 		{"add", "-A"},
@@ -67,6 +95,29 @@ func Create(ctx context.Context, runner system.Runner, p NewProject) (Plan, erro
 		}
 	}
 	return plan, step(ctx, runner, path, p.Launcher, "project", "add", "--title", p.Name, path)
+}
+
+// markerFiles returns the smallest files that make the Language a valid
+// project of its kind, keyed by path in the clone, or nil for an unknown
+// Language. Their marker is what Setup's language detection looks for.
+func markerFiles(p NewProject) map[string]string {
+	switch p.Language {
+	case "go":
+		return map[string]string{"go.mod": fmt.Sprintf("module github.com/%s/%s\n\ngo %s\n", p.Owner, p.Name, strings.TrimPrefix(runtime.Version(), "go"))}
+	case "typescript":
+		// npm rejects package names with capitals.
+		return map[string]string{"package.json": fmt.Sprintf("{\n  \"name\": %q,\n  \"private\": true\n}\n", strings.ToLower(p.Name))}
+	case "python":
+		return map[string]string{"pyproject.toml": fmt.Sprintf("[project]\nname = %q\nversion = \"0.1.0\"\n", p.Name)}
+	case "rust":
+		// Cargo refuses a manifest without a target, so an empty library
+		// comes with it.
+		return map[string]string{
+			"Cargo.toml": fmt.Sprintf("[package]\nname = %q\nversion = \"0.1.0\"\nedition = \"2024\"\n", p.Name),
+			"src/lib.rs": "",
+		}
+	}
+	return nil
 }
 
 func visibility(public bool) string {

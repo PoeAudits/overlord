@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/PoeAudits/overlord/internal/system"
 	"github.com/PoeAudits/overlord/internal/templates"
@@ -75,13 +76,14 @@ type Item struct {
 // root without changing anything. Languages are detected in projectRoot, the
 // Project's main checkout, which may differ from root when root is a worktree.
 func Check(ctx context.Context, runner system.Runner, root, projectRoot string) (Plan, error) {
-	_, _, plan, err := check(ctx, runner, root, projectRoot)
+	_, _, plan, err := check(ctx, runner, nil, root, projectRoot)
 	return plan, err
 }
 
 // check returns the manifest items that apply to this Project, the Template
-// data and the plan, with the items and plan rows in the same order.
-func check(ctx context.Context, runner system.Runner, root, projectRoot string) ([]templates.Item, templates.Data, Plan, error) {
+// data and the plan, with the items and plan rows in the same order. A non-nil
+// sleep makes a failing label lookup retry; see labelsStatus.
+func check(ctx context.Context, runner system.Runner, sleep func(time.Duration), root, projectRoot string) ([]templates.Item, templates.Data, Plan, error) {
 	manifest, err := templates.Manifest()
 	if err != nil {
 		return nil, templates.Data{}, Plan{}, err
@@ -103,7 +105,7 @@ func check(ctx context.Context, runner system.Runner, root, projectRoot string) 
 			}
 		}
 		for _, item := range expanded {
-			row, err := planRow(ctx, runner, root, item, data)
+			row, err := planRow(ctx, runner, sleep, root, item, data)
 			if err != nil {
 				return nil, templates.Data{}, Plan{}, fmt.Errorf("check %s: %w", item.Path, err)
 			}
@@ -126,10 +128,10 @@ func appliesTo(item templates.Item, languages []string) bool {
 	return slices.Contains(languages, item.Language)
 }
 
-func planRow(ctx context.Context, runner system.Runner, root string, item templates.Item, data templates.Data) (Item, error) {
+func planRow(ctx context.Context, runner system.Runner, sleep func(time.Duration), root string, item templates.Item, data templates.Data) (Item, error) {
 	row := Item{Path: item.Path, Block: item.Block, Strategy: item.Strategy}
 	if item.Strategy == templates.Labels {
-		row.Status, row.Detail, row.MissingLabels = labelsStatus(ctx, runner, root, item, data)
+		row.Status, row.Detail, row.MissingLabels = labelsStatus(ctx, runner, sleep, root, item, data)
 		return row, nil
 	}
 	var err error
@@ -234,7 +236,7 @@ func dirContents(path string) (empty, hasKeep bool, err error) {
 // templateData names the Project after its GitHub origin repo, falling back
 // to the directory name when there is no GitHub origin.
 func templateData(ctx context.Context, runner system.Runner, root, projectRoot string) (templates.Data, error) {
-	languages, err := detectLanguages(projectRoot)
+	languages, err := DetectLanguages(projectRoot)
 	if err != nil {
 		return templates.Data{}, err
 	}
@@ -251,9 +253,9 @@ func templateData(ctx context.Context, runner system.Runner, root, projectRoot s
 	return data, nil
 }
 
-// detectLanguages lists each language in templates.Languages whose marker
+// DetectLanguages lists each language in templates.Languages whose marker
 // file exists in projectRoot.
-func detectLanguages(projectRoot string) ([]string, error) {
+func DetectLanguages(projectRoot string) ([]string, error) {
 	var found []string
 	for _, language := range templates.Languages {
 		for _, marker := range language.Markers {

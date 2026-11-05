@@ -39,7 +39,7 @@ A `#name` suffix is a Managed Block inside that file. `triage labels` is the fiv
 | `stale` | `refreshed` | A Managed Block differs from its Template, a directory's `.gitkeep` is wrong, a symlink points elsewhere, or a generated agent file is out of date. Setup replaces the block wholesale, so edits made inside it are lost; text outside the block is kept. |
 | `ok` | `ok` | Already as guaranteed. |
 | `conflict` | `conflict` | Something Overlord does not own sits at the path (a real directory where the symlink goes, a hand-written agent file, a block with no end marker). Left untouched. |
-| `warning` | `warning` | Setup could not check or create the triage labels: no GitHub `origin`, or `gh` failed. Setup carries on and exits 0, with or without `--check`. |
+| `warning` | `warning` | Setup could not check or create the triage labels: no GitHub `origin`, or `gh` failed. The reason says whether the labels may be or are missing; the issue triage workflow needs them, so re-run `overlord setup` once `gh` works. Setup carries on and exits 0, with or without `--check` (`overlord new` instead stops). |
 | (never) | `failed` | Setup could not write the item; the reason is the error, such as `mkdir <path>: permission denied`. Setup carries on with the other items and exits 1. An item inside a failed one fails with its own error. |
 
 `overlord setup --check --json` prints the same plan as JSON, with the same exit code, `{"root": ..., "items": [{"path", "block", "strategy", "status", "detail", "missingLabels"}]}`, with `block`, `detail` and `missingLabels` present only when set. The JSON always uses the `--check` words, even without `--check`, plus `failed`.

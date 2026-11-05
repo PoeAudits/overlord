@@ -63,7 +63,7 @@ func Projects(ctx context.Context, runner system.Runner, home string) ([]Project
 	output, err := runner.Run(ctx, "", "sqlite3", "-readonly", "-json", stateDatabasePath(home),
 		"SELECT project_id, title, workspace_root FROM projection_projects WHERE deleted_at IS NULL")
 	if err != nil {
-		return nil, fmt.Errorf("read T3 projects: %w: %s", err, output)
+		return nil, fmt.Errorf("read T3 projects: %w", err)
 	}
 	// sqlite3 prints nothing at all for no rows.
 	if len(bytes.TrimSpace(output)) == 0 {

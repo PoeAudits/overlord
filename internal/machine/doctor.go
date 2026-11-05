@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/PoeAudits/overlord/internal/catalog"
 	"github.com/PoeAudits/overlord/internal/harness"
+	"github.com/PoeAudits/overlord/internal/project"
 	"github.com/PoeAudits/overlord/internal/system"
 	"github.com/PoeAudits/overlord/internal/t3"
 )
@@ -30,8 +32,9 @@ type Diagnosis struct {
 }
 
 // Doctor reports drift between agentsDir and every Harness under sys.Home,
-// and in T3 Code's settings. It never writes.
-func Doctor(ctx context.Context, sys system.System, agentsDir string) (Diagnosis, error) {
+// in T3 Code's settings and in the Projects under projectsRoot. It never
+// writes.
+func Doctor(ctx context.Context, sys system.System, agentsDir, projectsRoot string) (Diagnosis, error) {
 	report, err := Sync(sys, agentsDir, true)
 	if err != nil {
 		return Diagnosis{}, err
@@ -61,6 +64,11 @@ func Doctor(ctx context.Context, sys system.System, agentsDir string) (Diagnosis
 		return Diagnosis{}, err
 	}
 	diagnosis.Findings = append(diagnosis.Findings, overrides...)
+	withoutCI, err := findProjectsWithoutCI(projectsRoot)
+	if err != nil {
+		return Diagnosis{}, err
+	}
+	diagnosis.Findings = append(diagnosis.Findings, withoutCI...)
 	moved, unreachable, err := findMovedUpstreams(ctx, sys.Runner, agentsDir)
 	if err != nil {
 		return Diagnosis{}, err
@@ -89,6 +97,39 @@ func findT3OverridesWithoutSetup(ctx context.Context, sys system.System) ([]Find
 		findings = append(findings, Finding{
 			Path:    t3.SettingsPath(sys.Home),
 			Problem: fmt.Sprintf("T3 project %s has a scripts override without %s, so Setup does not run there", name, t3.SetupScriptID),
+		})
+	}
+	return findings, nil
+}
+
+// findProjectsWithoutCI names each Project under projectsRoot with a detected
+// language but no CI workflow. Setup creates the workflow only once a
+// language is detected, so a Project set up before it had one lacks it.
+func findProjectsWithoutCI(projectsRoot string) ([]Finding, error) {
+	entries, err := os.ReadDir(projectsRoot)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var findings []Finding
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		root := filepath.Join(projectsRoot, entry.Name())
+		languages, err := project.DetectLanguages(root)
+		if err != nil {
+			return nil, err
+		}
+		ci := filepath.Join(root, ".github", "workflows", "ci.yml")
+		if _, err := os.Lstat(ci); len(languages) == 0 || !errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		findings = append(findings, Finding{
+			Path:    ci,
+			Problem: fmt.Sprintf("missing although %s is detected; run overlord setup in that Project", strings.Join(languages, ", ")),
 		})
 	}
 	return findings, nil
