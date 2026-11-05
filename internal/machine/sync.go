@@ -271,16 +271,15 @@ func (run syncRun) createLink(path, target string) error {
 	return os.Symlink(target, path)
 }
 
-// syncT3 ensures T3 Code runs `overlord setup` on every new worktree.
+// syncT3 removes the overlord-setup script earlier Syncs registered, so
+// creating a T3 worktree no longer runs Setup (ADR 0007).
 func syncT3(run syncRun) ([]Result, error) {
-	status, err := t3.EnsureSetupScript(run.sys.Home, run.check)
-	if err != nil {
+	found, err := t3.RemoveSetupScript(run.sys.Home, run.check)
+	if err != nil || !found {
 		return nil, err
 	}
-	return []Result{{Path: t3.SettingsPath(run.sys.Home), Action: t3Actions[status], Detail: "overlord-setup script"}}, nil
+	return []Result{{Path: t3.SettingsPath(run.sys.Home), Action: Remove, Detail: "retired overlord-setup script"}}, nil
 }
-
-var t3Actions = map[t3.Status]Action{t3.Missing: Create, t3.Stale: Replace, t3.OK: OK}
 
 // DisplayPath shortens paths under home to ~/... for readable reports.
 func DisplayPath(home, path string) string {

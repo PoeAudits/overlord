@@ -1,7 +1,6 @@
 package machine
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -15,7 +14,6 @@ import (
 	"github.com/PoeAudits/overlord/internal/harness"
 	"github.com/PoeAudits/overlord/internal/project"
 	"github.com/PoeAudits/overlord/internal/system"
-	"github.com/PoeAudits/overlord/internal/t3"
 )
 
 // Finding is one piece of drift doctor found at a path.
@@ -59,11 +57,6 @@ func Doctor(ctx context.Context, sys system.System, agentsDir, projectsRoot stri
 		return Diagnosis{}, err
 	}
 	diagnosis.Findings = append(diagnosis.Findings, agents...)
-	overrides, err := findT3OverridesWithoutSetup(ctx, sys)
-	if err != nil {
-		return Diagnosis{}, err
-	}
-	diagnosis.Findings = append(diagnosis.Findings, overrides...)
 	withoutCI, err := findProjectsWithoutCI(projectsRoot)
 	if err != nil {
 		return Diagnosis{}, err
@@ -76,30 +69,6 @@ func Doctor(ctx context.Context, sys system.System, agentsDir, projectsRoot stri
 	diagnosis.Findings = append(diagnosis.Findings, moved...)
 	diagnosis.Notes = unreachable
 	return diagnosis, nil
-}
-
-// findT3OverridesWithoutSetup names each T3 project whose scripts override
-// replaces the global list without keeping the setup script. A project T3's
-// database does not list, or an unreadable database, leaves only its id.
-func findT3OverridesWithoutSetup(ctx context.Context, sys system.System) ([]Finding, error) {
-	ids, err := t3.ProjectsWithoutSetupScript(sys.Home)
-	if err != nil || len(ids) == 0 {
-		return nil, err
-	}
-	names := map[string]string{}
-	projects, _ := t3.Projects(ctx, sys.Runner, sys.Home)
-	for _, project := range projects {
-		names[project.ID] = fmt.Sprintf("%s (%s)", project.Title, project.Root)
-	}
-	var findings []Finding
-	for _, id := range ids {
-		name := cmp.Or(names[id], id)
-		findings = append(findings, Finding{
-			Path:    t3.SettingsPath(sys.Home),
-			Problem: fmt.Sprintf("T3 project %s has a scripts override without %s, so Setup does not run there", name, t3.SetupScriptID),
-		})
-	}
-	return findings, nil
 }
 
 // findProjectsWithoutCI names each Project under projectsRoot with a detected
@@ -256,6 +225,9 @@ func syncProblem(result Result) string {
 	case Create:
 		return thing + " missing"
 	case Remove:
+		if result.Step == T3Step {
+			return thing + " present"
+		}
 		return "dangling " + thing
 	case Update:
 		// Hooks are only ever added; the main Model can differ.

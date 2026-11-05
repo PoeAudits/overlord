@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by ADR-0007
 ---
 # Setup runs from T3 Code's worktree-create script, checks first, and repairs only what it owns
 

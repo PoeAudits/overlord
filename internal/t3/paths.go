@@ -18,10 +18,6 @@ func LauncherPath(home string) string {
 	return filepath.Join(home, ".t3", "bin", "t3")
 }
 
-func stateDatabasePath(home string) string {
-	return filepath.Join(userdata(home), "statev2.sqlite")
-}
-
 func userdata(home string) string {
 	return filepath.Join(home, ".t3", "userdata")
 }

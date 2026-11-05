@@ -7,7 +7,7 @@ ADR 0005 makes GitHub the Project's truth, yet only `overlord new` created a rep
 
 ## Consequences
 
-- Because T3 runs Setup when a thread starts (ADR 0003), the first thread on a Project without an origin creates its GitHub repository.
-- A Secret in history, a non-empty repository with the same name, or a failed push is a real failure: Setup exits 1, which blocks T3 threads on that Project until the history is cleaned or the origin is added by hand. A gh failure that says nothing about the repository (offline, not logged in) only warns.
+- Setup runs only when the user invokes it (ADR 0007), so a GitHub repository is created only by a deliberate `overlord setup` or `overlord new`, never by opening a T3 thread.
+- A Secret in history, a non-empty repository with the same name, or a failed push is a real failure: Setup exits 1 until the history is cleaned or the origin is added by hand. A gh failure that says nothing about the repository (offline, not logged in) only warns.
 - A failed push after the origin was created is not retried, since Setup then finds an origin; the message says to push by hand.
 - The `.gitignore` block goes at the top of an existing file, so a Project's own lines, such as `!.vscode/launch.json`, can override it.

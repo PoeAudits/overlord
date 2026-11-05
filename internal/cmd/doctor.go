@@ -16,15 +16,13 @@ func newDoctorCommand(sys system.System) *cobra.Command {
 		Short: "Report drift between the agents directory, every Harness and T3 Code without changing anything",
 		Long: `Report drift without changing anything. Doctor reports what "overlord
 sync --check" would change (missing or dangling skill links, global
-instruction files that are not symlinks, missing session hooks, a missing T3
-overlord-setup script), plus:
+instruction files that are not symlinks, missing session hooks, a retired T3
+overlord-setup script still present), plus:
 
   - global instruction links and ~/.claude/skills links whose target is gone
   - ~/.config/opencode/skills, or an agents directory that is not a git
     checkout: stale skill copies
   - global agent files without the generated header, Role or not
-  - T3 projects whose own scripts override lacks overlord-setup, which
-    replaces the global list so Setup does not run there
   - UPSTREAM.md sources whose remote HEAD differs from the recorded commit
   - Projects under projectsRoot (~/.config/overlord/config.yaml, default
     ~/Overlord/projects) with a detected language but no

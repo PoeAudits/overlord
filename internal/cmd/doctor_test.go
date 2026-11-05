@@ -156,9 +156,11 @@ func TestDoctorReportsEachDriftConditionAndWritesNothing(t *testing.T) {
 			want: "  ~/.claude/skills/old: dangling link to ~/gone\n",
 		},
 		{
-			name:  "missing T3 default script",
-			drift: func(t *testing.T, home string) { mustWrite(t, t3Settings(home), "{}\n") },
-			want:  "  ~/.t3/userdata/settings.json: overlord-setup script missing\n",
+			name: "retired T3 setup script",
+			drift: func(t *testing.T, home string) {
+				mustWrite(t, t3Settings(home), `{"defaultProjectScripts": [`+setupScriptJSON+`]}`)
+			},
+			want: "  ~/.t3/userdata/settings.json: retired overlord-setup script present\n",
 		},
 	}
 	for _, c := range cases {
@@ -194,81 +196,6 @@ func assertUnchanged(t *testing.T, before, after map[string]string) {
 	t.Helper()
 	if !maps.Equal(before, after) {
 		t.Errorf("doctor changed HOME:\nbefore %v\nafter  %v", keys(before), keys(after))
-	}
-}
-
-// addProjectOverrides adds per-project settings to T3's synced settings: one
-// project whose scripts override lacks the setup script, one whose override
-// has it, and one with no scripts override at all.
-func addProjectOverrides(t *testing.T, home string) {
-	t.Helper()
-	var settings map[string]any
-	if err := json.Unmarshal([]byte(readFile(t, t3Settings(home))), &settings); err != nil {
-		t.Fatal(err)
-	}
-	lint := map[string]any{"id": "lint", "name": "Lint", "command": "make lint", "icon": "lint", "runOnWorktreeCreate": false}
-	settings["projectSettingsOverrides"] = map[string]any{
-		"p-dropped": map[string]any{"defaultProjectScripts": []any{lint}},
-		"p-kept":    map[string]any{"defaultProjectScripts": append([]any{lint}, settings["defaultProjectScripts"].([]any)...)},
-		"p-other":   map[string]any{"defaultAutoPull": true},
-	}
-	content, err := json.MarshalIndent(settings, "", "  ")
-	if err != nil {
-		t.Fatal(err)
-	}
-	mustWrite(t, t3Settings(home), string(content))
-}
-
-func t3ProjectsQuery(home string) string {
-	return "sqlite3 -readonly -json " + filepath.Join(home, ".t3", "userdata", "statev2.sqlite") +
-		" SELECT project_id, title, workspace_root FROM projection_projects WHERE deleted_at IS NULL"
-}
-
-func TestDoctorNamesT3ProjectsWhoseScriptsOverrideOmitsTheSetupScript(t *testing.T) {
-	sys := syncedHome(t)
-	addProjectOverrides(t, sys.Home)
-	sys.runner.outputs[t3ProjectsQuery(sys.Home)] = `[{"project_id":"p-dropped","title":"pixie","workspace_root":"/src/pixie"},` +
-		`{"project_id":"p-kept","title":"overlord","workspace_root":"/src/overlord"}]` + "\n"
-	before := homeFiles(t, sys.Home)
-
-	stdout, code := run(t, sys.System, "doctor")
-
-	want := "Doctor found drift\n" +
-		"  ~/.t3/userdata/settings.json: T3 project pixie (/src/pixie) has a scripts override without overlord-setup, so Setup does not run there\n"
-	if code != 1 || stdout != want {
-		t.Fatalf("exit code = %d, stdout:\n%s\nwant:\n%s", code, stdout, want)
-	}
-	assertUnchanged(t, before, homeFiles(t, sys.Home))
-}
-
-func TestDoctorNamesT3ProjectsByIDWhenT3sDatabaseCannotBeRead(t *testing.T) {
-	sys := syncedHome(t)
-	addProjectOverrides(t, sys.Home)
-	// The fake runner fails the sqlite3 query, as when sqlite3 is missing.
-
-	stdout, code := run(t, sys.System, "doctor")
-
-	want := "Doctor found drift\n" +
-		"  ~/.t3/userdata/settings.json: T3 project p-dropped has a scripts override without overlord-setup, so Setup does not run there\n"
-	if code != 1 || stdout != want {
-		t.Fatalf("exit code = %d, stdout:\n%s\nwant:\n%s", code, stdout, want)
-	}
-}
-
-func TestDoctorNamesAT3ProjectByIDWhenT3sDatabaseDoesNotListIt(t *testing.T) {
-	sys := syncedHome(t)
-	addProjectOverrides(t, sys.Home)
-	sys.runner.outputs[t3ProjectsQuery(sys.Home)] = `[{"project_id":"p-kept","title":"overlord","workspace_root":"/src/overlord"}]` + "\n"
-
-	stdout, code := run(t, sys.System, "doctor")
-
-	want := "Doctor found drift\n" +
-		"  ~/.t3/userdata/settings.json: T3 project p-dropped has a scripts override without overlord-setup, so Setup does not run there\n"
-	if code != 1 || stdout != want {
-		t.Fatalf("exit code = %d, stdout:\n%s\nwant:\n%s", code, stdout, want)
-	}
-	if !slices.Contains(sys.runner.calls, ": "+t3ProjectsQuery(sys.Home)) {
-		t.Fatalf("doctor did not query T3's projects: %v", sys.runner.calls)
 	}
 }
 
