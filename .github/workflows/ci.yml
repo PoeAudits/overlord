@@ -4,18 +4,26 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    # Either default branch name; git init still defaults to master.
+    branches: [main, master]
   pull_request:
 
 jobs:
   go:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: gofmt
         run: test -z "$(gofmt -l .)"
-      - run: go vet ./...
-      - run: go test ./...
+      # go vet and go test fail when there are no packages, as in a new
+      # Project.
+      - name: go vet and go test
+        run: |
+          packages=$(go list ./...)
+          if [ -n "$packages" ]; then
+            go vet ./...
+            go test ./...
+          fi

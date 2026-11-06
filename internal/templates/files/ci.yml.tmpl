@@ -4,7 +4,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Either default branch name; git init still defaults to master.
+    branches: [main, master]
   pull_request:
 
 jobs:
@@ -13,19 +14,26 @@ jobs:
 {{end}}{{if eq $language "Go"}}  go:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: gofmt
         run: test -z "$(gofmt -l .)"
-      - run: go vet ./...
-      - run: go test ./...
+      # go vet and go test fail when there are no packages, as in a new
+      # Project.
+      - name: go vet and go test
+        run: |
+          packages=$(go list ./...)
+          if [ -n "$packages" ]; then
+            go vet ./...
+            go test ./...
+          fi
 {{end}}{{if eq $language "TypeScript"}}  typescript:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: lts/*
       - name: Detect package manager
@@ -54,15 +62,41 @@ jobs:
 {{end}}{{if eq $language "Python"}}  python:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - run: uv sync
-      - run: uvx ruff check
-      - run: uv run --with pytest pytest
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      # The runner's own Python is the newest release, which dependencies may
+      # not support yet, so use .python-version, else the oldest Python that
+      # requires-python allows.
+      - name: Pick Python
+        if: hashFiles('.python-version') == '' && hashFiles('pyproject.toml') != ''
+        run: |
+          uv run --no-project --with packaging python - <<'EOF'
+          import os, tomllib
+          from packaging.specifiers import SpecifierSet
+          spec = tomllib.load(open("pyproject.toml", "rb")).get("project", {}).get("requires-python")
+          if spec:
+              version = next(f"3.{minor}" for minor in range(8, 30) if f"3.{minor}.99" in SpecifierSet(spec))
+              with open(os.environ["GITHUB_ENV"], "a") as env:
+                  print(f"UV_PYTHON={version}", file=env)
+          EOF
+      - name: Install
+        run: |
+          if [ -f pyproject.toml ]; then uv sync
+          else uv venv && uv pip install -r requirements.txt
+          fi
+      # Like pytest below, ruff comes from the Project's own dependencies
+      # when it has them, so new ruff rules can't fail an unchanged Project.
+      - name: Lint
+        run: uv run --with ruff ruff check
+      # python -m puts the Project root on sys.path, so flat-layout tests can
+      # import its modules. pytest exits 5 when it collects no tests, as in a
+      # new Project.
+      - name: Test
+        run: uv run --with pytest python -m pytest || [ $? -eq 5 ]
 {{end}}{{if eq $language "Rust"}}  rust:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
