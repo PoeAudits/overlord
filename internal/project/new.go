@@ -112,10 +112,10 @@ func markerFiles(p NewProject) map[string]string {
 		return map[string]string{"pyproject.toml": fmt.Sprintf("[project]\nname = %q\nversion = \"0.1.0\"\n", p.Name)}
 	case "rust":
 		// Cargo refuses a manifest without a target, so an empty library
-		// comes with it.
+		// comes with it; cargo fmt --check wants its one newline.
 		return map[string]string{
 			"Cargo.toml": fmt.Sprintf("[package]\nname = %q\nversion = \"0.1.0\"\nedition = \"2024\"\n", p.Name),
-			"src/lib.rs": "",
+			"src/lib.rs": "\n",
 		}
 	}
 	return nil

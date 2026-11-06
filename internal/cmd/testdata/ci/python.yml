@@ -4,15 +4,34 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Either default branch name; git init still defaults to master.
+    branches: [main, master]
   pull_request:
 
 jobs:
   python:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - run: uv sync
-      - run: uvx ruff check
-      - run: uv run --with pytest pytest
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      # The runner's own Python is the newest release, which dependencies may
+      # not support yet, so use .python-version, else the oldest Python that
+      # requires-python allows.
+      - name: Pick Python
+        run: |
+          if [ ! -f .python-version ] && [ -f pyproject.toml ]; then
+            version=$(sed -nE 's/^requires-python *= *"[^0-9]*([0-9]+\.[0-9]+).*/\1/p' pyproject.toml | head -1)
+            if [ -n "$version" ]; then echo "UV_PYTHON=$version" >> "$GITHUB_ENV"; fi
+          fi
+      - name: Install
+        run: |
+          if [ -f pyproject.toml ]; then uv sync
+          else uv venv && uv pip install -r requirements.txt
+          fi
+      # Like pytest below, ruff comes from the Project's own dependencies
+      # when it has them, so new ruff rules can't fail an unchanged Project.
+      - name: Lint
+        run: uv run --with ruff ruff check
+      # pytest exits 5 when it collects no tests, as in a new Project.
+      - name: Test
+        run: uv run --with pytest pytest || [ $? -eq 5 ]
