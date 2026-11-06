@@ -32,6 +32,8 @@ jobs:
       # when it has them, so new ruff rules can't fail an unchanged Project.
       - name: Lint
         run: uv run --with ruff ruff check
-      # pytest exits 5 when it collects no tests, as in a new Project.
+      # python -m puts the Project root on sys.path, so flat-layout tests can
+      # import its modules. pytest exits 5 when it collects no tests, as in a
+      # new Project.
       - name: Test
-        run: uv run --with pytest pytest || [ $? -eq 5 ]
+        run: uv run --with pytest python -m pytest || [ $? -eq 5 ]
