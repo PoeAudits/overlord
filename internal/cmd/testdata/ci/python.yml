@@ -18,11 +18,17 @@ jobs:
       # not support yet, so use .python-version, else the oldest Python that
       # requires-python allows.
       - name: Pick Python
+        if: hashFiles('.python-version') == '' && hashFiles('pyproject.toml') != ''
         run: |
-          if [ ! -f .python-version ] && [ -f pyproject.toml ]; then
-            version=$(sed -nE 's/^requires-python *= *"[^0-9]*([0-9]+\.[0-9]+).*/\1/p' pyproject.toml | head -1)
-            if [ -n "$version" ]; then echo "UV_PYTHON=$version" >> "$GITHUB_ENV"; fi
-          fi
+          uv run --no-project --with packaging python - <<'EOF'
+          import os, tomllib
+          from packaging.specifiers import SpecifierSet
+          spec = tomllib.load(open("pyproject.toml", "rb")).get("project", {}).get("requires-python")
+          if spec:
+              version = next(f"3.{minor}" for minor in range(8, 30) if f"3.{minor}.99" in SpecifierSet(spec))
+              with open(os.environ["GITHUB_ENV"], "a") as env:
+                  print(f"UV_PYTHON={version}", file=env)
+          EOF
       - name: Install
         run: |
           if [ -f pyproject.toml ]; then uv sync
