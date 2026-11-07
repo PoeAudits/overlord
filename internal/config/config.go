@@ -18,7 +18,8 @@ import (
 
 // Config is Overlord's config with every path absolute.
 type Config struct {
-	// AgentsDir is the catalog Sync applies (skills, Roles, instructions).
+	// AgentsDir is the Agents directory Sync applies (skills, Roles,
+	// instructions).
 	AgentsDir string `yaml:"agentsDir"`
 	// ProjectsRoot is where `overlord new` clones new Projects and where
 	// `doctor` looks for Projects to check.
@@ -79,6 +80,7 @@ func Load(home string) (Config, error) {
 	}
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	decoder.KnownFields(true)
+	// An empty or comment-only file decodes as io.EOF and means the defaults.
 	if err := decoder.Decode(&config); err != nil && !errors.Is(err, io.EOF) {
 		return Config{}, fmt.Errorf("%s: %w", Path(home), err)
 	}

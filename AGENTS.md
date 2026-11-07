@@ -57,6 +57,8 @@ things or changing decided behaviour.
 - `internal/config`: Overlord's own config, `~/.config/overlord/config.yaml`.
   `Load(home)` returns it with paths absolute (defaults when the file is
   absent, never writes); `WriteDefault(home)` writes the defaults once.
+  An unknown key is an error, since the file is never rewritten and a
+  misspelt key would otherwise be ignored for good.
   `Load` leaves `{t3Origin}` in health URLs; Start resolves it each run.
 - `internal/cmd`: thin Cobra wiring. Commands: `setup`, `sync`, `start`,
   `doctor`, `new`, and the temporary `revert` and `snapshot` (see

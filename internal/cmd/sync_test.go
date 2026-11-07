@@ -358,5 +358,26 @@ func TestSyncRejectsAnUnknownKeyInOverlordsConfig(t *testing.T) {
 	if code == 0 {
 		t.Fatalf("exit code = 0, want failure\n%s", stdout)
 	}
-	assertContains(t, stderr, "field agentDir not found")
+	configPath := filepath.Join(sys.Home, ".config", "overlord", "config.yaml")
+	if !strings.HasPrefix(stderr, "overlord: "+configPath+": ") || !strings.Contains(stderr, "agentDir") {
+		t.Fatalf("stderr does not name the config file and the unknown key:\n%s", stderr)
+	}
+}
+
+func TestSyncTreatsAnEmptyOrCommentOnlyConfigAsTheDefaults(t *testing.T) {
+	for name, content := range map[string]string{"empty": "", "comment only": "# nothing set yet\n"} {
+		t.Run(name, func(t *testing.T) {
+			sys := newSystem(t, t.TempDir())
+			agents := newAgentsDir(t, sys.Home, "tdd")
+			configPath := filepath.Join(sys.Home, ".config", "overlord", "config.yaml")
+			mustWrite(t, configPath, content)
+
+			if stdout, code := run(t, sys, "sync"); code != 0 {
+				t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
+			}
+
+			assertLink(t, filepath.Join(sys.Home, ".claude", "skills", "tdd"), filepath.Join(agents, "skills", "tdd"))
+			assertFile(t, configPath, content)
+		})
+	}
 }
