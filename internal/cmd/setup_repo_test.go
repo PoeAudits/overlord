@@ -169,6 +169,26 @@ func TestSetupPushesToAnExistingEmptyRepositoryOfTheOwner(t *testing.T) {
 	}
 }
 
+func TestSetupAddsAnExistingEmptyRepositoryAsOriginAndPushesNothingWithoutBranches(t *testing.T) {
+	project := sampleProject(t)
+	sys := newSystem(t, project)
+	runner := noOrigin(project, "")
+	delete(runner.stderr, repoView)
+	runner.outputs[repoView] = `{"isEmpty":true}`
+	runner.outputs[branches] = ""
+	runner.outputs["git remote add origin https://github.com/PoeAudits/sample.git"] = ""
+	sys.Runner = runner
+
+	stdout, code := run(t, sys, "setup")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
+	}
+	assertContains(t, stdout, "  created    GitHub repository (the existing empty PoeAudits/sample added as origin; nothing to push yet)\n")
+	assertNoCall(t, runner, "gh repo create")
+	assertNoCall(t, runner, "git push")
+}
+
 func TestSetupLeavesAProjectInsideAnotherRepositoryWithoutAnOrigin(t *testing.T) {
 	project := sampleProject(t)
 	sys := newSystem(t, project)

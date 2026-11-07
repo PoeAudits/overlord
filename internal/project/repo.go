@@ -73,16 +73,17 @@ func createRepo(ctx context.Context, runner system.Runner, root string, row Item
 		row.Status, row.Detail = Failed, err.Error()
 		return row
 	}
-	if !pushed {
-		row.Detail = "private " + row.repo + " created; nothing to push yet"
-		if row.existing {
-			row.Detail = "the existing empty " + row.repo + " added as origin; nothing to push yet"
-		}
-		return row
-	}
-	row.Detail = "private " + row.repo + ", every branch and tag pushed"
+	row.Detail = "private " + row.repo
 	if row.existing {
-		row.Detail = "the existing empty " + row.repo + ", every branch and tag pushed"
+		row.Detail = "the existing empty " + row.repo
+	}
+	switch {
+	case pushed:
+		row.Detail += ", every branch and tag pushed"
+	case row.existing:
+		row.Detail += " added as origin; nothing to push yet"
+	default:
+		row.Detail += " created; nothing to push yet"
 	}
 	return row
 }
