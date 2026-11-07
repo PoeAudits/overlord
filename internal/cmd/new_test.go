@@ -65,7 +65,7 @@ func newProjectRunner(t *testing.T, home, name string) *cloneRunner {
 	}}}
 }
 
-func TestNewProjectCreatesClonesSetsUpCommitsPushesAndRegistersInOrder(t *testing.T) {
+func TestNewCreatesClonesSetsUpCommitsPushesAndRegistersInOrder(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	runner := newProjectRunner(t, sys.Home, "sample")
 	sys.Runner = runner
@@ -103,7 +103,7 @@ func TestNewProjectCreatesClonesSetsUpCommitsPushesAndRegistersInOrder(t *testin
 	}
 }
 
-func TestNewProjectCommitsTheLanguagesMarkerStandardsAndCI(t *testing.T) {
+func TestNewCommitsTheLanguagesMarkerStandardsAndCI(t *testing.T) {
 	tests := []struct {
 		lang, name string
 		markers    []string
@@ -137,7 +137,7 @@ func TestNewProjectCommitsTheLanguagesMarkerStandardsAndCI(t *testing.T) {
 	}
 }
 
-func TestNewProjectRefusesAMissingOrUnknownLanguageBeforeAnyRemoteCall(t *testing.T) {
+func TestNewRefusesAMissingOrUnknownLanguageBeforeAnyRemoteCall(t *testing.T) {
 	tests := []struct {
 		name, want string
 		args       []string
@@ -163,7 +163,7 @@ func TestNewProjectRefusesAMissingOrUnknownLanguageBeforeAnyRemoteCall(t *testin
 	}
 }
 
-func TestNewProjectRetriesTheLabelListWhileGitHubCreatesTheRepository(t *testing.T) {
+func TestNewRetriesTheLabelListWhileGitHubCreatesTheRepository(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	runner := newProjectRunner(t, sys.Home, "sample")
 	runner.labelListFailures = 2
@@ -187,7 +187,7 @@ func TestNewProjectRetriesTheLabelListWhileGitHubCreatesTheRepository(t *testing
 	}
 }
 
-func TestNewProjectFailsWithoutCommittingWhenTheTriageLabelsCannotBeSetUp(t *testing.T) {
+func TestNewFailsWithoutCommittingWhenTheTriageLabelsCannotBeSetUp(t *testing.T) {
 	tests := []struct {
 		name string
 		// failures is how many times gh label list fails; -1 leaves the
@@ -245,7 +245,7 @@ func TestNewProjectFailsWithoutCommittingWhenTheTriageLabelsCannotBeSetUp(t *tes
 	}
 }
 
-func TestNewProjectRefusesAnExistingDirectoryBeforeAnyRemoteCall(t *testing.T) {
+func TestNewRefusesAnExistingDirectoryBeforeAnyRemoteCall(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	runner := newProjectRunner(t, sys.Home, "sample")
 	sys.Runner = runner
@@ -264,7 +264,7 @@ func TestNewProjectRefusesAnExistingDirectoryBeforeAnyRemoteCall(t *testing.T) {
 	}
 }
 
-func TestNewProjectStopsAtTheFirstFailingRemoteStep(t *testing.T) {
+func TestNewStopsAtTheFirstFailingRemoteStep(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	runner := newProjectRunner(t, sys.Home, "sample")
 	delete(runner.outputs, "git push -u origin HEAD")
@@ -284,7 +284,7 @@ func TestNewProjectStopsAtTheFirstFailingRemoteStep(t *testing.T) {
 	}
 }
 
-func TestNewProjectStopsBeforeCommittingWhenSetupFailsAnItem(t *testing.T) {
+func TestNewStopsBeforeCommittingWhenSetupFailsAnItem(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	runner := newProjectRunner(t, sys.Home, "sample")
 	agents := filepath.Join(runner.clonePath, ".agents")
@@ -313,7 +313,7 @@ func TestNewProjectStopsBeforeCommittingWhenSetupFailsAnItem(t *testing.T) {
 	}
 }
 
-func TestNewProjectPublicWithDescriptionPassesBothToGitHub(t *testing.T) {
+func TestNewPublicWithDescriptionPassesBothToGitHub(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	runner := newProjectRunner(t, sys.Home, "sample")
 	sys.Runner = runner
@@ -329,7 +329,7 @@ func TestNewProjectPublicWithDescriptionPassesBothToGitHub(t *testing.T) {
 	}
 }
 
-func TestNewProjectClonesUnderTheProjectsRootFromOverlordsConfig(t *testing.T) {
+func TestNewClonesUnderTheProjectsRootFromOverlordsConfig(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	mustWrite(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), "projectsRoot: ~/code\n")
 	root := filepath.Join(sys.Home, "code")
@@ -349,7 +349,7 @@ func TestNewProjectClonesUnderTheProjectsRootFromOverlordsConfig(t *testing.T) {
 	}
 }
 
-func TestNewProjectCreatesTheRepoUnderTheGitHubOwnerFromOverlordsConfig(t *testing.T) {
+func TestNewCreatesTheRepoUnderTheGitHubOwnerFromOverlordsConfig(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	mustWrite(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), "githubOwner: acme\n")
 	path := filepath.Join(sys.Home, "Overlord", "projects", "sample")
