@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/PoeAudits/overlord/internal/config"
 	"github.com/PoeAudits/overlord/internal/system"
 )
 
@@ -27,7 +28,7 @@ func Execute(sys system.System, args []string) int {
 	cobra.EnableCommandSorting = false
 	root.AddCommand(newStartCommand(sys))
 	root.AddCommand(newSyncCommand(sys))
-	root.AddCommand(newNewProjectCommand(sys))
+	root.AddCommand(newNewCommand(sys))
 	root.AddCommand(newSetupCommand(sys))
 	root.AddCommand(newDoctorCommand(sys))
 	root.AddCommand(newRevertCommand(sys))
@@ -44,3 +45,12 @@ func Execute(sys system.System, args []string) int {
 
 // errReported fails a command whose output already says why.
 var errReported = errors.New("failure already reported")
+
+// ensureConfig writes the default config when there is no config file, then
+// loads it. Checks use config.Load alone, since a check never writes.
+func ensureConfig(home string) (config.Config, error) {
+	if err := config.WriteDefault(home); err != nil {
+		return config.Config{}, err
+	}
+	return config.Load(home)
+}

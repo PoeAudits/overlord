@@ -99,7 +99,7 @@ func TestSetupGitInitsADirectoryThatIsNotARepositoryAndPushesNothingWithoutBranc
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
 	}
-	assertContains(t, stdout, "  created    GitHub repository (private PoeAudits/sample, every branch and tag pushed)\n")
+	assertContains(t, stdout, "  created    GitHub repository (private PoeAudits/sample created; nothing to push yet)\n")
 	want := []string{
 		project + ": " + repoView,
 		project + ": git init",

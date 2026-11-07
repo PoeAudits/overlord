@@ -33,10 +33,6 @@ type target struct {
 	Entries bool
 }
 
-// ownedByClaude are entries of the skills directory that belong to Claude
-// Code itself; Sync never touches them and neither does revert.
-var ownedByClaude = map[string]bool{"synced": true, ".trash": true}
-
 // Dir is where the saved copy lives.
 func Dir(home string) string {
 	return filepath.Join(home, ".local", "state", "overlord", "revert")
@@ -108,8 +104,8 @@ func Restore(sys system.System) (string, error) {
 			}
 		}
 	}
-	// Nothing was replaced when this fails because the directory is empty;
-	// that is the only case in which removing it is right.
+	// Remove succeeds only when the directory is empty, which means nothing
+	// was replaced, so the caller gets "".
 	if os.Remove(replaced) == nil {
 		replaced = ""
 	}
@@ -131,7 +127,7 @@ func targetsFor(home, agentsDir string) []target {
 	for _, path := range harness.InstructionPaths(home) {
 		targets = append(targets, target{Path: path})
 	}
-	for _, h := range []harness.Harness{harness.Claude, harness.Codex, harness.OpenCode} {
+	for _, h := range harness.All {
 		targets = append(targets, target{Path: harness.GlobalAgentDir(h, home)})
 	}
 	return targets
@@ -169,7 +165,7 @@ func childPaths(dirs ...string) ([]string, error) {
 			return nil, err
 		}
 		for _, entry := range entries {
-			if seen[entry.Name()] || ownedByClaude[entry.Name()] {
+			if seen[entry.Name()] || harness.ClaudeOwnedSkillEntries[entry.Name()] {
 				continue
 			}
 			seen[entry.Name()] = true

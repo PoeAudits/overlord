@@ -45,5 +45,6 @@ Every item is committed in the first commit, so a fresh clone works in every Har
 - `GLOSSARY.md`, and `docs/adr/` with a starter ADR (lint and tests must pass before merge).
 - `docs/agents/issue-tracker.md`, `triage-labels.md` and `domain.md`, so the issue and triage skills work without their own setup run.
 - `.agents/skills/` for Project skills, with `.claude/skills` linking to it.
+- `.gitignore` with Overlord's Managed Block at the top: the Secret patterns, common dependency and cache directories, and OS and editor files, then a block for the `--lang` language when it has one.
 - `.github/workflows/ci.yml` running lint and tests for the `--lang` language.
 - The five triage labels on the GitHub repo (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`).

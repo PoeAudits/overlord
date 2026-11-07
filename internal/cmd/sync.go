@@ -35,15 +35,14 @@ any defaultProjectScripts entry with id overlord-setup from
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// A check never writes, so it reads the defaults without saving them.
+			load := config.Load
 			if !check {
 				if _, err := revert.Save(sys); err != nil {
 					return err
 				}
-				if err := config.WriteDefault(sys.Home); err != nil {
-					return err
-				}
+				load = ensureConfig
 			}
-			cfg, err := config.Load(sys.Home)
+			cfg, err := load(sys.Home)
 			if err != nil {
 				return err
 			}

@@ -65,11 +65,7 @@ func Create(ctx context.Context, runner system.Runner, p NewProject) (Plan, erro
 		return Plan{}, err
 	}
 	for name, content := range markers {
-		file := filepath.Join(path, name)
-		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
-			return Plan{}, err
-		}
-		if err := os.WriteFile(file, []byte(content), 0o644); err != nil {
+		if err := writeFile(filepath.Join(path, name), []byte(content)); err != nil {
 			return Plan{}, err
 		}
 	}

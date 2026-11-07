@@ -22,21 +22,21 @@ func userdata(home string) string {
 	return filepath.Join(home, ".t3", "userdata")
 }
 
-// DefaultOrigin is where T3 Code's server listens unless configured otherwise.
-const DefaultOrigin = "http://127.0.0.1:3773"
+// defaultOrigin is where T3 Code's server listens unless configured otherwise.
+const defaultOrigin = "http://127.0.0.1:3773"
 
 // Origin is the origin T3 Code's server last ran on, read from its
-// server-runtime file, or DefaultOrigin when that file is absent or unreadable.
+// server-runtime file, or defaultOrigin when that file is absent or unreadable.
 func Origin(home string) string {
 	data, err := os.ReadFile(filepath.Join(userdata(home), "server-runtime.json"))
 	if err != nil {
-		return DefaultOrigin
+		return defaultOrigin
 	}
 	var runtime struct {
 		Origin string `json:"origin"`
 	}
 	if json.Unmarshal(data, &runtime) != nil || runtime.Origin == "" {
-		return DefaultOrigin
+		return defaultOrigin
 	}
 	return runtime.Origin
 }

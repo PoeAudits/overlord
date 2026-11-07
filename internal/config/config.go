@@ -12,15 +12,14 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
-
-	"github.com/PoeAudits/overlord/internal/t3"
 )
 
 // Config is Overlord's config with every path absolute.
 type Config struct {
 	// AgentsDir is the catalog Sync applies (skills, Roles, instructions).
 	AgentsDir string `yaml:"agentsDir"`
-	// ProjectsRoot is where `overlord new` clones new Projects.
+	// ProjectsRoot is where `overlord new` clones new Projects and where
+	// `doctor` looks for Projects to check.
 	ProjectsRoot string `yaml:"projectsRoot"`
 	// GitHubOwner is the GitHub account or organisation `overlord new` creates
 	// repositories under.
@@ -100,9 +99,6 @@ func (c Config) resolve(home string, defaults Config) (Config, error) {
 		if service.Timeout <= 0 {
 			c.Services[i].Timeout = defaultTimeout
 		}
-		if strings.Contains(service.Health, t3OriginPlaceholder) {
-			c.Services[i].Health = strings.ReplaceAll(service.Health, t3OriginPlaceholder, t3.Origin(home))
-		}
 	}
 	return c, nil
 }
@@ -118,9 +114,9 @@ func expandHome(home, path string) string {
 	return path
 }
 
-// t3OriginPlaceholder in a health URL stands for T3 Code's current origin, so
+// T3OriginPlaceholder in a health URL stands for T3 Code's current origin, so
 // the default t3 service follows T3 to another port without a config edit.
-const t3OriginPlaceholder = "{t3Origin}"
+const T3OriginPlaceholder = "{t3Origin}"
 
 // defaultFile is the config written on first run.
 const defaultFile = `# Overlord's config. Written once with defaults; Overlord never rewrites it.
@@ -143,7 +139,7 @@ githubOwner: PoeAudits
 services:
   - name: t3
     command: ~/.t3/bin/t3 service install
-    health: "` + t3OriginPlaceholder + `/.well-known/t3/environment"
+    health: "` + T3OriginPlaceholder + `/.well-known/t3/environment"
     timeout: 30s
   - name: sleev
     command: sleev gateway start

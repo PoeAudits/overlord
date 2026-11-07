@@ -3,7 +3,6 @@ package project
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -69,9 +68,16 @@ func repoRow(ctx context.Context, runner system.Runner, root, newRepo string, da
 // every branch and tag. It returns the row, failed at the first step that
 // fails.
 func createRepo(ctx context.Context, runner system.Runner, root string, row Item) Item {
-	err := createAndPush(ctx, runner, root, row)
+	pushed, err := createAndPush(ctx, runner, root, row)
 	if err != nil {
 		row.Status, row.Detail = Failed, err.Error()
+		return row
+	}
+	if !pushed {
+		row.Detail = "private " + row.repo + " created; nothing to push yet"
+		if row.existing {
+			row.Detail = "the existing empty " + row.repo + " added as origin; nothing to push yet"
+		}
 		return row
 	}
 	row.Detail = "private " + row.repo + ", every branch and tag pushed"
@@ -81,10 +87,12 @@ func createRepo(ctx context.Context, runner system.Runner, root string, row Item
 	return row
 }
 
-func createAndPush(ctx context.Context, runner system.Runner, root string, row Item) error {
+// createAndPush reports whether it pushed anything; a repository without
+// branches has nothing to push.
+func createAndPush(ctx context.Context, runner system.Runner, root string, row Item) (bool, error) {
 	if row.gitInit {
 		if err := step(ctx, runner, root, "git", "init"); err != nil {
-			return err
+			return false, err
 		}
 	}
 	origin := []string{"gh", "repo", "create", row.repo, "--private", "--source", root, "--remote", "origin"}
@@ -92,20 +100,20 @@ func createAndPush(ctx context.Context, runner system.Runner, root string, row I
 		origin = []string{"git", "remote", "add", "origin", remoteURL(ctx, runner, root, row.repo)}
 	}
 	if err := step(ctx, runner, root, origin[0], origin[1:]...); err != nil {
-		return err
+		return false, err
 	}
 	branches, err := runner.Run(ctx, root, "git", "for-each-ref", "--format=%(refname)", "refs/heads")
 	if err != nil {
-		return fmt.Errorf("git for-each-ref failed: %s", failure(branches, err))
+		return false, fmt.Errorf("git for-each-ref failed: %s", failure(branches, err))
 	}
 	// git refuses to push when there is nothing to push, as in a new repository.
 	if len(strings.TrimSpace(string(branches))) == 0 {
-		return nil
+		return false, nil
 	}
 	if err := step(ctx, runner, root, "git", "push", "-u", "origin", "refs/heads/*:refs/heads/*", "refs/tags/*:refs/tags/*"); err != nil {
-		return fmt.Errorf("%w; origin now exists, so overlord setup will not push again: push every branch and tag yourself", err)
+		return false, fmt.Errorf("%w; origin now exists, so overlord setup will not push again: push every branch and tag yourself", err)
 	}
-	return nil
+	return true, nil
 }
 
 // remoteURL is the clone URL of repo in the protocol gh is configured for.
@@ -124,7 +132,7 @@ func trackedSecrets(ctx context.Context, runner system.Runner, root string) ([]s
 	// still matches.
 	output, err := runner.Run(ctx, root, "git", "-c", "core.quotePath=false", "log", "--branches", "--tags", "--name-only", "--format=")
 	if err != nil {
-		return nil, errors.New(failure(output, err))
+		return nil, fmt.Errorf("git log failed: %s", failure(output, err))
 	}
 	var found []string
 	for _, path := range strings.Split(string(output), "\n") {

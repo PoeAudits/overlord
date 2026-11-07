@@ -4,10 +4,12 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/PoeAudits/overlord/internal/config"
 	"github.com/PoeAudits/overlord/internal/system"
+	"github.com/PoeAudits/overlord/internal/t3"
 )
 
 // ServiceStatus is what Start found or did for one service.
@@ -34,8 +36,8 @@ type ServiceResult struct {
 	Log string
 }
 
-// AppName names the T3 Code desktop app in Start's results.
-const AppName = "T3 Code app"
+// appName names the T3 Code desktop app in Start's results.
+const appName = "T3 Code app"
 
 // Start brings up every enabled service that is not healthy, in order, and
 // then the T3 Code desktop app. A service that fails does not stop the rest.
@@ -43,6 +45,7 @@ func Start(ctx context.Context, sys system.System, services []config.Service) []
 	logs := filepath.Join(sys.Home, ".local", "state", "overlord")
 	var results []ServiceResult
 	for _, service := range services {
+		service.Health = strings.ReplaceAll(service.Health, config.T3OriginPlaceholder, t3.Origin(sys.Home))
 		results = append(results, startService(ctx, sys, logs, service))
 	}
 	return append(results, startApp(ctx, sys, logs))
@@ -75,12 +78,12 @@ func startService(ctx context.Context, sys system.System, logs string, service c
 // it is already running.
 func startApp(ctx context.Context, sys system.System, logs string) ServiceResult {
 	if appRunning(ctx, sys) {
-		return ServiceResult{Name: AppName, Status: Healthy, Detail: "running"}
+		return ServiceResult{Name: appName, Status: Healthy, Detail: "running"}
 	}
 	if _, err := launch(sys, logs, "t3-app", "gtk-launch", "t3code"); err != nil {
-		return ServiceResult{Name: AppName, Status: Failed, Detail: err.Error()}
+		return ServiceResult{Name: appName, Status: Failed, Detail: err.Error()}
 	}
-	return ServiceResult{Name: AppName, Status: Started, Detail: "launched"}
+	return ServiceResult{Name: appName, Status: Started, Detail: "launched"}
 }
 
 // launch starts name detached with its output appended to logs/<logName>.log

@@ -68,15 +68,9 @@ func repair(path string, item templates.Item, data templates.Data, earlier []str
 		if err != nil {
 			return err
 		}
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return err
-		}
-		return os.WriteFile(path, content, 0o644)
+		return writeFile(path, content)
 	case templates.Generated:
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return err
-		}
-		return os.WriteFile(path, item.Content, 0o644)
+		return writeFile(path, item.Content)
 	case templates.Dir:
 		return repairDir(path)
 	case templates.Symlink:
@@ -91,6 +85,14 @@ func repair(path string, item templates.Item, data templates.Data, earlier []str
 		return os.Symlink(item.Target, path)
 	}
 	return fmt.Errorf("unknown strategy %q", item.Strategy)
+}
+
+// writeFile writes content to path, creating its parent directories.
+func writeFile(path string, content []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, content, 0o644)
 }
 
 // repairDir ensures the directory exists with a .gitkeep only while empty.

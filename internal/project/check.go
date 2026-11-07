@@ -261,7 +261,7 @@ func dirContents(path string) (empty, hasKeep bool, err error) {
 // templateData names the Project after its GitHub origin repo, falling back
 // to the directory name when there is no GitHub origin.
 func templateData(ctx context.Context, runner system.Runner, root, projectRoot string) (templates.Data, error) {
-	languages, err := DetectLanguages(projectRoot)
+	languages, err := templates.DetectLanguages(projectRoot)
 	if err != nil {
 		return templates.Data{}, err
 	}
@@ -277,26 +277,6 @@ func templateData(ctx context.Context, runner system.Runner, root, projectRoot s
 	}
 	data.ProjectName, data.Owner, data.Repo = repo, owner, repo
 	return data, nil
-}
-
-// DetectLanguages lists each language in templates.Languages whose marker
-// file exists in projectRoot.
-func DetectLanguages(projectRoot string) ([]string, error) {
-	var found []string
-	for _, language := range templates.Languages {
-		for _, marker := range language.Markers {
-			_, err := os.Stat(filepath.Join(projectRoot, marker))
-			if errors.Is(err, fs.ErrNotExist) {
-				continue
-			}
-			if err != nil {
-				return nil, err
-			}
-			found = append(found, language.Name)
-			break
-		}
-	}
-	return found, nil
 }
 
 func parseGitHubRemote(url string) (owner, repo string, ok bool) {

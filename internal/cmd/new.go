@@ -5,13 +5,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/PoeAudits/overlord/internal/config"
 	"github.com/PoeAudits/overlord/internal/project"
 	"github.com/PoeAudits/overlord/internal/system"
 	"github.com/PoeAudits/overlord/internal/t3"
 )
 
-func newNewProjectCommand(sys system.System) *cobra.Command {
+func newNewCommand(sys system.System) *cobra.Command {
 	var description, language string
 	var public bool
 	command := &cobra.Command{
@@ -35,10 +34,7 @@ workflow in the first commit:
   rust        Cargo.toml and an empty src/lib.rs`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(command *cobra.Command, args []string) error {
-			if err := config.WriteDefault(sys.Home); err != nil {
-				return err
-			}
-			cfg, err := config.Load(sys.Home)
+			cfg, err := ensureConfig(sys.Home)
 			if err != nil {
 				return err
 			}

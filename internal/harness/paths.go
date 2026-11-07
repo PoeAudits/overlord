@@ -4,21 +4,26 @@ import "path/filepath"
 
 // GlobalAgentDir is where h reads global agent files.
 func GlobalAgentDir(h Harness, home string) string {
-	return map[Harness]string{
-		Claude:   filepath.Join(home, ".claude", "agents"),
-		Codex:    filepath.Join(home, ".codex", "agents"),
-		OpenCode: filepath.Join(home, ".config", "opencode", "agents"),
-	}[h]
+	return filepath.Join(home, globalAgentDirs[h])
+}
+
+// globalAgentDirs are relative to home.
+var globalAgentDirs = map[Harness]string{
+	Claude:   filepath.Join(".claude", "agents"),
+	Codex:    filepath.Join(".codex", "agents"),
+	OpenCode: filepath.Join(".config", "opencode", "agents"),
 }
 
 // ProjectAgentDir is where h reads a Project's agent files, relative to the
 // Project root and slash-separated.
 func ProjectAgentDir(h Harness) string {
-	return map[Harness]string{
-		Claude:   ".claude/agents",
-		Codex:    ".codex/agents",
-		OpenCode: ".opencode/agents",
-	}[h]
+	return projectAgentDirs[h]
+}
+
+var projectAgentDirs = map[Harness]string{
+	Claude:   ".claude/agents",
+	Codex:    ".codex/agents",
+	OpenCode: ".opencode/agents",
 }
 
 // InstructionPaths are where each Harness reads global instructions.
@@ -34,6 +39,10 @@ func InstructionPaths(home string) []string {
 func SkillsDir(home string) string {
 	return filepath.Join(home, ".claude", "skills")
 }
+
+// ClaudeOwnedSkillEntries are entries of SkillsDir that belong to Claude Code
+// itself: claude.ai skill sync and its trash. Overlord never touches them.
+var ClaudeOwnedSkillEntries = map[string]bool{"synced": true, ".trash": true}
 
 // OpenCodeSkillsDir is OpenCode's own skills directory. OpenCode reads
 // SkillsDir too, so anything here is a stale copy.

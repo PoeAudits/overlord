@@ -10,7 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Harness is a coding-agent tool Overlord configures.
+// Harness is a coding agent Overlord configures.
 type Harness string
 
 const (
@@ -18,6 +18,9 @@ const (
 	Codex    Harness = "codex"
 	OpenCode Harness = "opencode"
 )
+
+// All is every Harness, in report order.
+var All = []Harness{Claude, Codex, OpenCode}
 
 // AgentFile is one rendered agent definition. Name is the file name inside
 // the Harness's agents directory; callers choose that directory.

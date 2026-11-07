@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -86,10 +85,7 @@ func createBlockFile(path string, item templates.Item, data templates.Data, rend
 		}
 		rendered = append(append(rendered, '\n'), trailer...)
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, rendered, 0o644)
+	return writeFile(path, rendered)
 }
 
 func writeSpliced(path string, content []byte, start, end int, insert []byte) error {
