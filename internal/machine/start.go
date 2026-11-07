@@ -43,9 +43,10 @@ const appName = "T3 Code app"
 // then the T3 Code desktop app. A service that fails does not stop the rest.
 func Start(ctx context.Context, sys system.System, services []config.Service) []ServiceResult {
 	logs := config.StateDir(sys.Home)
+	origin := t3.Origin(sys.Home)
 	var results []ServiceResult
 	for _, service := range services {
-		service.Health = strings.ReplaceAll(service.Health, config.T3OriginPlaceholder, t3.Origin(sys.Home))
+		service.Health = strings.ReplaceAll(service.Health, config.T3OriginPlaceholder, origin)
 		results = append(results, startService(ctx, sys, logs, service))
 	}
 	return append(results, startApp(ctx, sys, logs))

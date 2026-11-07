@@ -4,26 +4,21 @@ import "path/filepath"
 
 // GlobalAgentDir is where h reads global agent files.
 func GlobalAgentDir(h Harness, home string) string {
-	return filepath.Join(home, globalAgentDirs[h])
-}
-
-// globalAgentDirs are relative to home.
-var globalAgentDirs = map[Harness]string{
-	Claude:   filepath.Join(".claude", "agents"),
-	Codex:    filepath.Join(".codex", "agents"),
-	OpenCode: filepath.Join(".config", "opencode", "agents"),
+	return map[Harness]string{
+		Claude:   filepath.Join(home, ".claude", "agents"),
+		Codex:    filepath.Join(home, ".codex", "agents"),
+		OpenCode: filepath.Join(home, ".config", "opencode", "agents"),
+	}[h]
 }
 
 // ProjectAgentDir is where h reads a Project's agent files, relative to the
 // Project root and slash-separated.
 func ProjectAgentDir(h Harness) string {
-	return projectAgentDirs[h]
-}
-
-var projectAgentDirs = map[Harness]string{
-	Claude:   ".claude/agents",
-	Codex:    ".codex/agents",
-	OpenCode: ".opencode/agents",
+	return map[Harness]string{
+		Claude:   ".claude/agents",
+		Codex:    ".codex/agents",
+		OpenCode: ".opencode/agents",
+	}[h]
 }
 
 // InstructionPaths are where each Harness reads global instructions.

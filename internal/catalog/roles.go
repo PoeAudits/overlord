@@ -76,6 +76,8 @@ type roleEntry struct {
 }
 
 // harnessKeys are the keys a Role's models map must have, one per Harness.
+// They must stay in step with harness.All, which this package cannot import
+// because harness imports catalog.
 var harnessKeys = []string{"claude", "codex", "opencode"}
 
 func readRole(dir, name string, entry roleEntry) (Role, error) {
