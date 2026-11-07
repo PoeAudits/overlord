@@ -3,9 +3,11 @@
 package config
 
 import (
+	"bytes"
 	"cmp"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -52,8 +54,16 @@ func Path(home string) string {
 	return filepath.Join(home, ".config", "overlord", "config.yaml")
 }
 
+// StateDir is where Overlord keeps what it writes for itself: service logs
+// and the revert copy.
+func StateDir(home string) string {
+	return filepath.Join(home, ".local", "state", "overlord")
+}
+
 // Load reads the config under home. A missing file means the defaults; Load
-// never writes. Keys the file leaves out take their default value.
+// never writes. Keys the file leaves out take their default value; a key the
+// config does not know is an error, since the file is never rewritten and a
+// misspelt key would otherwise be ignored for good.
 func Load(home string) (Config, error) {
 	data, err := os.ReadFile(Path(home))
 	if errors.Is(err, os.ErrNotExist) {
@@ -67,7 +77,9 @@ func Load(home string) (Config, error) {
 	if err := yaml.Unmarshal([]byte(defaultFile), &defaults); err != nil {
 		return Config{}, fmt.Errorf("default config: %w", err)
 	}
-	if err := yaml.Unmarshal(data, &config); err != nil {
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&config); err != nil && !errors.Is(err, io.EOF) {
 		return Config{}, fmt.Errorf("%s: %w", Path(home), err)
 	}
 	return config.resolve(home, defaults)

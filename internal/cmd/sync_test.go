@@ -348,3 +348,15 @@ func TestSyncAndStartRejectAMalformedConfigNamingTheFile(t *testing.T) {
 		})
 	}
 }
+
+func TestSyncRejectsAnUnknownKeyInOverlordsConfig(t *testing.T) {
+	sys := newSystem(t, t.TempDir())
+	newAgentsDir(t, sys.Home, "tdd")
+	mustWrite(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), "agentDir: ~/src/agents\n")
+
+	stdout, stderr, code := runCapturing(sys, "sync")
+	if code == 0 {
+		t.Fatalf("exit code = 0, want failure\n%s", stdout)
+	}
+	assertContains(t, stderr, "field agentDir not found")
+}

@@ -35,7 +35,7 @@ type target struct {
 
 // Dir is where the saved copy lives.
 func Dir(home string) string {
-	return filepath.Join(home, ".local", "state", "overlord", "revert")
+	return filepath.Join(config.StateDir(home), "revert")
 }
 
 // Save copies every path Sync or Start can change, unless a saved copy

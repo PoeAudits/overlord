@@ -42,7 +42,7 @@ const appName = "T3 Code app"
 // Start brings up every enabled service that is not healthy, in order, and
 // then the T3 Code desktop app. A service that fails does not stop the rest.
 func Start(ctx context.Context, sys system.System, services []config.Service) []ServiceResult {
-	logs := filepath.Join(sys.Home, ".local", "state", "overlord")
+	logs := config.StateDir(sys.Home)
 	var results []ServiceResult
 	for _, service := range services {
 		service.Health = strings.ReplaceAll(service.Health, config.T3OriginPlaceholder, t3.Origin(sys.Home))
