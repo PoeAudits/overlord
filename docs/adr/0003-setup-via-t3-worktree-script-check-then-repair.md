@@ -1,9 +1,9 @@
 ---
-status: superseded by ADR-0007
+status: superseded by ADR-0007 (the T3 trigger; check-then-repair stands)
 ---
 # Setup runs from T3 Code's worktree-create script, checks first, and repairs only what it owns
 
-T3 Code runs the first project script flagged `runOnWorktreeCreate` after creating a worktree for a new thread, with the worktree as working directory and `T3CODE_PROJECT_ROOT` / `T3CODE_WORKTREE_PATH` in the environment. Overlord registers `overlord setup` as a `defaultProjectScripts` entry in `~/.t3/userdata/settings.json` with `async: false`, so setup finishes before the agent starts and applies to every project, including ones added earlier. A `t3.json` in the repo is not executed by T3 (it is only importable from the UI), so it is not used. so new or incomplete projects are set up before the agent starts and without the user typing commands. Setup first checks the project, then creates missing files and refreshes only its own marked blocks (header/footer-delimited, versioned) when they are out of date. It never edits text outside those blocks. We rejected Harness session-start hooks as the setup trigger because they depend on the model acting and differ per Harness; hooks are used only for Sync.
+T3 Code runs the first project script flagged `runOnWorktreeCreate` after creating a worktree for a new thread, with the worktree as working directory and `T3CODE_PROJECT_ROOT` / `T3CODE_WORKTREE_PATH` in the environment. Overlord registers `overlord setup` as a `defaultProjectScripts` entry in `~/.t3/userdata/settings.json` with `async: false`, so setup finishes before the agent starts and applies to every project, including ones added earlier. A `t3.json` in the repo is not executed by T3 (it is only importable from the UI), so it is not used. This way new or incomplete projects are set up before the agent starts and without the user typing commands. Setup first checks the project, then creates missing files and refreshes only its own marked blocks (header/footer-delimited, versioned) when they are out of date. It never edits text outside those blocks. We rejected Harness session-start hooks as the setup trigger because they depend on the model acting and differ per Harness; hooks are used only for Sync.
 
 ## Consequences
 

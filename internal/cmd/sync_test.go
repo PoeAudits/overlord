@@ -275,18 +275,6 @@ func TestSyncQuietPrintsOnlyWhatNeedsTheUser(t *testing.T) {
 	}
 }
 
-// newAgentsDir creates home/.agents with one skill directory per name and the
-// global AGENTS.md, and returns its path.
-func newAgentsDir(t *testing.T, home string, skills ...string) string {
-	t.Helper()
-	agents := filepath.Join(home, ".agents")
-	for _, name := range skills {
-		mustWrite(t, filepath.Join(agents, "skills", name, "SKILL.md"), "# "+name+"\n")
-	}
-	mustWrite(t, filepath.Join(agents, "AGENTS.md"), "# Global rules\n")
-	return agents
-}
-
 // hookLines is the report of the hooks step when every hook has the given
 // action label.
 func hookLines(label string) string {
@@ -300,17 +288,6 @@ func instructionPaths(home string) []string {
 		filepath.Join(home, ".claude", "CLAUDE.md"),
 		filepath.Join(home, ".codex", "AGENTS.md"),
 		filepath.Join(home, ".config", "opencode", "AGENTS.md"),
-	}
-}
-
-func assertLink(t *testing.T, path, target string) {
-	t.Helper()
-	got, err := os.Readlink(path)
-	if err != nil {
-		t.Fatalf("%s is not a symlink: %v", path, err)
-	}
-	if got != target {
-		t.Fatalf("%s -> %s, want -> %s", path, got, target)
 	}
 }
 
@@ -368,6 +345,39 @@ func TestSyncAndStartRejectAMalformedConfigNamingTheFile(t *testing.T) {
 			if _, err := os.Lstat(filepath.Join(sys.Home, ".claude")); err == nil {
 				t.Fatalf("%s changed the home despite the bad config", command)
 			}
+		})
+	}
+}
+
+func TestSyncRejectsAnUnknownKeyInOverlordsConfig(t *testing.T) {
+	sys := newSystem(t, t.TempDir())
+	newAgentsDir(t, sys.Home, "tdd")
+	mustWrite(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), "agentDir: ~/src/agents\n")
+
+	stdout, stderr, code := runCapturing(sys, "sync")
+	if code == 0 {
+		t.Fatalf("exit code = 0, want failure\n%s", stdout)
+	}
+	configPath := filepath.Join(sys.Home, ".config", "overlord", "config.yaml")
+	if !strings.HasPrefix(stderr, "overlord: "+configPath+": ") || !strings.Contains(stderr, "agentDir") {
+		t.Fatalf("stderr does not name the config file and the unknown key:\n%s", stderr)
+	}
+}
+
+func TestSyncTreatsAnEmptyOrCommentOnlyConfigAsTheDefaults(t *testing.T) {
+	for name, content := range map[string]string{"empty": "", "comment only": "# nothing set yet\n"} {
+		t.Run(name, func(t *testing.T) {
+			sys := newSystem(t, t.TempDir())
+			agents := newAgentsDir(t, sys.Home, "tdd")
+			configPath := filepath.Join(sys.Home, ".config", "overlord", "config.yaml")
+			mustWrite(t, configPath, content)
+
+			if stdout, code := run(t, sys, "sync"); code != 0 {
+				t.Fatalf("exit code = %d, want 0\n%s", code, stdout)
+			}
+
+			assertLink(t, filepath.Join(sys.Home, ".claude", "skills", "tdd"), filepath.Join(agents, "skills", "tdd"))
+			assertFile(t, configPath, content)
 		})
 	}
 }

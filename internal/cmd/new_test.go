@@ -10,9 +10,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/PoeAudits/overlord/internal/cmd"
-	"github.com/PoeAudits/overlord/internal/system"
 )
 
 // cloneRunner answers like fakeRunner, and also acts like the real tools
@@ -68,7 +65,7 @@ func newProjectRunner(t *testing.T, home, name string) *cloneRunner {
 	}}}
 }
 
-func TestNewProjectCreatesClonesSetsUpCommitsPushesAndRegistersInOrder(t *testing.T) {
+func TestNewCreatesClonesSetsUpCommitsPushesAndRegistersInOrder(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	runner := newProjectRunner(t, sys.Home, "sample")
 	sys.Runner = runner
@@ -106,7 +103,7 @@ func TestNewProjectCreatesClonesSetsUpCommitsPushesAndRegistersInOrder(t *testin
 	}
 }
 
-func TestNewProjectCommitsTheLanguagesMarkerStandardsAndCI(t *testing.T) {
+func TestNewCommitsTheLanguagesMarkerStandardsAndCI(t *testing.T) {
 	tests := []struct {
 		lang, name string
 		markers    []string
@@ -140,7 +137,7 @@ func TestNewProjectCommitsTheLanguagesMarkerStandardsAndCI(t *testing.T) {
 	}
 }
 
-func TestNewProjectRefusesAMissingOrUnknownLanguageBeforeAnyRemoteCall(t *testing.T) {
+func TestNewRefusesAMissingOrUnknownLanguageBeforeAnyRemoteCall(t *testing.T) {
 	tests := []struct {
 		name, want string
 		args       []string
@@ -153,21 +150,20 @@ func TestNewProjectRefusesAMissingOrUnknownLanguageBeforeAnyRemoteCall(t *testin
 			sys := newSystem(t, t.TempDir())
 			runner := newProjectRunner(t, sys.Home, "sample")
 			sys.Runner = runner
-			var stderr strings.Builder
 
-			code := cmdExecute(sys, &stderr, tt.args...)
+			_, stderr, code := runCapturing(sys, tt.args...)
 
 			if code == 0 || len(runner.calls) != 0 {
 				t.Fatalf("exit code = %d, commands %q; want non-zero and none", code, runner.calls)
 			}
-			if stderr.String() != tt.want {
-				t.Fatalf("stderr = %q, want %q", stderr.String(), tt.want)
+			if stderr != tt.want {
+				t.Fatalf("stderr = %q, want %q", stderr, tt.want)
 			}
 		})
 	}
 }
 
-func TestNewProjectRetriesTheLabelListWhileGitHubCreatesTheRepository(t *testing.T) {
+func TestNewRetriesTheLabelListWhileGitHubCreatesTheRepository(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	runner := newProjectRunner(t, sys.Home, "sample")
 	runner.labelListFailures = 2
@@ -191,7 +187,7 @@ func TestNewProjectRetriesTheLabelListWhileGitHubCreatesTheRepository(t *testing
 	}
 }
 
-func TestNewProjectFailsWithoutCommittingWhenTheTriageLabelsCannotBeSetUp(t *testing.T) {
+func TestNewFailsWithoutCommittingWhenTheTriageLabelsCannotBeSetUp(t *testing.T) {
 	tests := []struct {
 		name string
 		// failures is how many times gh label list fails; -1 leaves the
@@ -249,14 +245,13 @@ func TestNewProjectFailsWithoutCommittingWhenTheTriageLabelsCannotBeSetUp(t *tes
 	}
 }
 
-func TestNewProjectRefusesAnExistingDirectoryBeforeAnyRemoteCall(t *testing.T) {
+func TestNewRefusesAnExistingDirectoryBeforeAnyRemoteCall(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	runner := newProjectRunner(t, sys.Home, "sample")
 	sys.Runner = runner
 	mustMkdir(t, runner.clonePath)
-	var stderr strings.Builder
 
-	code := cmdExecute(sys, &stderr, "new", "sample", "--lang", "go")
+	_, stderr, code := runCapturing(sys, "new", "sample", "--lang", "go")
 
 	if code == 0 {
 		t.Fatal("exit code = 0, want non-zero")
@@ -264,19 +259,18 @@ func TestNewProjectRefusesAnExistingDirectoryBeforeAnyRemoteCall(t *testing.T) {
 	if len(runner.calls) != 0 {
 		t.Fatalf("commands ran: %q", runner.calls)
 	}
-	if want := runner.clonePath + " already exists"; !strings.Contains(stderr.String(), want) {
-		t.Fatalf("stderr = %q, want it to contain %q", stderr.String(), want)
+	if want := runner.clonePath + " already exists"; !strings.Contains(stderr, want) {
+		t.Fatalf("stderr = %q, want it to contain %q", stderr, want)
 	}
 }
 
-func TestNewProjectStopsAtTheFirstFailingRemoteStep(t *testing.T) {
+func TestNewStopsAtTheFirstFailingRemoteStep(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	runner := newProjectRunner(t, sys.Home, "sample")
 	delete(runner.outputs, "git push -u origin HEAD")
 	sys.Runner = runner
-	var stderr strings.Builder
 
-	code := cmdExecute(sys, &stderr, "new", "sample", "--lang", "go")
+	_, stderr, code := runCapturing(sys, "new", "sample", "--lang", "go")
 
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
@@ -285,12 +279,12 @@ func TestNewProjectStopsAtTheFirstFailingRemoteStep(t *testing.T) {
 		t.Fatalf("last command = %q, want the push; t3 registration must not run", last)
 	}
 	want := "overlord: git push -u origin HEAD failed: fake: command failed\n"
-	if stderr.String() != want {
-		t.Fatalf("stderr = %q, want %q", stderr.String(), want)
+	if stderr != want {
+		t.Fatalf("stderr = %q, want %q", stderr, want)
 	}
 }
 
-func TestNewProjectStopsBeforeCommittingWhenSetupFailsAnItem(t *testing.T) {
+func TestNewStopsBeforeCommittingWhenSetupFailsAnItem(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	runner := newProjectRunner(t, sys.Home, "sample")
 	agents := filepath.Join(runner.clonePath, ".agents")
@@ -319,7 +313,7 @@ func TestNewProjectStopsBeforeCommittingWhenSetupFailsAnItem(t *testing.T) {
 	}
 }
 
-func TestNewProjectPublicWithDescriptionPassesBothToGitHub(t *testing.T) {
+func TestNewPublicWithDescriptionPassesBothToGitHub(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	runner := newProjectRunner(t, sys.Home, "sample")
 	sys.Runner = runner
@@ -335,14 +329,7 @@ func TestNewProjectPublicWithDescriptionPassesBothToGitHub(t *testing.T) {
 	}
 }
 
-// cmdExecute runs overlord with stderr captured in stderr.
-func cmdExecute(sys system.System, stderr *strings.Builder, args ...string) int {
-	sys.Stdout = &strings.Builder{}
-	sys.Stderr = stderr
-	return cmd.Execute(sys, args)
-}
-
-func TestNewProjectClonesUnderTheProjectsRootFromOverlordsConfig(t *testing.T) {
+func TestNewClonesUnderTheProjectsRootFromOverlordsConfig(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	mustWrite(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), "projectsRoot: ~/code\n")
 	root := filepath.Join(sys.Home, "code")
@@ -362,7 +349,7 @@ func TestNewProjectClonesUnderTheProjectsRootFromOverlordsConfig(t *testing.T) {
 	}
 }
 
-func TestNewProjectCreatesTheRepoUnderTheGitHubOwnerFromOverlordsConfig(t *testing.T) {
+func TestNewCreatesTheRepoUnderTheGitHubOwnerFromOverlordsConfig(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
 	mustWrite(t, filepath.Join(sys.Home, ".config", "overlord", "config.yaml"), "githubOwner: acme\n")
 	path := filepath.Join(sys.Home, "Overlord", "projects", "sample")

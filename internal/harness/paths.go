@@ -35,6 +35,10 @@ func SkillsDir(home string) string {
 	return filepath.Join(home, ".claude", "skills")
 }
 
+// ClaudeOwnedSkillEntries are entries of SkillsDir that belong to Claude Code
+// itself: claude.ai skill sync and its trash. Overlord never touches them.
+var ClaudeOwnedSkillEntries = map[string]bool{"synced": true, ".trash": true}
+
 // OpenCodeSkillsDir is OpenCode's own skills directory. OpenCode reads
 // SkillsDir too, so anything here is a stale copy.
 func OpenCodeSkillsDir(home string) string {

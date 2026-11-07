@@ -198,11 +198,34 @@ func TestSetupLeavesABlockWithoutAnEndMarkerUntouched(t *testing.T) {
 	}
 }
 
-func readFile(t *testing.T, path string) string {
-	t.Helper()
-	content, err := os.ReadFile(path)
+func TestSetupWarnsAboutTrackedFilesItsGitignoreBlockIgnoresAndLeavesThemTracked(t *testing.T) {
+	project := completeProject(t)
+	sys := newSystem(t, project)
+	runner := sys.Runner.(*fakeRunner)
+	runner.outputs[lsIgnored] = ".env\nnode_modules/left-pad/index.js\n"
+
+	stdout, code := run(t, sys, "setup")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0: tracked files are the Project's call\n%s", code, stdout)
+	}
+	assertContains(t, stdout, "  warning    .gitignore#general (tracked files it ignores, left tracked: .env, node_modules/left-pad/index.js)\n")
+	assertNoCall(t, runner, "git rm")
+}
+
+// The block goes first, so a Project's own lines, such as !.vscode/launch.json,
+// override it: git lets the last matching line decide.
+func TestSetupAddsTheGitignoreBlockBeforeAProjectsOwnLines(t *testing.T) {
+	project := t.TempDir()
+	mustWrite(t, filepath.Join(project, ".gitignore"), "/bin\n*.tmp\n")
+
+	if _, code := run(t, newSystem(t, project), "setup"); code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+
+	golden, err := os.ReadFile(filepath.Join("testdata", "empty-project", ".gitignore"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return string(content)
+	assertFile(t, filepath.Join(project, ".gitignore"), string(golden)+"\n/bin\n*.tmp\n")
 }

@@ -37,12 +37,13 @@ things or changing decided behaviour.
   (HTTP health checks), `Sleep` and `Stdout`/`Stderr`. Never call
   `os.UserHomeDir`, `os.Getenv`, `os.Getwd` or `os/exec` outside
   `internal/system`.
-- Tests drive commands through `cmd.Execute(sys, args)` with a temporary
-  `Home`, a temporary Project directory, a fake `Runner` and, for `start`, a
-  fake `Health`. Assert on the
-  resulting files, the output and the recorded commands, never on internal
-  calls. Never touch the real home directory, real Harness config or real
-  services in tests.
+- Command behaviour is tested through `cmd.Execute(sys, args)` with a
+  temporary `Home`, a temporary Project directory, a fake `Runner` and, for
+  `start`, a fake `Health`. Assert on the resulting files, the output and the
+  recorded commands, never on internal calls. `internal/harness`,
+  `internal/catalog` and `internal/system` have unit tests of their own.
+  Never touch the real home directory, real Harness config or real services
+  in tests.
 - Setup never edits text outside a Managed Block, and `--check` never writes.
 - What Setup guarantees is data in `internal/templates/manifest.yaml`; adding a
   guaranteed file is a manifest and Template change, not new code.
@@ -56,20 +57,27 @@ things or changing decided behaviour.
 - `internal/config`: Overlord's own config, `~/.config/overlord/config.yaml`.
   `Load(home)` returns it with paths absolute (defaults when the file is
   absent, never writes); `WriteDefault(home)` writes the defaults once.
+  An unknown key is an error, since the file is never rewritten and a
+  misspelt key would otherwise be ignored for good.
+  `Load` leaves `{t3Origin}` in health URLs; Start resolves it each run.
 - `internal/cmd`: thin Cobra wiring. Commands: `setup`, `sync`, `start`,
-  `doctor`, `new`.
+  `doctor`, `new`, and the temporary `revert` and `snapshot` (see
+  `internal/revert`).
 - `internal/templates`: embedded Templates and the Setup manifest
-  (`Manifest()` returns the guaranteed items and their strategy).
+  (`Manifest()` returns the guaranteed items and their strategy), and
+  `DetectLanguages`, the only language detector.
 - `internal/project`: Setup for one Project, and `Create` for `new`.
   `Check(ctx, runner, root, projectRoot, owner)` returns a `Plan` with a
-  `missing`, `stale`, `ok`, `conflict` or `warning` status per manifest item;
+  `missing`, `stale`, `ok`, `conflict` or `warning` status per manifest item
+  (`Apply` adds `failed`);
   languages are detected in `projectRoot`, files are written under `root`, and
   a Project without an origin is checked against `owner/<projectRoot's
-  directory name>` (ADR 0006). The `repo` item is the only one that runs
-  `git init`, `gh repo create` or `git push`; a repo `conflict` (Secret in
-  history, name taken on GitHub, inside another repository) becomes `failed`
-  in `Apply`. A `.gitignore` block row warns, listing the tracked files its
-  patterns ignore.
+  directory name>` (ADR 0006). Within Setup, the `repo` item is the only one
+  that runs `git init`, `gh repo create` or `git push`; `Create` (`overlord
+  new`) runs `gh repo create`, `gh repo clone` and `git push` itself, around
+  Setup. A repo `conflict` (Secret in history, name taken on GitHub, inside
+  another repository) becomes `failed` in `Apply`. A `.gitignore` block row
+  warns, listing the tracked files its patterns ignore.
   `Apply` tries every item and marks each one it cannot write `failed`, with
   the error as its detail; `setup` prints the whole plan, then exits 1 when
   `Plan.HasFailures`, and `Create` stops before committing. `Create` also
@@ -77,16 +85,18 @@ things or changing decided behaviour.
   since it has just created the origin; it passes `Apply` a sleep so a failing label lookup is
   retried while GitHub finishes creating the repository, where `setup` passes
   nil and warns at once. Before Setup, `Create` writes the `--lang` marker
-  file so the language is detected by `DetectLanguages`, the only detector.
+  file so `DetectLanguages` detects the language.
   `setup --check` exits 1 when `Plan.NeedsWork` (anything but `ok` or
   `warning`); `sync --check` likewise exits 1 when Sync would change anything
   or finds a conflict, but not for a `shadowed` skill.
-- `internal/catalog`: reads `~/.agents` (skills, Roles, global instructions).
+- `internal/catalog`: reads the agents directory (`~/.agents` by default, from
+  config): skills, Roles, global instructions and `UPSTREAM.md` (skill
+  provenance, read only by Doctor).
 - `internal/harness`: one adapter per Harness (paths, agent file format, model
-  config writer, hook installer).
+  config writer, hook installer); `harness.All` lists every Harness.
 - `internal/jsonedit`: in-place JSON edits that keep every other byte, shared
   by `internal/harness` and `internal/t3`.
-- `internal/machine`: Sync and Start.
+- `internal/machine`: Sync, Start and Doctor.
 - `internal/revert` (temporary, with the `revert` and `snapshot` commands): saves
   every path Sync or Start can change before the first change, and restores
   them. Its package comment lists how to remove it once v2 has proven itself.

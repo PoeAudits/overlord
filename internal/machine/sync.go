@@ -121,7 +121,7 @@ func syncSkills(run syncRun) ([]Result, error) {
 	linksDir := harness.SkillsDir(run.sys.Home)
 	var results []Result
 	for _, skill := range skills {
-		if protectedSkillEntries[skill.Name] {
+		if harness.ClaudeOwnedSkillEntries[skill.Name] {
 			continue
 		}
 		path := filepath.Join(linksDir, skill.Name)
@@ -164,7 +164,7 @@ func (run syncRun) removeDanglingSkillLinks(linksDir string) ([]Result, error) {
 	var results []Result
 	for _, entry := range entries {
 		path := filepath.Join(linksDir, entry.Name())
-		if protectedSkillEntries[entry.Name()] || entry.Type()&os.ModeSymlink == 0 {
+		if harness.ClaudeOwnedSkillEntries[entry.Name()] || entry.Type()&os.ModeSymlink == 0 {
 			continue
 		}
 		target, err := os.Readlink(path)
@@ -190,10 +190,6 @@ func (run syncRun) removeDanglingSkillLinks(linksDir string) ([]Result, error) {
 	}
 	return results, nil
 }
-
-// protectedSkillEntries are entries of ~/.claude/skills that belong to Claude
-// Code itself (claude.ai skill sync and its trash). Sync never touches them.
-var protectedSkillEntries = map[string]bool{"synced": true, ".trash": true}
 
 func syncInstructions(run syncRun) ([]Result, error) {
 	source := catalog.InstructionsPath(run.agentsDir)

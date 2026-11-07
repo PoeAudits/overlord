@@ -5,7 +5,11 @@ package templates
 import (
 	"bytes"
 	"embed"
+	"errors"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"text/template"
 
 	"gopkg.in/yaml.v3"
@@ -75,6 +79,26 @@ var Languages = []struct {
 	{Name: "TypeScript", Markers: []string{"package.json", "tsconfig.json"}},
 	{Name: "Python", Markers: []string{"pyproject.toml", "requirements.txt"}},
 	{Name: "Rust", Markers: []string{"Cargo.toml"}},
+}
+
+// DetectLanguages lists each language in Languages whose marker
+// file exists in projectRoot.
+func DetectLanguages(projectRoot string) ([]string, error) {
+	var found []string
+	for _, language := range Languages {
+		for _, marker := range language.Markers {
+			_, err := os.Stat(filepath.Join(projectRoot, marker))
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+			found = append(found, language.Name)
+			break
+		}
+	}
+	return found, nil
 }
 
 // Secrets are the .gitignore patterns of files that hold credentials, matched

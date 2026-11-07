@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/PoeAudits/overlord/internal/config"
 	"github.com/PoeAudits/overlord/internal/machine"
 	"github.com/PoeAudits/overlord/internal/revert"
 	"github.com/PoeAudits/overlord/internal/system"
@@ -33,10 +32,7 @@ from starting; start then exits non-zero too.`,
 			if _, err := revert.Save(sys); err != nil {
 				return err
 			}
-			if err := config.WriteDefault(sys.Home); err != nil {
-				return err
-			}
-			cfg, err := config.Load(sys.Home)
+			cfg, err := ensureConfig(sys.Home)
 			if err != nil {
 				return err
 			}

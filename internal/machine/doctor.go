@@ -12,8 +12,8 @@ import (
 
 	"github.com/PoeAudits/overlord/internal/catalog"
 	"github.com/PoeAudits/overlord/internal/harness"
-	"github.com/PoeAudits/overlord/internal/project"
 	"github.com/PoeAudits/overlord/internal/system"
+	"github.com/PoeAudits/overlord/internal/templates"
 )
 
 // Finding is one piece of drift doctor found at a path.
@@ -88,7 +88,7 @@ func findProjectsWithoutCI(projectsRoot string) ([]Finding, error) {
 			continue
 		}
 		root := filepath.Join(projectsRoot, entry.Name())
-		languages, err := project.DetectLanguages(root)
+		languages, err := templates.DetectLanguages(root)
 		if err != nil {
 			return nil, err
 		}
@@ -146,7 +146,7 @@ func findDanglingLinks(home string, found []Finding) ([]Finding, error) {
 		return nil, err
 	}
 	for _, entry := range entries {
-		if !protectedSkillEntries[entry.Name()] {
+		if !harness.ClaudeOwnedSkillEntries[entry.Name()] {
 			paths = append(paths, filepath.Join(linksDir, entry.Name()))
 		}
 	}
@@ -183,7 +183,7 @@ func findStaleSkillCopies(home, agentsDir string) []Finding {
 // Sync writes, whether or not a Role has its name.
 func findHandWrittenAgents(home string) ([]Finding, error) {
 	var findings []Finding
-	for _, h := range []harness.Harness{harness.Claude, harness.Codex, harness.OpenCode} {
+	for _, h := range harness.All {
 		dir := harness.GlobalAgentDir(h, home)
 		entries, err := os.ReadDir(dir)
 		if errors.Is(err, os.ErrNotExist) {

@@ -1,9 +1,6 @@
 package cmd_test
 
 import (
-	"context"
-	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -48,75 +45,6 @@ func TestSetupOnEmptyProjectCreatesEveryItemFromTheGoldenFiles(t *testing.T) {
 	if want := []string{project + ": git remote get-url origin", project + ": " + lsIgnored, project + ": " + labelList}; !reflect.DeepEqual(runner.calls, want) {
 		t.Fatalf("commands = %q, want %q", runner.calls, want)
 	}
-}
-
-// tree maps every regular file under root to its content, and every symlink
-// to "-> target", keyed by slash-separated relative path.
-func tree(t *testing.T, root string) map[string]string {
-	t.Helper()
-	files := map[string]string{}
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
-			return err
-		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		if entry.Type()&fs.ModeSymlink != 0 {
-			target, err := os.Readlink(path)
-			files[filepath.ToSlash(rel)] = "-> " + target
-			return err
-		}
-		content, err := os.ReadFile(path)
-		files[filepath.ToSlash(rel)] = string(content)
-		return err
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return files
-}
-
-func keys(files map[string]string) []string {
-	var names []string
-	for name := range files {
-		names = append(names, name)
-	}
-	return names
-}
-
-// fakeRunner records every command as "dir: name args" and answers from
-// outputs keyed by "name args"; unknown commands fail like a missing remote.
-// lsIgnored is the command Setup runs to find tracked files that the general
-// .gitignore block ignores. The fake fails it, as git does outside a
-// repository, unless a test gives it an output.
-const lsIgnored = "git ls-files --cached --ignored --exclude=.env --exclude=.env.* --exclude=!.env.example --exclude=!.env.sample --exclude=*.pass --exclude=*.pem --exclude=*.key --exclude=*.p12 --exclude=*.pfx --exclude=*.jks --exclude=*.keystore --exclude=id_rsa* --exclude=id_ed25519* --exclude=credentials*.json --exclude=service-account*.json --exclude=secrets.json --exclude=secrets.yaml --exclude=secrets.yml --exclude=secrets.toml --exclude=*.secret --exclude=.npmrc --exclude=.pypirc --exclude=node_modules/ --exclude=.venv/ --exclude=__pycache__/ --exclude=.DS_Store --exclude=*.log --exclude=.idea/ --exclude=.vscode/* --exclude=!.vscode/extensions.json --exclude=!.vscode/settings.json"
-
-type fakeRunner struct {
-	outputs map[string]string
-	// stderr makes a command fail with this stderr, carried in the error the
-	// way system.ExecRunner carries it.
-	stderr map[string]string
-	calls  []string
-}
-
-func (r *fakeRunner) Run(_ context.Context, dir, name string, args ...string) ([]byte, error) {
-	command := strings.Join(append([]string{name}, args...), " ")
-	r.calls = append(r.calls, dir+": "+command)
-	if stderr, ok := r.stderr[command]; ok {
-		return nil, errors.New("exit status 1: " + stderr)
-	}
-	output, ok := r.outputs[command]
-	if !ok && command == "git remote get-url origin" {
-		return []byte("error: No such remote 'origin'\n"), errors.New("exit status 2")
-	}
-	if !ok {
-		// Any command without an output fails, the way gh does when it is
-		// not logged in or offline.
-		return []byte("fake: command failed\n"), errors.New("exit status 1")
-	}
-	return []byte(output), nil
 }
 
 // nonGitHubOrigin is a runner for a Project whose origin is not on GitHub, so
@@ -348,10 +276,4 @@ func TestSetupLeavesAFileWhereADirectoryBelongsUntouched(t *testing.T) {
 	if want := "  conflict   .agents/skills (not a directory; left untouched)\n"; !strings.Contains(stdout, want) {
 		t.Fatalf("stdout lacks %q:\n%s", want, stdout)
 	}
-}
-
-func (r *fakeRunner) Launch(dir, logPath, name string, args ...string) error {
-	command := strings.Join(append([]string{name}, args...), " ")
-	r.calls = append(r.calls, dir+": launch "+logPath+": "+command)
-	return nil
 }

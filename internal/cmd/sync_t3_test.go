@@ -2,12 +2,9 @@ package cmd_test
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
-
-const setupScriptJSON = `{"id": "overlord-setup", "name": "Overlord setup", "command": "overlord setup", "icon": "configure", "runOnWorktreeCreate": true, "async": false}`
 
 func TestSyncRemovesTheRetiredSetupScriptAndKeepsEverythingElse(t *testing.T) {
 	sys := newSystem(t, t.TempDir())
@@ -110,27 +107,5 @@ func TestSyncDoesNotCreateT3Settings(t *testing.T) {
 	}
 	if _, err := os.Lstat(t3Settings(sys.Home)); err == nil {
 		t.Fatal("sync created T3's settings file")
-	}
-}
-
-func t3Settings(home string) string {
-	return filepath.Join(home, ".t3", "userdata", "settings.json")
-}
-
-func assertFile(t *testing.T, path, want string) {
-	t.Helper()
-	got, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != want {
-		t.Fatalf("%s:\n%s\nwant:\n%s", path, got, want)
-	}
-}
-
-func assertContains(t *testing.T, stdout, want string) {
-	t.Helper()
-	if !strings.Contains(stdout, want) {
-		t.Fatalf("stdout:\n%s\nwant it to contain:\n%s", stdout, want)
 	}
 }
