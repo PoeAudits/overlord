@@ -1,14 +1,11 @@
 package cmd_test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/PoeAudits/overlord/internal/system"
 )
 
 func TestStartFirstRunWritesTheDefaultConfigAndNeverRewritesIt(t *testing.T) {
@@ -26,68 +23,6 @@ func TestStartFirstRunWritesTheDefaultConfigAndNeverRewritesIt(t *testing.T) {
 	}
 	assertFile(t, configPath, "# edited by hand\nservices: []\n")
 }
-
-// defaultConfig is the config file a first run writes.
-const defaultConfig = `# Overlord's config. Written once with defaults; Overlord never rewrites it.
-#
-# agentsDir: the source of skills, Roles and global instructions for Sync.
-# projectsRoot: where overlord new clones new Projects.
-# githubOwner: the GitHub account or organisation overlord new creates
-# repositories under.
-# services: what start brings up, in order. A service is healthy when its
-# health URL answers with any HTTP status below 500. When it is not, start
-# runs command with sh -c, detached, output appended to
-# ~/.local/state/overlord/<name>.log, and waits up to timeout for health.
-# Set enabled: false to skip a service.
-# {t3Origin} in a health URL is replaced, each time start runs, with the
-# origin T3 Code's server last ran on (from
-# ~/.t3/userdata/server-runtime.json; http://127.0.0.1:3773 when absent).
-agentsDir: ~/.agents
-projectsRoot: ~/Overlord/projects
-githubOwner: PoeAudits
-services:
-  - name: t3
-    command: ~/.t3/bin/t3 service install
-    health: "{t3Origin}/.well-known/t3/environment"
-    timeout: 30s
-  - name: sleev
-    command: sleev gateway start
-    health: http://127.0.0.1:17321/__sleeve_local/health
-    timeout: 30s
-  - name: opencode
-    command: opencode serve --hostname 127.0.0.1 --port 4096
-    # /api/info answers 401 without the server password, which proves the
-    # API is up; other paths return the web page even when the API is broken.
-    health: http://127.0.0.1:4096/api/info
-    timeout: 30s
-`
-
-// startSystem is a System for start with a catalog in its HOME, a fake runner
-// and a health checker that answers with healthy.
-func startSystem(t *testing.T, healthy func(url string, calls int) bool) (system.System, *fakeRunner) {
-	t.Helper()
-	sys := newSystem(t, t.TempDir())
-	newAgentsDir(t, sys.Home, "tdd")
-	runner := &fakeRunner{}
-	sys.Runner = runner
-	sys.Health = &fakeHealth{healthy: healthy, calls: map[string]int{}}
-	sys.Sleep = func(time.Duration) {}
-	return sys, runner
-}
-
-// fakeHealth answers each check with healthy(url, n), where n counts the
-// checks of url so far, starting at 1.
-type fakeHealth struct {
-	healthy func(url string, calls int) bool
-	calls   map[string]int
-}
-
-func (h *fakeHealth) Healthy(_ context.Context, url string) bool {
-	h.calls[url]++
-	return h.healthy(url, h.calls[url])
-}
-
-func allHealthy(string, int) bool { return true }
 
 func TestStartWithEveryServiceHealthyAndTheAppRunningLaunchesNothing(t *testing.T) {
 	sys, runner := startSystem(t, allHealthy)

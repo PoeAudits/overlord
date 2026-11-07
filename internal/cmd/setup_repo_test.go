@@ -1,20 +1,19 @@
 package cmd_test
 
 import (
-	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
 
 const (
-	notFound     = "GraphQL: Could not resolve to a Repository with the name 'PoeAudits/sample'. (repository)"
-	repoView     = "gh repo view PoeAudits/sample --json isEmpty"
-	gitLog       = "git -c core.quotePath=false log --branches --tags --name-only --format="
-	branches     = "git for-each-ref --format=%(refname) refs/heads"
-	pushAll      = "git push -u origin refs/heads/*:refs/heads/* refs/tags/*:refs/tags/*"
-	sampleLabels = "gh label list --repo PoeAudits/sample --json name --limit 1000"
+	notFound = "GraphQL: Could not resolve to a Repository with the name 'PoeAudits/sample'. (repository)"
+	repoView = "gh repo view PoeAudits/sample --json isEmpty"
+	gitLog   = "git -c core.quotePath=false log --branches --tags --name-only --format="
+	branches = "git for-each-ref --format=%(refname) refs/heads"
+	pushAll  = "git push -u origin refs/heads/*:refs/heads/* refs/tags/*:refs/tags/*"
 )
 
 // noOrigin is a runner for the git repository at project with no origin
@@ -26,8 +25,8 @@ func noOrigin(project, history string) *fakeRunner {
 			gitLog:                          history,
 			branches:                        "refs/heads/main\nrefs/heads/feature\n",
 			"gh repo create PoeAudits/sample --private --source " + project + " --remote origin": "",
-			pushAll:      "",
-			sampleLabels: allTriageLabels,
+			pushAll:   "",
+			labelList: allTriageLabels,
 		},
 		stderr: map[string]string{repoView: notFound},
 	}
@@ -78,7 +77,7 @@ func TestSetupCreatesAPrivateRepositoryPushesEveryBranchAndTagThenCreatesLabels(
 		project + ": gh repo create PoeAudits/sample --private --source " + project + " --remote origin",
 		project + ": " + branches,
 		project + ": " + pushAll,
-		project + ": " + sampleLabels,
+		project + ": " + labelList,
 	}
 	if got := afterCall(runner.calls, project+": "+gitLog); !reflect.DeepEqual(got, want) {
 		t.Fatalf("commands after the history check:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
@@ -105,7 +104,7 @@ func TestSetupGitInitsADirectoryThatIsNotARepositoryAndPushesNothingWithoutBranc
 		project + ": git init",
 		project + ": gh repo create PoeAudits/sample --private --source " + project + " --remote origin",
 		project + ": " + branches,
-		project + ": " + sampleLabels,
+		project + ": " + labelList,
 	}
 	if got := afterCall(runner.calls, project+": git rev-parse --show-toplevel"); !reflect.DeepEqual(got, want) {
 		t.Fatalf("commands after the repository check:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
@@ -165,7 +164,7 @@ func TestSetupPushesToAnExistingEmptyRepositoryOfTheOwner(t *testing.T) {
 	}
 	assertContains(t, stdout, "  created    GitHub repository (the existing empty PoeAudits/sample, every branch and tag pushed)\n")
 	assertNoCall(t, runner, "gh repo create")
-	if !slicesContain(runner.calls, project+": "+pushAll) {
+	if !slices.Contains(runner.calls, project+": "+pushAll) {
 		t.Fatalf("no push in %q", runner.calls)
 	}
 }
@@ -186,38 +185,6 @@ func TestSetupLeavesAProjectInsideAnotherRepositoryWithoutAnOrigin(t *testing.T)
 	assertNoCall(t, runner, "gh repo")
 }
 
-func TestSetupWarnsAboutTrackedFilesItsGitignoreBlockIgnoresAndLeavesThemTracked(t *testing.T) {
-	project := completeProject(t)
-	sys := newSystem(t, project)
-	runner := sys.Runner.(*fakeRunner)
-	runner.outputs[lsIgnored] = ".env\nnode_modules/left-pad/index.js\n"
-
-	stdout, code := run(t, sys, "setup")
-
-	if code != 0 {
-		t.Fatalf("exit code = %d, want 0: tracked files are the Project's call\n%s", code, stdout)
-	}
-	assertContains(t, stdout, "  warning    .gitignore#general (tracked files it ignores, left tracked: .env, node_modules/left-pad/index.js)\n")
-	assertNoCall(t, runner, "git rm")
-}
-
-// The block goes first, so a Project's own lines, such as !.vscode/launch.json,
-// override it: git lets the last matching line decide.
-func TestSetupAddsTheGitignoreBlockBeforeAProjectsOwnLines(t *testing.T) {
-	project := t.TempDir()
-	mustWrite(t, filepath.Join(project, ".gitignore"), "/bin\n*.tmp\n")
-
-	if _, code := run(t, newSystem(t, project), "setup"); code != 0 {
-		t.Fatalf("exit code = %d, want 0", code)
-	}
-
-	golden, err := os.ReadFile(filepath.Join("testdata", "empty-project", ".gitignore"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertFile(t, filepath.Join(project, ".gitignore"), string(golden)+"\n/bin\n*.tmp\n")
-}
-
 // afterCall returns the calls after the first call equal to marker.
 func afterCall(calls []string, marker string) []string {
 	for i, call := range calls {
@@ -226,22 +193,4 @@ func afterCall(calls []string, marker string) []string {
 		}
 	}
 	return nil
-}
-
-func assertNoCall(t *testing.T, runner *fakeRunner, command string) {
-	t.Helper()
-	for _, call := range runner.calls {
-		if strings.Contains(call, ": "+command) {
-			t.Fatalf("ran %q", call)
-		}
-	}
-}
-
-func slicesContain(calls []string, call string) bool {
-	for _, c := range calls {
-		if c == call {
-			return true
-		}
-	}
-	return false
 }

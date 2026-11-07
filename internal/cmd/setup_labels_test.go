@@ -8,11 +8,6 @@ import (
 	"testing"
 )
 
-const (
-	labelList       = "gh label list --repo PoeAudits/sample --json name --limit 1000"
-	allTriageLabels = `[{"name":"needs-triage"},{"name":"needs-info"},{"name":"ready-for-agent"},{"name":"ready-for-human"},{"name":"wontfix"}]`
-)
-
 func TestSetupCreatesOnlyTheMissingTriageLabels(t *testing.T) {
 	project := t.TempDir()
 	sys := newSystem(t, project)

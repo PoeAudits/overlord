@@ -275,18 +275,6 @@ func TestSyncQuietPrintsOnlyWhatNeedsTheUser(t *testing.T) {
 	}
 }
 
-// newAgentsDir creates home/.agents with one skill directory per name and the
-// global AGENTS.md, and returns its path.
-func newAgentsDir(t *testing.T, home string, skills ...string) string {
-	t.Helper()
-	agents := filepath.Join(home, ".agents")
-	for _, name := range skills {
-		mustWrite(t, filepath.Join(agents, "skills", name, "SKILL.md"), "# "+name+"\n")
-	}
-	mustWrite(t, filepath.Join(agents, "AGENTS.md"), "# Global rules\n")
-	return agents
-}
-
 // hookLines is the report of the hooks step when every hook has the given
 // action label.
 func hookLines(label string) string {
@@ -300,17 +288,6 @@ func instructionPaths(home string) []string {
 		filepath.Join(home, ".claude", "CLAUDE.md"),
 		filepath.Join(home, ".codex", "AGENTS.md"),
 		filepath.Join(home, ".config", "opencode", "AGENTS.md"),
-	}
-}
-
-func assertLink(t *testing.T, path, target string) {
-	t.Helper()
-	got, err := os.Readlink(path)
-	if err != nil {
-		t.Fatalf("%s is not a symlink: %v", path, err)
-	}
-	if got != target {
-		t.Fatalf("%s -> %s, want -> %s", path, got, target)
 	}
 }
 

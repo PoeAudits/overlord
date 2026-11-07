@@ -3,7 +3,6 @@ package cmd_test
 import (
 	"encoding/json"
 	"maps"
-	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -167,7 +166,7 @@ func TestDoctorReportsEachDriftConditionAndWritesNothing(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			sys := syncedHome(t)
 			c.drift(t, sys.Home)
-			before := homeFiles(t, sys.Home)
+			before := tree(t, sys.Home)
 
 			stdout, stderr, code := runCapturing(sys.System, "doctor")
 
@@ -180,15 +179,8 @@ func TestDoctorReportsEachDriftConditionAndWritesNothing(t *testing.T) {
 			if stdout != "Doctor found drift\n"+c.want {
 				t.Errorf("stdout:\n%s\nwant:\nDoctor found drift\n%s", stdout, c.want)
 			}
-			assertUnchanged(t, before, homeFiles(t, sys.Home))
+			assertUnchanged(t, before, tree(t, sys.Home))
 		})
-	}
-}
-
-func mustRemove(t *testing.T, path string) {
-	t.Helper()
-	if err := os.RemoveAll(path); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -277,12 +269,5 @@ func TestDoctorUsesTheAgentsDirFromOverlordsConfig(t *testing.T) {
 
 	if code != 0 || stdout != "Doctor: no drift found\n" {
 		t.Fatalf("exit code = %d, stdout:\n%s", code, stdout)
-	}
-}
-
-func mustSymlink(t *testing.T, target, path string) {
-	t.Helper()
-	if err := os.Symlink(target, path); err != nil {
-		t.Fatal(err)
 	}
 }

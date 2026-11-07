@@ -10,9 +10,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/PoeAudits/overlord/internal/cmd"
-	"github.com/PoeAudits/overlord/internal/system"
 )
 
 // cloneRunner answers like fakeRunner, and also acts like the real tools
@@ -153,15 +150,14 @@ func TestNewProjectRefusesAMissingOrUnknownLanguageBeforeAnyRemoteCall(t *testin
 			sys := newSystem(t, t.TempDir())
 			runner := newProjectRunner(t, sys.Home, "sample")
 			sys.Runner = runner
-			var stderr strings.Builder
 
-			code := cmdExecute(sys, &stderr, tt.args...)
+			_, stderr, code := runCapturing(sys, tt.args...)
 
 			if code == 0 || len(runner.calls) != 0 {
 				t.Fatalf("exit code = %d, commands %q; want non-zero and none", code, runner.calls)
 			}
-			if stderr.String() != tt.want {
-				t.Fatalf("stderr = %q, want %q", stderr.String(), tt.want)
+			if stderr != tt.want {
+				t.Fatalf("stderr = %q, want %q", stderr, tt.want)
 			}
 		})
 	}
@@ -254,9 +250,8 @@ func TestNewProjectRefusesAnExistingDirectoryBeforeAnyRemoteCall(t *testing.T) {
 	runner := newProjectRunner(t, sys.Home, "sample")
 	sys.Runner = runner
 	mustMkdir(t, runner.clonePath)
-	var stderr strings.Builder
 
-	code := cmdExecute(sys, &stderr, "new", "sample", "--lang", "go")
+	_, stderr, code := runCapturing(sys, "new", "sample", "--lang", "go")
 
 	if code == 0 {
 		t.Fatal("exit code = 0, want non-zero")
@@ -264,8 +259,8 @@ func TestNewProjectRefusesAnExistingDirectoryBeforeAnyRemoteCall(t *testing.T) {
 	if len(runner.calls) != 0 {
 		t.Fatalf("commands ran: %q", runner.calls)
 	}
-	if want := runner.clonePath + " already exists"; !strings.Contains(stderr.String(), want) {
-		t.Fatalf("stderr = %q, want it to contain %q", stderr.String(), want)
+	if want := runner.clonePath + " already exists"; !strings.Contains(stderr, want) {
+		t.Fatalf("stderr = %q, want it to contain %q", stderr, want)
 	}
 }
 
@@ -274,9 +269,8 @@ func TestNewProjectStopsAtTheFirstFailingRemoteStep(t *testing.T) {
 	runner := newProjectRunner(t, sys.Home, "sample")
 	delete(runner.outputs, "git push -u origin HEAD")
 	sys.Runner = runner
-	var stderr strings.Builder
 
-	code := cmdExecute(sys, &stderr, "new", "sample", "--lang", "go")
+	_, stderr, code := runCapturing(sys, "new", "sample", "--lang", "go")
 
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
@@ -285,8 +279,8 @@ func TestNewProjectStopsAtTheFirstFailingRemoteStep(t *testing.T) {
 		t.Fatalf("last command = %q, want the push; t3 registration must not run", last)
 	}
 	want := "overlord: git push -u origin HEAD failed: fake: command failed\n"
-	if stderr.String() != want {
-		t.Fatalf("stderr = %q, want %q", stderr.String(), want)
+	if stderr != want {
+		t.Fatalf("stderr = %q, want %q", stderr, want)
 	}
 }
 
@@ -333,13 +327,6 @@ func TestNewProjectPublicWithDescriptionPassesBothToGitHub(t *testing.T) {
 	if runner.calls[0] != want {
 		t.Fatalf("first command = %q, want %q", runner.calls[0], want)
 	}
-}
-
-// cmdExecute runs overlord with stderr captured in stderr.
-func cmdExecute(sys system.System, stderr *strings.Builder, args ...string) int {
-	sys.Stdout = &strings.Builder{}
-	sys.Stderr = stderr
-	return cmd.Execute(sys, args)
 }
 
 func TestNewProjectClonesUnderTheProjectsRootFromOverlordsConfig(t *testing.T) {

@@ -7,9 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/PoeAudits/overlord/internal/cmd"
-	"github.com/PoeAudits/overlord/internal/system"
 )
 
 func TestSetupCheckOnEmptyProjectListsEveryItemMissingFailsAndWritesNothing(t *testing.T) {
@@ -156,70 +153,8 @@ func TestSetupCheckProjectRoot(t *testing.T) {
 	}
 }
 
-// completeProject returns a Project directory that already has every item:
-// a copy of the golden files for Setup on an empty Project.
-func completeProject(t *testing.T) string {
-	t.Helper()
-	project := t.TempDir()
-	if err := os.CopyFS(project, os.DirFS(filepath.Join("testdata", "empty-project"))); err != nil {
-		t.Fatal(err)
-	}
-	return project
-}
-
 func jsonEqual(a, b any) bool {
 	left, _ := json.Marshal(a)
 	right, _ := json.Marshal(b)
 	return bytes.Equal(left, right)
-}
-
-// newSystem returns a System with a temporary HOME, no environment, the given
-// working directory and a runner that reports the PoeAudits/sample GitHub
-// origin with every triage label present.
-func newSystem(t *testing.T, workdir string) system.System {
-	t.Helper()
-	return system.System{
-		Home:    t.TempDir(),
-		Getenv:  func(string) string { return "" },
-		Workdir: workdir,
-		Runner: &fakeRunner{outputs: map[string]string{
-			"git remote get-url origin": "git@github.com:PoeAudits/sample.git\n",
-			labelList:                   allTriageLabels,
-		}},
-	}
-}
-
-func run(t *testing.T, sys system.System, args ...string) (string, int) {
-	t.Helper()
-	stdout, stderr, code := runCapturing(sys, args...)
-	if stderr != "" {
-		t.Logf("stderr: %s", stderr)
-	}
-	return stdout, code
-}
-
-// runCapturing runs overlord and returns its stdout, stderr and exit code.
-func runCapturing(sys system.System, args ...string) (stdout, stderr string, code int) {
-	var out, errOut bytes.Buffer
-	sys.Stdout = &out
-	sys.Stderr = &errOut
-	code = cmd.Execute(sys, args)
-	return out.String(), errOut.String(), code
-}
-
-func mustMkdir(t *testing.T, path string) {
-	t.Helper()
-	if err := os.MkdirAll(path, 0o755); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func mustWrite(t *testing.T, path, content string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
 }
